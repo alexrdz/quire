@@ -1,0 +1,8 @@
+@layer base, layouts, components, sticker, bookbinder, utilities;
+
+@import './lib/styles/layers/base.css' layer(base);
+@import './lib/styles/layers/layouts.css' layer(layouts);
+@import './lib/styles/layers/components.css' layer(components);
+@import './lib/styles/layers/sticker.css' layer(sticker);
+@import './lib/styles/layers/bookbinder.css' layer(bookbinder);
+@import './lib/styles/layers/utilities.css' layer(utilities);

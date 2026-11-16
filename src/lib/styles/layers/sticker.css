@@ -1,0 +1,41 @@
+/* Sticker QR Layouts (Print and Screen) */
+.sticker-sheet {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 2rem;
+	background: #000000;
+}
+
+.sticker-badge {
+	inline-size: 280px;
+	block-size: 280px;
+	background: var(--ink);
+	border: 4px solid var(--highlight);
+	border-radius: 24px;
+	padding: 1.5rem;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: space-between;
+	text-align: center;
+	box-shadow: 0 8px 32px rgba(1, 255, 195, 0.2);
+}
+
+.sticker-qr-svg {
+	inline-size: 160px;
+	block-size: 160px;
+	border-radius: 8px;
+	background: #FFFFFF;
+	padding: 8px;
+}
+
+.sticker-caption {
+	font-family: var(--font-mono);
+	font-size: 0.75rem;
+	font-weight: 700;
+	color: var(--highlight);
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+}

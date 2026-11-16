@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <script id="aura-preview-performance-controller">
+    (function () {
+      if (window.__auraPreviewPerformanceController) return;
+      const nativeRequestAnimationFrame = window.requestAnimationFrame
+        ? window.requestAnimationFrame.bind(window)
+        : function (callback) { return window.setTimeout(function () { callback(Date.now()); }, 16); };
+      const nativeCancelAnimationFrame = window.cancelAnimationFrame
+        ? window.cancelAnimationFrame.bind(window)
+        : window.clearTimeout.bind(window);
+      const nativeSetInterval = window.setInterval.bind(window);
+      let paused = false;
+      let nextFrameId = 1;
+      const frameRecords = new Map();
+      const pausedFrameCallbacks = new Map();
+      const style = document.createElement('style');
+      style.id = 'aura-preview-performance-style';
+      style.textContent = [
+        'html[data-aura-preview-paused="true"] *,',
+        'html[data-aura-preview-paused="true"] *::before,',
+        'html[data-aura-preview-paused="true"] *::after {',
+        '  animation-play-state: paused !important;',
+        '  transition-duration: 0s !important;',
+        '  scroll-behavior: auto !important;',
+        '}'
+      ].join('\n');
+      document.head.appendChild(style);
+      window.requestAnimationFrame = function (callback) {
+        const frameId = nextFrameId++;
+        if (paused) {
+          pausedFrameCallbacks.set(frameId, callback);
+          frameRecords.set(frameId, { paused: true });
+          return frameId;
+        }
+        const nativeFrameId = nativeRequestAnimationFrame(function (timestamp) {
+          frameRecords.delete(frameId);
+          callback(timestamp);
+        });
+        frameRecords.set(frameId, { nativeFrameId: nativeFrameId });
+        return frameId;
+      };
+      window.cancelAnimationFrame = function (frameId) {
+        const record = frameRecords.get(frameId);
+        pausedFrameCallbacks.delete(frameId);
+        if (record && typeof record.nativeFrameId !== 'undefined') {
+          nativeCancelAnimationFrame(record.nativeFrameId);
+        }
+        frameRecords.delete(frameId);
+      };
+      window.setInterval = function (callback, delay) {
+        const args = Array.prototype.slice.call(arguments, 2);
+        return nativeSetInterval(function () {
+          if (paused) return;
+          callback.apply(this, args);
+        }, delay);
+      };
+      const flushPausedFrames = function () {
+        const callbacks = Array.from(pausedFrameCallbacks.entries());
+        pausedFrameCallbacks.clear();
+        callbacks.forEach(function (entry) {
+          const frameId = entry[0];
+          const callback = entry[1];
+          const nativeFrameId = nativeRequestAnimationFrame(function (timestamp) {
+            frameRecords.delete(frameId);
+            callback(timestamp);
+          });
+          frameRecords.set(frameId, { nativeFrameId: nativeFrameId });
+        });
+      };
+      const setPaused = function (nextPaused) {
+        const shouldPause = Boolean(nextPaused);
+        if (paused === shouldPause) return;
+        paused = shouldPause;
+        document.documentElement.toggleAttribute('data-aura-preview-paused', paused);
+        if (!paused) {
+          flushPausedFrames();
+        }
+      };
+      window.__auraPreviewPerformanceController = {
+        setPaused: setPaused,
+        get paused() {
+          return paused;
+        }
+      };
+      window.addEventListener('message', function (event) {
+        if (event.source !== window.parent) return;
+        if (!event.data || event.data.type !== 'aura-preview-performance-mode') return;
+        setPaused(event.data.paused);
+      });
+    })();
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>The Green Room | Artist Feed</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #000;
+      -webkit-font-smoothing: antialiased;
+      overscroll-behavior-y: none;
+    }
+
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    .glass-panel {
+      background: rgba(21, 17, 36, 0.6);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .glass-drawer {
+      background: rgba(9, 7, 16, 0.85);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+    }
+
+    /* Smooth out numeric inputs */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+  </style>
+  <script>document.addEventListener('click', event => {
+      const anchor = event.target.closest?.('a[href]');
+      const href = anchor?.getAttribute('href');
+      if (event.defaultPrevented || !href?.startsWith('#')) return;
+      event.preventDefault();
+      // Hash routers need a real hashchange in this frame. Letting the anchor
+      // navigate normally would resolve against the parent URL of srcdoc.
+      if (href.startsWith('#/') || href.startsWith('#!/')) {
+        window.location.hash = href;
+        return;
+      }
+      if (href === '#') { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+      try {
+        const id = decodeURIComponent(href.slice(1));
+        const target = document.getElementById(id) || document.getElementsByName(id)[0];
+        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch { /* Invalid fragments remain in the saved document. */ }
+    });</script>
+  <script>document.addEventListener('click', event => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const anchor = event.target.closest?.('a[href]');
+      if (!anchor || anchor.hasAttribute('download')) return;
+      const target = anchor.getAttribute('target')?.toLowerCase();
+      if (target && target !== '_self' && target !== '_top') return;
+      try {
+        const destination = new URL(anchor.href, document.baseURI);
+        const base = new URL(document.baseURI);
+        if (!['http:', 'https:'].includes(destination.protocol) || destination.origin === base.origin) return;
+        event.preventDefault();
+        window.open(destination.href, '_blank', 'noopener,noreferrer');
+      } catch { /* Leave invalid links to the browser. */ }
+    }, true);</script>
+</head>
+
+<body class="text-zinc-100 flex items-center justify-center min-h-screen">
+  <!-- App Container constraints for desktop, full for mobile -->
+  <div id="app"
+    class="relative w-full max-w-md h-dvh bg-[#090710] overflow-hidden flex flex-col shadow-2xl sm:border sm:border-white/10 sm:rounded-2xl">
+    <!-- Header -->
+    <header
+      class="absolute top-0 inset-x-0 z-40 flex items-center justify-between px-5 py-4 bg-gradient-to-b from-[#090710]/80 to-transparent pointer-events-none">
+      <div class="text-sm font-semibold tracking-tight text-[#05D9E8] pointer-events-auto">
+        TGR.
+      </div>
+      <button id="auth-status-btn"
+        class="pointer-events-auto text-xs font-medium tracking-wide text-zinc-300 hover:text-white transition-colors bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/5">
+        Log In
+      </button>
+    </header>
+
+    <!-- Main Feed -->
+    <main
+      class="flex-1 h-full snap-mandatory hide-scrollbar pb-[env(safe-area-inset-bottom)] flex overflow-x-scroll snap-x">
+      <!-- Post 1 -->
+      <article class="relative h-full w-full snap-start snap-always bg-[#090710] shrink-0">
+        <!-- Media -->
+        <div class="absolute inset-0 bg-cover bg-center transition-opacity duration-300 post-media cursor-pointer"
+          style="background-image: url('https://images.unsplash.com/photo-1598387181032-a3103a2db5b3?auto=format&amp;fit=crop&amp;q=80&amp;w=800');"
+          onclick="togglePlay(this)">
+          <div class="absolute inset-0 bg-black/20"></div>
+        </div>
+
+        <!-- Play Indicator -->
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div
+            class="play-indicator w-16 h-16 rounded-full glass-panel flex items-center justify-center border border-white/10 text-white transition-all duration-300 opacity-0 scale-90">
+            <iconify-icon icon="solar:play-linear" class="text-3xl" stroke-width="1.5"></iconify-icon>
+          </div>
+        </div>
+
+        <!-- Content Overlay -->
+        <div
+          class="absolute inset-x-0 bottom-0 pt-32 pb-6 px-5 bg-gradient-to-t from-[#090710] via-[#090710]/80 to-transparent pointer-events-none flex flex-col justify-end">
+          <div class="pointer-events-auto">
+            <div class="flex items-center gap-2 mb-3">
+              <span
+                class="text-xs font-medium text-[#01FFC3] bg-[#01FFC3]/10 border border-[#01FFC3]/20 px-2 py-0.5 rounded-md backdrop-blur-sm">
+                OCT 12
+              </span>
+              <span
+                class="text-xs font-medium text-zinc-300 bg-white/5 border border-white/10 px-2 py-0.5 rounded-md backdrop-blur-sm">
+                DETROIT
+              </span>
+              <span class="text-xs font-medium text-[#05D9E8] ml-auto">
+                00:00 / 03:42
+              </span>
+            </div>
+            <h2 class="text-2xl font-semibold tracking-tight text-white mb-1.5 drop-shadow-md">
+              Studio Session 04
+            </h2>
+            <p class="text-sm text-zinc-300 leading-relaxed max-w-[90%] drop-shadow-sm">
+              Rough mix of the new bridge. Needs more fuzz.
+            </p>
+          </div>
+
+          <!-- Actions -->
+          <div class="grid grid-cols-2 gap-3 mt-5 pointer-events-auto">
+            <button
+              class="tip-trigger glass-panel border border-white/10 hover:border-[#FF2A6D]/50 rounded-xl h-12 flex items-center justify-center gap-2 text-sm font-medium transition-all group"
+              data-post="1">
+              <iconify-icon icon="solar:star-fall-linear"
+                class="text-xl text-[#FF2A6D] group-hover:scale-110 transition-transform"
+                stroke-width="1.5"></iconify-icon>
+              Support
+            </button>
+            <button
+              class="comment-trigger glass-panel border border-white/10 hover:border-white/30 rounded-xl h-12 flex items-center justify-center gap-2 text-sm font-medium transition-all group"
+              data-post="1">
+              <iconify-icon icon="solar:chat-round-dots-linear"
+                class="text-xl text-zinc-300 group-hover:scale-110 transition-transform"
+                stroke-width="1.5"></iconify-icon>
+              24
+            </button>
+          </div>
+        </div>
+      </article>
+
+      <!-- Post 2 -->
+      <article class="relative h-full w-full snap-start snap-always bg-[#090710] shrink-0">
+        <div class="absolute inset-0 bg-cover bg-center"
+          style="background-image: url('https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&amp;fit=crop&amp;q=80&amp;w=800');">
+          <div class="absolute inset-0 bg-black/10"></div>
+        </div>
+
+        <div
+          class="absolute top-16 right-5 bg-white/10 backdrop-blur-md border border-white/20 text-white text-xs font-medium px-2.5 py-1 rounded-md tracking-wide">
+          IMAGE
+        </div>
+
+        <div
+          class="absolute inset-x-0 bottom-0 pt-32 pb-6 px-5 bg-gradient-to-t from-[#090710] via-[#090710]/80 to-transparent flex flex-col justify-end">
+          <div>
+            <div class="flex items-center gap-2 mb-3">
+              <span
+                class="text-xs font-medium text-[#01FFC3] bg-[#01FFC3]/10 border border-[#01FFC3]/20 px-2 py-0.5 rounded-md backdrop-blur-sm">
+                OCT 10
+              </span>
+              <span
+                class="text-xs font-medium text-zinc-300 bg-white/5 border border-white/10 px-2 py-0.5 rounded-md backdrop-blur-sm">
+                CHICAGO
+              </span>
+            </div>
+            <h2 class="text-2xl font-semibold tracking-tight text-white mb-1.5 drop-shadow-md">
+              Tour Diary: CHI
+            </h2>
+            <p class="text-sm text-zinc-300 leading-relaxed max-w-[90%] drop-shadow-sm">
+              Sold out the Metro. You animals.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 mt-5">
+            <button
+              class="tip-trigger glass-panel border border-white/10 hover:border-[#FF2A6D]/50 rounded-xl h-12 flex items-center justify-center gap-2 text-sm font-medium transition-all group"
+              data-post="2">
+              <iconify-icon icon="solar:star-fall-linear"
+                class="text-xl text-[#FF2A6D] group-hover:scale-110 transition-transform"
+                stroke-width="1.5"></iconify-icon>
+              Support
+            </button>
+            <button
+              class="comment-trigger glass-panel border border-white/10 hover:border-white/30 rounded-xl h-12 flex items-center justify-center gap-2 text-sm font-medium transition-all group"
+              data-post="2">
+              <iconify-icon icon="solar:chat-round-dots-linear"
+                class="text-xl text-zinc-300 group-hover:scale-110 transition-transform"
+                stroke-width="1.5"></iconify-icon>
+              89
+            </button>
+          </div>
+        </div>
+      </article>
+      <article
+        class="relative h-full w-full snap-start snap-always bg-[#090710] flex flex-col pt-20 pb-6 px-5 shrink-0">
+        <div class="absolute inset-0 bg-gradient-to-br from-[#151124] to-[#090710]"></div>
+
+        <div class="relative flex-1 overflow-y-auto hide-scrollbar flex flex-col z-10 pb-20">
+          <div class="flex items-center gap-2 mb-4 shrink-0">
+            <span
+              class="text-xs font-medium text-[#01FFC3] bg-[#01FFC3]/10 border border-[#01FFC3]/20 px-2 py-0.5 rounded-md backdrop-blur-sm">
+              OCT 14
+            </span>
+            <span
+              class="text-xs font-medium text-zinc-300 bg-white/5 border border-white/10 px-2 py-0.5 rounded-md backdrop-blur-sm">
+              UPDATE
+            </span>
+          </div>
+          <h2 class="text-3xl font-semibold tracking-tight text-white mb-6 drop-shadow-md shrink-0">
+            Thoughts on the New Record
+          </h2>
+
+          <div class="text-zinc-300 text-[15px] leading-relaxed space-y-5">
+            <p>
+              Been locked in the studio for the last three weeks. The energy
+              here is different. We stripped back a lot of the heavy
+              production we leaned on for the last album. Everything feels
+              more raw, more intentional.
+            </p>
+            <p>
+              Yesterday, we recorded this acoustic progression that just came
+              out of nowhere. No click track, just playing to the room. It has
+              this haunting quality that I can't seem to shake. I think it's
+              going to be the opening track.
+            </p>
+            <p>
+              I want this record to feel like you're sitting in the room with
+              us. No polish, just the truth. Thanks to everyone who's been
+              supporting the process. Your messages keep us going when the 3
+              AM burnout hits.
+            </p>
+            <p>
+              More updates soon. Might drop a rough demo of that acoustic
+              track later this week if we can get the mix right. We're
+              experimenting with some analog synths for the bridge section.
+            </p>
+          </div>
+        </div>
+
+        <!-- Actions Overlay -->
+        <div
+          class="absolute inset-x-0 bottom-0 pt-20 pb-6 px-5 bg-gradient-to-t from-[#090710] via-[#090710]/95 to-transparent pointer-events-none flex flex-col justify-end z-20">
+          <div class="grid grid-cols-2 gap-3 pointer-events-auto">
+            <button
+              class="tip-trigger glass-panel border border-white/10 hover:border-[#FF2A6D]/50 rounded-xl h-12 flex items-center justify-center gap-2 text-sm font-medium transition-all group"
+              data-post="3">
+              <iconify-icon icon="solar:star-fall-linear"
+                class="text-xl text-[#FF2A6D] group-hover:scale-110 transition-transform"
+                stroke-width="1.5"></iconify-icon>
+              Support
+            </button>
+            <button
+              class="comment-trigger glass-panel border border-white/10 hover:border-white/30 rounded-xl h-12 flex items-center justify-center gap-2 text-sm font-medium transition-all group"
+              data-post="3">
+              <iconify-icon icon="solar:chat-round-dots-linear"
+                class="text-xl text-zinc-300 group-hover:scale-110 transition-transform"
+                stroke-width="1.5"></iconify-icon>
+              156
+            </button>
+          </div>
+        </div>
+      </article>
+      <article
+        class="relative h-full w-full snap-start snap-always bg-[#090710] flex flex-col pt-20 pb-6 px-5 shrink-0">
+        <div class="absolute inset-0 bg-gradient-to-b from-[#151124]/60 to-[#090710]"></div>
+
+        <div class="relative flex flex-col h-full z-10">
+          <!-- Guestbook Header -->
+          <div class="mb-6 shrink-0">
+            <div class="flex items-center gap-2 mb-3">
+              <span
+                class="text-xs font-medium text-[#05D9E8] bg-[#05D9E8]/10 border border-[#05D9E8]/20 px-2 py-0.5 rounded-md backdrop-blur-sm">
+                COMMUNITY
+              </span>
+            </div>
+            <h2 class="text-3xl font-semibold tracking-tight text-white drop-shadow-md">
+              Digital Guestbook
+            </h2>
+            <p class="text-sm text-zinc-400 mt-2">
+              Read the wall or leave your own mark.
+            </p>
+          </div>
+
+          <!-- Guestbook Messages -->
+          <div class="flex-1 overflow-y-auto hide-scrollbar pb-24 flex flex-col gap-6"
+            style="-webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%); mask-image: linear-gradient(to bottom, black 70%, transparent 100%);">
+            <!-- Fan Post 1 -->
+            <div class="flex gap-3">
+              <div
+                class="w-8 h-8 rounded-full bg-gradient-to-tr from-[#01FFC3] to-emerald-600 flex-shrink-0 opacity-90 flex items-center justify-center text-xs font-bold text-black">
+                JD
+              </div>
+              <div class="flex-1">
+                <div class="flex items-baseline gap-2 mb-1.5">
+                  <span class="text-xs font-semibold text-white">
+                    johndoe_99
+                  </span>
+                  <span class="text-[10px] text-zinc-500">Oct 15</span>
+                </div>
+                <p
+                  class="text-sm text-zinc-300 bg-white/5 border border-white/10 rounded-2xl rounded-tl-sm p-3 backdrop-blur-sm">
+                  Saw you guys in Chicago! That new track blew my mind. When
+                  is it dropping on streaming?
+                </p>
+
+                <!-- Artist Reply -->
+                <div class="flex gap-3 mt-3">
+                  <div
+                    class="w-6 h-6 rounded-full bg-[#05D9E8] flex-shrink-0 flex items-center justify-center text-black">
+                    <iconify-icon icon="solar:verified-check-bold" class="text-sm"></iconify-icon>
+                  </div>
+                  <div class="flex-1">
+                    <div class="flex items-baseline gap-2 mb-1.5">
+                      <span class="text-[11px] font-semibold text-[#05D9E8]">
+                        TGR (Artist)
+                      </span>
+                      <span class="text-[9px] text-zinc-500">Oct 16</span>
+                    </div>
+                    <p
+                      class="text-[13px] text-zinc-300 bg-[#05D9E8]/10 border border-[#05D9E8]/20 rounded-2xl rounded-tl-sm p-2.5 backdrop-blur-sm">
+                      Thanks man! We're aiming for late November. Still
+                      tweaking the mix on the bridge.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fan Post 2 -->
+            <div class="flex gap-3">
+              <div
+                class="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex-shrink-0 opacity-90 flex items-center justify-center text-xs font-bold text-white">
+                SJ
+              </div>
+              <div class="flex-1">
+                <div class="flex items-baseline gap-2 mb-1.5">
+                  <span class="text-xs font-semibold text-white">
+                    sarahj_music
+                  </span>
+                  <span class="text-[10px] text-zinc-500">Oct 14</span>
+                </div>
+                <p
+                  class="text-sm text-zinc-300 bg-white/5 border border-white/10 rounded-2xl rounded-tl-sm p-3 backdrop-blur-sm">
+                  The merch line was insane but the hoodie is 100% worth it.
+                  So cozy.
+                </p>
+
+                <div class="flex gap-3 mt-3">
+                  <div
+                    class="w-6 h-6 rounded-full bg-[#05D9E8] flex-shrink-0 flex items-center justify-center text-black">
+                    <iconify-icon icon="solar:verified-check-bold" class="text-sm"></iconify-icon>
+                  </div>
+                  <div class="flex-1">
+                    <div class="flex items-baseline gap-2 mb-1.5">
+                      <span class="text-[11px] font-semibold text-[#05D9E8]">
+                        TGR (Artist)
+                      </span>
+                      <span class="text-[9px] text-zinc-500">Oct 14</span>
+                    </div>
+                    <p
+                      class="text-[13px] text-zinc-300 bg-[#05D9E8]/10 border border-[#05D9E8]/20 rounded-2xl rounded-tl-sm p-2.5 backdrop-blur-sm">
+                      Appreciate you waiting in that! We honestly didn't
+                      expect it to sell out that fast.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fan Post 3 -->
+            <div class="flex gap-3">
+              <div
+                class="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-500 to-red-500 flex-shrink-0 opacity-90 flex items-center justify-center text-xs font-bold text-white">
+                MK
+              </div>
+              <div class="flex-1">
+                <div class="flex items-baseline gap-2 mb-1.5">
+                  <span class="text-xs font-semibold text-white">
+                    mike_keys
+                  </span>
+                  <span class="text-[10px] text-zinc-500">Oct 12</span>
+                </div>
+                <p
+                  class="text-sm text-zinc-300 bg-white/5 border border-white/10 rounded-2xl rounded-tl-sm p-3 backdrop-blur-sm">
+                  What synth did you use on the intro of Track 4? Sounds like
+                  a Prophet but I can't tell.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions Overlay -->
+        <div class="absolute inset-x-0 bottom-0 pt-20 pb-6 px-5 pointer-events-none flex flex-col justify-end z-20">
+          <div class="pointer-events-auto w-full">
+            <button
+              class="comment-trigger w-full glass-panel border border-white/10 hover:border-[#05D9E8]/50 bg-[#090710]/80 hover:bg-[#151124]/90 rounded-xl h-12 flex items-center justify-center gap-2 text-sm font-medium transition-all group shadow-[0_0_20px_rgba(5,217,232,0.1)]"
+              data-post="4">
+              <iconify-icon icon="solar:pen-new-square-linear"
+                class="text-xl text-[#05D9E8] group-hover:scale-110 transition-transform"
+                stroke-width="1.5"></iconify-icon>
+              Sign the Guestbook
+            </button>
+          </div>
+        </div>
+      </article>
+    </main>
+
+    <!-- Global Scrim -->
+    <div id="scrim"
+      class="absolute inset-0 bg-black/60 backdrop-blur-sm z-40 opacity-0 pointer-events-none transition-opacity duration-300">
+    </div>
+
+    <!-- Auth Drawer -->
+    <div id="auth-drawer"
+      class="absolute inset-x-0 bottom-0 h-auto pb-8 glass-drawer border-t border-white/10 rounded-t-3xl translate-y-full transition-transform duration-400 ease-[cubic-bezier(0.32,0.72,0,1)] z-50 flex flex-col">
+      <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mt-3 mb-2"></div>
+      <div class="px-5 py-4 flex items-center justify-between border-b border-white/5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">
+          Authentication
+        </h3>
+        <button
+          class="close-btn p-2 -mr-2 text-zinc-400 hover:text-white transition-colors rounded-full bg-transparent hover:bg-white/5"
+          onclick="closeDrawers()">
+          <iconify-icon icon="solar:close-circle-linear" class="text-xl" stroke-width="1.5"></iconify-icon>
+        </button>
+      </div>
+      <div class="p-5 flex flex-col gap-5">
+        <p class="text-sm text-zinc-400 text-center px-4">
+          Identity required to leave a mark or support the artist.
+        </p>
+        <button id="google-auth-btn"
+          class="w-full h-12 flex items-center justify-center gap-3 bg-white hover:bg-zinc-100 text-black rounded-xl text-sm font-medium transition-colors">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+              fill="#4285F4"></path>
+            <path
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              fill="#34A853"></path>
+            <path
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+              fill="#FBBC05"></path>
+            <path
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+              fill="#EA4335"></path>
+          </svg>
+          Continue with Google
+        </button>
+      </div>
+    </div>
+
+    <!-- Tip Drawer -->
+    <div id="tip-drawer"
+      class="absolute inset-x-0 bottom-0 h-auto pb-8 glass-drawer border-t border-white/10 rounded-t-3xl translate-y-full transition-transform duration-400 ease-[cubic-bezier(0.32,0.72,0,1)] z-50 flex flex-col">
+      <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mt-3 mb-2"></div>
+      <div class="px-5 py-4 flex items-center justify-between border-b border-white/5">
+        <h3 class="text-lg font-semibold tracking-tight text-white">
+          Support Content
+        </h3>
+        <button
+          class="close-btn p-2 -mr-2 text-zinc-400 hover:text-white transition-colors rounded-full bg-transparent hover:bg-white/5"
+          onclick="closeDrawers()">
+          <iconify-icon icon="solar:close-circle-linear" class="text-xl" stroke-width="1.5"></iconify-icon>
+        </button>
+      </div>
+      <div class="p-5 flex flex-col gap-6">
+        <p class="text-sm text-zinc-400">
+          Directly fund the studio time. Secure checkout.
+        </p>
+        <div class="grid grid-cols-3 gap-3">
+          <button
+            class="tip-option border border-white/10 bg-white/5 rounded-xl py-3 text-center text-sm font-medium text-zinc-300 hover:bg-white/10 transition-colors"
+            data-amount="5">
+            $5
+          </button>
+          <button
+            class="tip-option border border-[#01FFC3]/50 bg-[#01FFC3]/10 rounded-xl py-3 text-center text-sm font-semibold text-[#01FFC3] transition-colors"
+            data-amount="10">
+            $10
+          </button>
+          <button
+            class="tip-option border border-white/10 bg-white/5 rounded-xl py-3 text-center text-sm font-medium text-zinc-300 hover:bg-white/10 transition-colors"
+            data-amount="20">
+            $20
+          </button>
+        </div>
+        <div class="relative group">
+          <span
+            class="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 font-semibold group-focus-within:text-[#01FFC3] transition-colors">
+            $
+          </span>
+          <input type="number" id="custom-tip"
+            class="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-8 pr-4 text-white font-semibold outline-none focus:border-[#01FFC3]/50 focus:bg-white/5 transition-all placeholder:text-zinc-600 text-sm"
+            placeholder="Custom Amount" min="1">
+        </div>
+        <button id="checkout-btn"
+          class="w-full h-12 flex items-center justify-center gap-2 bg-white hover:bg-zinc-200 text-black rounded-xl text-sm font-semibold transition-colors mt-2">
+          Proceed to Checkout
+          <iconify-icon icon="solar:arrow-right-linear" class="text-lg" stroke-width="1.5"></iconify-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- Comment Drawer -->
+    <div id="comment-drawer"
+      class="absolute inset-x-0 bottom-0 h-[75%] glass-drawer border-t border-white/10 rounded-t-3xl translate-y-full transition-transform duration-400 ease-[cubic-bezier(0.32,0.72,0,1)] z-50 flex flex-col">
+      <div class="w-10 h-1 bg-white/20 rounded-full mx-auto mt-3 mb-2 flex-shrink-0"></div>
+      <div class="px-5 py-4 flex items-center justify-between border-b border-white/5 flex-shrink-0">
+        <h3 class="text-lg font-semibold tracking-tight text-white flex items-center gap-2">
+          Guestbook
+          <span class="text-xs font-medium text-zinc-500 bg-white/5 px-2 py-0.5 rounded-full">
+            24
+          </span>
+        </h3>
+        <button
+          class="close-btn p-2 -mr-2 text-zinc-400 hover:text-white transition-colors rounded-full bg-transparent hover:bg-white/5"
+          onclick="closeDrawers()">
+          <iconify-icon icon="solar:close-circle-linear" class="text-xl" stroke-width="1.5"></iconify-icon>
+        </button>
+      </div>
+
+      <div id="comments-list" class="flex-1 overflow-y-auto p-5 pb-24 hide-scrollbar flex flex-col gap-5">
+        <!-- Comments -->
+        <div class="flex gap-3">
+          <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-[#05D9E8] to-[#FF2A6D] flex-shrink-0 opacity-80">
+          </div>
+          <div class="flex-1">
+            <div class="flex items-baseline gap-2 mb-1">
+              <span class="text-xs font-semibold text-white">user_4044</span>
+              <span class="text-[10px] text-zinc-500">2h ago</span>
+            </div>
+            <p class="text-sm text-zinc-300">
+              The tone on that bass is absolutely filthy.
+            </p>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex-shrink-0 opacity-80">
+          </div>
+          <div class="flex-1">
+            <div class="flex items-baseline gap-2 mb-1">
+              <span class="text-xs font-semibold text-white">user_9912</span>
+              <span class="text-[10px] text-zinc-500">4h ago</span>
+            </div>
+            <p class="text-sm text-zinc-300">Drop the stems for this!! 🔥</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input Area -->
+      <div class="absolute bottom-0 inset-x-0 p-4 border-t border-white/5 bg-[#090710]/95 backdrop-blur-xl">
+        <div class="flex items-center gap-2 relative">
+          <input type="text" id="comment-input"
+            class="w-full bg-white/5 border border-white/10 rounded-full py-2.5 pl-4 pr-12 text-sm text-white placeholder:text-zinc-500 outline-none focus:border-[#05D9E8]/50 focus:bg-white/10 transition-all"
+            placeholder="Leave a mark...">
+          <button id="submit-comment"
+            class="absolute right-1 w-8 h-8 flex items-center justify-center rounded-full bg-white text-black hover:bg-zinc-200 transition-colors">
+            <iconify-icon icon="solar:arrow-up-linear" class="text-lg" stroke-width="2"></iconify-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- System Notification -->
+    <div id="sys-modal"
+      class="absolute inset-x-4 top-20 z-[60] bg-[#151124] border border-white/10 rounded-2xl p-4 shadow-2xl shadow-black/50 transition-all duration-300 -translate-y-4 opacity-0 pointer-events-none flex flex-col gap-1">
+      <h3 id="sys-title" class="text-sm font-semibold tracking-tight text-white flex items-center gap-2">
+        <iconify-icon icon="solar:info-circle-linear" class="text-[#05D9E8]"></iconify-icon>
+        Notice
+      </h3>
+      <p id="sys-msg" class="text-xs text-zinc-400 ml-6"></p>
+    </div>
+  </div>
+
+  <script>
+    // App State
+    let isAuthenticated = false;
+    let pendingAction = null;
+
+    // Elements
+    const scrim = document.getElementById('scrim');
+    const authDrawer = document.getElementById('auth-drawer');
+    const tipDrawer = document.getElementById('tip-drawer');
+    const commentDrawer = document.getElementById('comment-drawer');
+    const sysModal = document.getElementById('sys-modal');
+    const authStatusBtn = document.getElementById('auth-status-btn');
+    let sysTimeout;
+
+    // Drawer Management
+    function closeDrawers() {
+      [authDrawer, tipDrawer, commentDrawer].forEach(d => {
+        d.classList.replace('translate-y-0', 'translate-y-full');
+      });
+      scrim.classList.remove('opacity-100', 'pointer-events-auto');
+      scrim.classList.add('opacity-0', 'pointer-events-none');
+      pendingAction = null;
+    }
+
+    function openDrawer(drawer) {
+      closeDrawers();
+      // Small delay to allow close animation to start if switching
+      setTimeout(() => {
+        drawer.classList.replace('translate-y-full', 'translate-y-0');
+        scrim.classList.remove('opacity-0', 'pointer-events-none');
+        scrim.classList.add('opacity-100', 'pointer-events-auto');
+      }, 50);
+    }
+
+    scrim.addEventListener('click', closeDrawers);
+
+    // Notification System
+    function showMessage(title, msg) {
+      clearTimeout(sysTimeout);
+      document.getElementById('sys-title').innerHTML = `<iconify-icon icon="solar:info-circle-linear" class="text-[#05D9E8]"></iconify-icon> ${title}`;
+      document.getElementById('sys-msg').textContent = msg;
+
+      sysModal.classList.remove('-translate-y-4', 'opacity-0', 'pointer-events-none');
+      sysModal.classList.add('translate-y-0', 'opacity-100');
+
+      sysTimeout = setTimeout(() => {
+        sysModal.classList.remove('translate-y-0', 'opacity-100');
+        sysModal.classList.add('-translate-y-4', 'opacity-0', 'pointer-events-none');
+      }, 3000);
+    }
+
+    // Media Interaction (Mock Play/Pause)
+    function togglePlay(element) {
+      const indicator = element.parentElement.querySelector('.play-indicator');
+      const icon = indicator.querySelector('iconify-icon');
+
+      // Visual pop
+      indicator.classList.remove('opacity-0', 'scale-90');
+      indicator.classList.add('opacity-100', 'scale-100');
+
+      if (icon.getAttribute('icon') === 'solar:play-linear') {
+        icon.setAttribute('icon', 'solar:pause-linear');
+      } else {
+        icon.setAttribute('icon', 'solar:play-linear');
+      }
+
+      setTimeout(() => {
+        indicator.classList.remove('opacity-100', 'scale-100');
+        indicator.classList.add('opacity-0', 'scale-90');
+      }, 800);
+    }
+
+    // Interceptors
+    document.querySelectorAll('.tip-trigger').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        if (!isAuthenticated) {
+          pendingAction = { type: 'tip', target: e.currentTarget };
+          openDrawer(authDrawer);
+        } else {
+          openDrawer(tipDrawer);
+        }
+      });
+    });
+
+    document.querySelectorAll('.comment-trigger').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        if (!isAuthenticated) {
+          pendingAction = { type: 'comment', target: e.currentTarget };
+          openDrawer(authDrawer);
+        } else {
+          openDrawer(commentDrawer);
+        }
+      });
+    });
+
+    // Authentication
+    authStatusBtn.addEventListener('click', () => {
+      if (isAuthenticated) {
+        isAuthenticated = false;
+        authStatusBtn.textContent = 'Log In';
+        authStatusBtn.classList.remove('text-[#05D9E8]', 'border-[#05D9E8]/30', 'bg-[#05D9E8]/10');
+        authStatusBtn.classList.add('text-zinc-300', 'border-white/5', 'bg-white/10');
+        showMessage("Signed Out", "Session disconnected.");
+      } else {
+        openDrawer(authDrawer);
+      }
+    });
+
+    document.getElementById('google-auth-btn').addEventListener('click', (e) => {
+      const btn = e.currentTarget;
+      const originalHTML = btn.innerHTML;
+      btn.innerHTML = `<iconify-icon icon="solar:restart-linear" class="animate-spin text-lg"></iconify-icon> Authenticating...`;
+      btn.classList.add('opacity-80', 'pointer-events-none');
+
+      setTimeout(() => {
+        isAuthenticated = true;
+        btn.innerHTML = originalHTML;
+        btn.classList.remove('opacity-80', 'pointer-events-none');
+
+        authStatusBtn.textContent = 'USER_7829';
+        authStatusBtn.classList.remove('text-zinc-300', 'border-white/5', 'bg-white/10');
+        authStatusBtn.classList.add('text-[#05D9E8]', 'border-[#05D9E8]/30', 'bg-[#05D9E8]/10');
+
+        if (pendingAction) {
+          if (pendingAction.type === 'tip') openDrawer(tipDrawer);
+          if (pendingAction.type === 'comment') openDrawer(commentDrawer);
+        } else {
+          closeDrawers();
+          showMessage("Signed In", "Welcome back to the green room.");
+        }
+      }, 1000);
+    });
+
+    // Tipping State Management
+    const tipOptions = document.querySelectorAll('.tip-option');
+    const customTip = document.getElementById('custom-tip');
+    let selectedTip = 10;
+
+    function resetTipButtons() {
+      tipOptions.forEach(b => {
+        b.className = 'tip-option border border-white/10 bg-white/5 rounded-xl py-3 text-center text-sm font-medium text-zinc-300 hover:bg-white/10 transition-colors';
+      });
+    }
+
+    tipOptions.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        resetTipButtons();
+        const target = e.currentTarget;
+        target.className = 'tip-option border border-[#01FFC3]/50 bg-[#01FFC3]/10 rounded-xl py-3 text-center text-sm font-semibold text-[#01FFC3] transition-colors';
+        customTip.value = '';
+        selectedTip = parseInt(target.dataset.amount);
+      });
+    });
+
+    customTip.addEventListener('input', (e) => {
+      if (e.target.value) {
+        resetTipButtons();
+        selectedTip = parseInt(e.target.value);
+      } else {
+        tipOptions[1].click(); // Reset to $10 default
+      }
+    });
+
+    document.getElementById('checkout-btn').addEventListener('click', () => {
+      if (!selectedTip || selectedTip <= 0) {
+        showMessage("Invalid Amount", "Please enter a valid support amount.");
+        return;
+      }
+      closeDrawers();
+      showMessage("Checkout Initiated", `Processing support of $${selectedTip}.00...`);
+    });
+
+    // Commenting Logic
+    document.getElementById('submit-comment').addEventListener('click', () => {
+      const input = document.getElementById('comment-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const list = document.getElementById('comments-list');
+      const newComment = document.createElement('div');
+      newComment.className = 'flex gap-3 animate-[fadeIn_0.3s_ease-out]';
+      newComment.innerHTML = `
+              <div class="w-8 h-8 rounded-full bg-white flex-shrink-0 opacity-90"></div>
+              <div class="flex-1">
+                  <div class="flex items-baseline gap-2 mb-1">
+                      <span class="text-xs font-semibold text-[#05D9E8]">user_7829 (You)</span>
+                      <span class="text-[10px] text-zinc-500">Just now</span>
+                  </div>
+                  <p class="text-sm text-zinc-200">${text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
+              </div>
+          `;
+
+      list.insertBefore(newComment, list.firstChild);
+      input.value = '';
+      list.scrollTop = 0;
+    });
+
+    // Add simple fade in keyframe for new comments
+    const style = document.createElement('style');
+    style.innerHTML = `@keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }`;
+    document.head.appendChild(style);
+  </script>
+
+</body>
+
+</html>

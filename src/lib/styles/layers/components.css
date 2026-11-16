@@ -1,0 +1,165 @@
+/* Glass Surfaces */
+.glass-panel {
+	background: var(--glass-surface);
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
+	border: 1px solid var(--glass-border);
+	border-radius: 16px;
+}
+
+.glass-drawer {
+	background: var(--glass-drawer);
+	backdrop-filter: blur(24px);
+	-webkit-backdrop-filter: blur(24px);
+	border-block-start: 1px solid var(--glass-border);
+	box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.glass-pill {
+	background: rgba(255, 255, 255, 0.08);
+	border: 1px solid var(--glass-border);
+	backdrop-filter: blur(8px);
+	border-radius: 9999px;
+	padding: 0.25rem 0.75rem;
+	font-size: 0.75rem;
+	font-weight: 600;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+}
+
+/* Cover Styling */
+.cover-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding-block-end: 1rem;
+}
+
+.cover-title {
+	font-size: clamp(2.5rem, 8vw, 4.5rem);
+	line-height: 0.95;
+	font-weight: 800;
+	letter-spacing: -0.03em;
+	color: #FFFFFF;
+	text-transform: uppercase;
+}
+
+.cover-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: center;
+	margin-block-start: 1rem;
+}
+
+.tag-highlight {
+	color: var(--highlight);
+	background: rgba(1, 255, 195, 0.1);
+	border: 1px solid rgba(1, 255, 195, 0.3);
+}
+
+.tag-support {
+	color: var(--support);
+	background: rgba(255, 42, 109, 0.1);
+	border: 1px solid rgba(255, 42, 109, 0.3);
+}
+
+.tag-accent {
+	color: var(--accent);
+	background: rgba(5, 217, 232, 0.1);
+	border: 1px solid rgba(5, 217, 232, 0.3);
+}
+
+/* Floating Tip Button & Trigger */
+.floating-tip-btn {
+	position: fixed;
+	inset-block-end: 1.5rem;
+	inset-inline-end: 1.5rem;
+	z-index: 50;
+	background: var(--support);
+	color: #FFFFFF;
+	font-weight: 700;
+	font-size: 0.9rem;
+	padding: 0.75rem 1.25rem;
+	border-radius: 9999px;
+	border: none;
+	cursor: pointer;
+	box-shadow: 0 4px 20px rgba(255, 42, 109, 0.4);
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.floating-tip-btn:hover {
+	transform: scale(1.05);
+	box-shadow: 0 6px 24px rgba(255, 42, 109, 0.6);
+}
+
+/* Ticket Stub */
+.ticket-stub {
+	background: #14121F;
+	border: 1px solid var(--glass-border);
+	border-radius: 12px;
+	position: relative;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+
+.ticket-stub-perforation {
+	inline-size: 100%;
+	block-size: 2px;
+	background: repeating-linear-gradient(90deg, transparent, transparent 4px, var(--glass-border) 4px, var(--glass-border) 8px);
+	margin-block: 0.75rem;
+	position: relative;
+}
+
+.ticket-stub-perforation::before,
+.ticket-stub-perforation::after {
+	content: '';
+	position: absolute;
+	inline-size: 16px;
+	block-size: 16px;
+	background-color: var(--ink);
+	border-radius: 50%;
+	inset-block-start: -7px;
+}
+.ticket-stub-perforation::before { inset-inline-start: -8px; }
+.ticket-stub-perforation::after { inset-inline-end: -8px; }
+
+/* Wall Notes */
+.note-card {
+	padding: 1rem;
+	background: rgba(255, 255, 255, 0.03);
+	border: 1px solid var(--glass-border);
+	border-radius: 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.note-author {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-size: 0.85rem;
+	font-weight: 600;
+}
+
+.note-avatar {
+	inline-size: 24px;
+	block-size: 24px;
+	border-radius: 50%;
+	object-fit: cover;
+	background: var(--ink-surface);
+}
+
+.artist-reply {
+	margin-inline-start: 1rem;
+	padding: 0.75rem 1rem;
+	background: rgba(1, 255, 195, 0.05);
+	border-inline-start: 3px solid var(--highlight);
+	border-radius: 0 8px 8px 0;
+	font-size: 0.85rem;
+}

@@ -1,0 +1,48 @@
+/* Desktop Bookbinder Workbench */
+.bookbinder-workbench {
+	display: grid;
+	grid-template-columns: 1fr;
+	min-block-size: 100vh;
+	background: var(--ink);
+}
+
+@media (min-width: 1024px) {
+	.bookbinder-workbench {
+		grid-template-columns: minmax(400px, 1fr) 480px;
+	}
+}
+
+.editor-pane {
+	padding: 2rem;
+	overflow-y: auto;
+	border-inline-end: 1px solid var(--glass-border);
+}
+
+.preview-pane {
+	padding: 2rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: #040307;
+	position: sticky;
+	inset-block-start: 0;
+	block-size: 100vh;
+}
+
+.device-mockup {
+	inline-size: 375px;
+	block-size: 780px;
+	max-block-size: 90vh;
+	background: var(--ink);
+	border: 12px solid #1E1B2E;
+	border-radius: 40px;
+	box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.1);
+	overflow: hidden;
+	position: relative;
+}
+
+.device-mockup iframe {
+	inline-size: 100%;
+	block-size: 100%;
+	border: none;
+}

@@ -1,0 +1,33 @@
+import { z } from 'zod';
+
+export const submitNoteSchema = z.object({
+	issueId: z.string().nullable().optional(),
+	body: z
+		.string()
+		.min(1, 'Note cannot be empty')
+		.max(500, 'Note cannot exceed 500 characters')
+		.refine((val) => !/(https?:\/\/|www\.|\.com|\.org|\.net|\.io|\.gg|\.me\b)/i.test(val), {
+			message: 'Links and URLs are not permitted on the Wall.'
+		})
+		.refine((val) => !/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(val), {
+			message: 'Email addresses are not permitted on the Wall.'
+		})
+		.refine((val) => !/(\+?\d{1,3}[-.\s]?)?(\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}/.test(val), {
+			message: 'Phone numbers are not permitted on the Wall.'
+		})
+});
+
+export type SubmitNoteInput = z.infer<typeof submitNoteSchema>;
+
+export const replyNoteSchema = z.object({
+	noteId: z.string().min(1, 'Note ID is required'),
+	body: z.string().min(1, 'Reply cannot be empty').max(300, 'Reply cannot exceed 300 characters')
+});
+
+export type ReplyNoteInput = z.infer<typeof replyNoteSchema>;
+
+export const flagNoteSchema = z.object({
+	noteId: z.string().min(1, 'Note ID is required')
+});
+
+export type FlagNoteInput = z.infer<typeof flagNoteSchema>;
