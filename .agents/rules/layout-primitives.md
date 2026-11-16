@@ -20,17 +20,20 @@ Never begin styling with ad-hoc CSS declarations like `display: flex`, `grid-tem
 
 ## 2. Mandatory Rules
 
-### No Inline Styles for Layout Primitives
-Never use inline styles for layout concerns:
-- ❌ `style="display: flex; gap: 1rem;"`
-- ❌ `style="max-width: 65ch; margin-inline: auto;"`
-- ❌ `style="grid-template-columns: repeat(3, 1fr);"`
-- ❌ `style="--stack-gap: 1.5rem;"`
+### No Inline Styles Across the Application
+Zero inline styles are permitted across the application for layout or visual presentation:
+- ❌ `style="display: flex; gap: 1rem;"` -> Use `<Cluster>` or `<Stack>`
+- ❌ `style="max-width: 65ch; margin-inline: auto;"` -> Use `<Center max="measure">`
+- ❌ `style="grid-template-columns: repeat(3, 1fr);"` -> Use `<Grid>` or `<Switcher>`
+- ❌ `style="--stack-gap: 1.5rem;"` -> Use `gap="md"` / `gap="lg"` props
+- ❌ `style="font-size: ...; font-weight: ...;"` -> Use CUBE CSS classes
+
+The only permitted inline styles are strictly runtime dynamic UI necessities (passing dynamic database values to CSS custom properties like `style="--accent: ...;"` or real-time animations like audio progress bar `style="width: ...%;"`).
 
 Express layout through:
-1. Exact Elemental `data-*` attribute syntax.
-2. Official modifier tokens (`gapmd`, `paddingsm`, `justifybetween`, `aligncenter`, `collapsemd`).
-3. Stylesheet-defined custom properties only when modifier tokens are insufficient.
+1. Exact Elemental layout primitive components (`<Stack>`, `<Cluster>`, `<Box>`, `<Grid>`, `<Center>`, `<Split>`, `<Switcher>`, `<Cover>`, `<Frame>`, `<Reel>`, `<Container>`).
+2. Exact Elemental `data-*` attribute syntax when writing raw HTML.
+3. Official modifier tokens (`gap:md`, `padding:sm`, `justify:between`, `align:center`, `collapse:md`).
 
 ### Exact API Syntax & Modifiers
 Use the exact primitive attributes and modifier tokens:

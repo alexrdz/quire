@@ -120,7 +120,7 @@
 
 		<!-- Top Header Bar -->
 		<header class="zine-header">
-			<div class="brand-badge">
+			<div class="brand-wrap">
 				<span class="brand-text">QUIRE.</span>
 				<span class="live-indicator">
 					<span class="pulse-dot"></span> LIVE ZINE
@@ -172,10 +172,7 @@
 			{#if activeTab === 'audio'}
 				<!-- Card 1: Audio / Demo -->
 				<div class="card-page audio-card">
-					<div
-						class="card-bg-image"
-						style="background-image: url('https://images.unsplash.com/photo-1598387181032-a3103a2db5b3?auto=format&fit=crop&q=80&w=800');"
-					>
+					<div class="card-bg-image audio-card-bg">
 						<div class="card-dark-scrim"></div>
 					</div>
 
@@ -199,16 +196,16 @@
 								</svg>
 							{/if}
 						</button>
-						<span class="play-hint-badge">
+						<span class="play-hint-text">
 							{isPlaying ? 'TAP TO PAUSE' : 'TAP TO LISTEN'}
 						</span>
 					</div>
 
 					<!-- Bottom Meta & Controls -->
 					<div class="card-bottom-content">
-						<div class="meta-pills">
-							<span class="badge mint-badge">OCT 12</span>
-							<span class="badge glass-badge">BROOKLYN, NY</span>
+						<div class="meta-row">
+							<span class="meta-tag mint">OCT 12</span>
+							<span class="meta-tag muted">BROOKLYN, NY</span>
 							<span class="time-stamp">{isPlaying ? '01:24' : '00:00'} / 03:42</span>
 						</div>
 
@@ -270,22 +267,19 @@
 			{:else if activeTab === 'photo'}
 				<!-- Card 2: Tour Photo Diary -->
 				<div class="card-page photo-card">
-					<div
-						class="card-bg-image"
-						style="background-image: url('https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=800');"
-					>
+					<div class="card-bg-image photo-card-bg">
 						<div class="card-dark-scrim"></div>
 					</div>
 
-					<div class="top-tag-badge">
+					<div class="top-film-label">
 						<span>35MM FILM STUB</span>
 					</div>
 
 					<div class="card-bottom-content">
-						<div class="meta-pills">
-							<span class="badge mint-badge">OCT 10</span>
-							<span class="badge glass-badge">CHICAGO</span>
-							<span class="badge cyan-badge">SOLD OUT</span>
+						<div class="meta-row">
+							<span class="meta-tag mint">OCT 10</span>
+							<span class="meta-tag muted">CHICAGO</span>
+							<span class="meta-tag cyan">SOLD OUT</span>
 						</div>
 
 						<h2 class="card-headline">Tour Diary: CHI</h2>
@@ -321,9 +315,9 @@
 				<!-- Card 3: Deep Cut Liner Notes -->
 				<div class="card-page notes-card">
 					<div class="notes-scrollable-area">
-						<div class="meta-pills">
-							<span class="badge mint-badge">OCT 14</span>
-							<span class="badge glass-badge">LINER NOTES</span>
+						<div class="meta-row">
+							<span class="meta-tag mint">OCT 14</span>
+							<span class="meta-tag muted">LINER NOTES</span>
 						</div>
 
 						<h2 class="notes-title">Thoughts on the New Record</h2>
@@ -371,9 +365,9 @@
 				<!-- Card 4: Digital Guestbook Wall -->
 				<div class="card-page wall-card">
 					<div class="wall-header-area">
-						<div class="meta-pills">
-							<span class="badge cyan-badge">COMMUNITY WALL</span>
-							<span class="badge glass-badge">{comments.length} ENTRIES</span>
+						<div class="meta-row">
+							<span class="meta-tag cyan">COMMUNITY WALL</span>
+							<span class="meta-tag muted">{comments.length} ENTRIES</span>
 						</div>
 						<h2 class="wall-title">Digital Guestbook</h2>
 						<p class="wall-sub">Read the wall or leave your own mark on tonight's gig.</p>
@@ -397,7 +391,7 @@
 
 									{#if c.reply}
 										<div class="artist-reply-block">
-											<div class="artist-badge-row">
+											<div class="artist-verified-row">
 												<span class="verified-icon">✓</span>
 												<span class="artist-reply-name">{c.reply.author}</span>
 												<span class="artist-reply-time">{c.reply.time}</span>
@@ -604,7 +598,7 @@
 		z-index: 40;
 	}
 
-	.brand-badge {
+	.brand-wrap {
 		display: flex;
 		align-items: center;
 		gap: 8px;
@@ -621,15 +615,11 @@
 	.live-indicator {
 		display: flex;
 		align-items: center;
-		gap: 4px;
-		font-size: 0.65rem;
+		gap: 5px;
+		font-size: 0.68rem;
 		font-weight: 700;
 		color: #01ffc3;
-		background: rgba(1, 255, 195, 0.12);
-		border: 1px solid rgba(1, 255, 195, 0.25);
-		padding: 2px 7px;
-		border-radius: 9999px;
-		letter-spacing: 0.05em;
+		letter-spacing: 0.08em;
 	}
 
 	.pulse-dot {
@@ -726,6 +716,14 @@
 		background-position: center;
 	}
 
+	.audio-card-bg {
+		background-image: url('https://images.unsplash.com/photo-1598387181032-a3103a2db5b3?auto=format&fit=crop&q=80&w=800');
+	}
+
+	.photo-card-bg {
+		background-image: url('https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=800');
+	}
+
 	.card-dark-scrim {
 		position: absolute;
 		inset: 0;
@@ -778,15 +776,12 @@
 		height: 28px;
 	}
 
-	.play-hint-badge {
-		font-size: 0.62rem;
+	.play-hint-text {
+		font-size: 0.66rem;
 		font-weight: 700;
 		letter-spacing: 0.08em;
 		color: #e4e4e7;
-		background: rgba(0, 0, 0, 0.6);
-		padding: 3px 8px;
-		border-radius: 9999px;
-		border: 1px solid rgba(255, 255, 255, 0.1);
+		text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
 	}
 
 	/* Card bottom content */
@@ -797,38 +792,30 @@
 		background: linear-gradient(to top, #090710 75%, transparent 100%);
 	}
 
-	.meta-pills {
+	.meta-row {
 		display: flex;
 		align-items: center;
-		gap: 6px;
+		gap: 10px;
 		margin-bottom: 8px;
 	}
 
-	.badge {
-		font-size: 0.65rem;
+	.meta-tag {
+		font-size: 0.72rem;
 		font-weight: 700;
-		padding: 3px 8px;
-		border-radius: 6px;
-		letter-spacing: 0.03em;
+		letter-spacing: 0.06em;
 		text-transform: uppercase;
 	}
 
-	.mint-badge {
+	.meta-tag.mint {
 		color: #01ffc3;
-		background: rgba(1, 255, 195, 0.14);
-		border: 1px solid rgba(1, 255, 195, 0.3);
 	}
 
-	.cyan-badge {
+	.meta-tag.cyan {
 		color: #05d9e8;
-		background: rgba(5, 217, 232, 0.14);
-		border: 1px solid rgba(5, 217, 232, 0.3);
 	}
 
-	.glass-badge {
-		color: #e4e4e7;
-		background: rgba(255, 255, 255, 0.08);
-		border: 1px solid rgba(255, 255, 255, 0.14);
+	.meta-tag.muted {
+		color: #a1a1aa;
 	}
 
 	.time-stamp {
@@ -975,19 +962,15 @@
 	}
 
 	/* Photo Card Specific */
-	.top-tag-badge {
+	.top-film-label {
 		position: absolute;
 		top: 14px;
 		right: 18px;
-		background: rgba(0, 0, 0, 0.6);
-		backdrop-filter: blur(8px);
-		border: 1px solid rgba(255, 255, 255, 0.2);
 		color: #e4e4e7;
-		font-size: 0.62rem;
+		font-size: 0.68rem;
 		font-weight: 700;
-		padding: 3px 8px;
-		border-radius: 6px;
-		letter-spacing: 0.05em;
+		letter-spacing: 0.08em;
+		text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
 	}
 
 	/* Notes Card */
@@ -1129,7 +1112,7 @@
 		border-radius: 10px;
 	}
 
-	.artist-badge-row {
+	.artist-verified-row {
 		display: flex;
 		align-items: center;
 		gap: 4px;

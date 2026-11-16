@@ -73,7 +73,14 @@ All AI agents, subagents, and contributors working on **Quire** must strictly ad
    - Unit tests: `vitest` in `tests/unit/`.
    - End-to-end tests: `@playwright/test` in `tests/e2e/`.
 3. **Styling:** Vanilla CUBE CSS with native `@layer` (`vendor`, `base`, `layouts`, `components`, `sticker`, `bookbinder`, `utilities`). **No Tailwind, no CSS-in-JS.**
-4. **Context Maintenance:**
+4. **Zero Inline Styles Policy:**
+   - No inline styles (`style="..."` or `style:...`) are permitted anywhere across templates, components, routes, or `app.html`.
+   - **Sole Exception:** Strictly runtime dynamic UI necessities and animations:
+     - Passing dynamic database-backed values into CSS custom properties (e.g., `style="--accent: {data.artist.accentColor};"`, `style="--cover-art: url('{data.artist.coverArtUrl}');"`).
+     - Real-time animations and playback progress (e.g., audio playback progress `style="width: {progress}%;"`, visualizer equalizer height custom properties `style="--h: 40%"`).
+     - Dynamic user swatches or avatars.
+   - Static styling (font sizes, weights, letter-spacing, text transformations, margins, paddings, flex/grid properties, static colors, static background images) must strictly live in CUBE CSS stylesheet layers or Elemental layout primitives (`<Stack>`, `<Cluster>`, `<Box>`, `<Grid>`, etc.).
+5. **Context Maintenance:**
    - Consult `CONTEXT.md` for ubiquitous language before introducing any new term.
    - Record significant, non-obvious, or hard-to-reverse trade-offs in `docs/adr/`.
    - Keep `docs/project-context.md` synchronized with problems, alternatives, and consequences.

@@ -17,7 +17,7 @@
 		<Stack gap="lg">
 			<header class="cover-header">
 				<a href="/dashboard" class="glass-pill text-highlight link-clean">← Back to Dashboard</a>
-				<span class="glass-pill tag-highlight">60-Second Phone Flow</span>
+				<span class="text-highlight header-eyebrow">60-Second Phone Flow</span>
 			</header>
 
 			{#if form?.success && form?.qrSvg}
@@ -25,7 +25,7 @@
 				<Box variant="raised" padding="xl" radius="lg">
 					<Stack gap="lg" align="center">
 						<Stack gap="xs" align="center">
-							<span class="tag-highlight glass-pill">
+							<span class="text-highlight success-eyebrow">
 								✓ Issue Published Live!
 							</span>
 							<h1 class="success-title">
@@ -183,6 +183,20 @@
 
 	.link-clean {
 		text-decoration: none;
+	}
+
+	.header-eyebrow {
+		font-size: 0.85rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+	}
+
+	.success-eyebrow {
+		font-size: 0.9rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
 	}
 
 	.success-title {

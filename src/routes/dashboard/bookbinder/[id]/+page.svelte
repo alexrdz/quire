@@ -23,8 +23,8 @@
 		<Stack gap="lg">
 			<header class="cover-header">
 				<a href="/dashboard" class="glass-pill text-highlight link-clean">← Dashboard</a>
-				<Cluster align="center" gap="xs">
-					<span class="glass-pill tag-highlight">Desktop Bookbinder</span>
+				<Cluster align="center" gap="sm">
+					<span class="text-highlight header-eyebrow">Desktop Bookbinder</span>
 					<a href="/i/{data.issue.slug}" target="_blank" class="glass-pill link-clean">
 						Open Tab ↗
 					</a>
@@ -98,14 +98,14 @@
 					<h2 class="card-title">
 						Bespoke Pages ({data.pages.length})
 					</h2>
-					<span class="glass-pill">Zine Sequence</span>
+					<span class="text-muted sequence-label">Zine Sequence</span>
 				</Cluster>
 
 				{#each data.pages as page, idx}
 					<Box variant="raised" padding="md" radius="md">
 						<Stack gap="sm">
 							<Cluster justify="between" align="center">
-								<span class="glass-pill tag-accent">Page {idx + 2}: {page.kind.toUpperCase()}</span>
+								<span class="page-kind-label">Page {idx + 2}: {page.kind.toUpperCase()}</span>
 								<form method="POST" action="?/deletePage" use:enhance={() => () => refreshPreview()}>
 									<input type="hidden" name="pageId" value={page.id} />
 									<button type="submit" class="glass-pill text-muted delete-page-btn">
@@ -171,6 +171,28 @@
 <style>
 	.link-clean {
 		text-decoration: none;
+	}
+
+	.header-eyebrow {
+		font-size: 0.85rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+	}
+
+	.sequence-label {
+		font-size: 0.8rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+	}
+
+	.page-kind-label {
+		font-size: 0.85rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--accent);
 	}
 
 	.bookbinder-title {

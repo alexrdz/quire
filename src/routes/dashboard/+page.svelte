@@ -18,7 +18,7 @@
 			<!-- Navigation Bar -->
 			<header class="cover-header">
 				<Cluster align="center" gap="sm">
-					<span class="glass-pill text-highlight brand-tag">QUIRE</span>
+					<span class="text-highlight font-mono brand-tag">QUIRE</span>
 					<h1 class="artist-heading">
 						{data.artist.displayName}
 					</h1>
@@ -64,8 +64,8 @@
 				<Box variant="raised" padding="lg">
 					<Stack gap="md">
 						<Cluster justify="between" align="center">
-							<Cluster align="center" gap="xs">
-								<span class="glass-pill tag-highlight">Morning-After Gig Recap</span>
+							<Cluster align="center" gap="sm">
+								<span class="text-highlight recap-eyebrow">Morning-After Gig Recap</span>
 								<span class="text-muted recap-date-label">{data.latestRecap.issue.date}</span>
 							</Cluster>
 							<a href="/i/{data.latestRecap.issue.slug}" class="glass-pill text-highlight open-zine-link">
@@ -157,7 +157,7 @@
 											<div class="text-muted cell-subtext">{issue.venue}</div>
 										</td>
 										<td class="table-cell">
-											<span class="glass-pill status-pill {issue.status === 'published' ? 'tag-highlight' : ''}">
+											<span class="font-mono issue-status-pill {issue.status === 'published' ? 'text-highlight' : 'text-muted'}">
 												{issue.status}
 											</span>
 										</td>
@@ -193,7 +193,7 @@
 							<h2 class="section-heading">Wall Guestbook & Replies</h2>
 							<p class="text-muted subtext-small">Reply to fans or moderate flagged posts.</p>
 						</Stack>
-						<span class="glass-pill">{data.pendingNotes.length} notes</span>
+						<span class="text-muted subtext-small font-semibold">{data.pendingNotes.length} notes</span>
 					</Cluster>
 
 					<Stack gap="sm">
@@ -207,12 +207,12 @@
 											</div>
 											<span class="note-author-name">{note.author?.name || 'Fan'}</span>
 											{#if note.issue}
-												<span class="glass-pill note-badge">{note.issue.city}</span>
+												<span class="text-muted subtext-small">/ {note.issue.city}</span>
 											{:else}
-												<span class="glass-pill note-badge">General Wall</span>
+												<span class="text-muted subtext-small">/ General Wall</span>
 											{/if}
 											{#if note.status === 'hidden'}
-												<span class="tag-support glass-pill note-badge">Hidden (Flagged)</span>
+												<span class="text-support subtext-small font-semibold">● Hidden (Flagged)</span>
 											{/if}
 										</Cluster>
 
@@ -303,7 +303,16 @@
 	}
 
 	.brand-tag {
-		font-weight: 800;
+		font-weight: 900;
+		font-size: 0.9rem;
+		letter-spacing: 0.12em;
+	}
+
+	.recap-eyebrow {
+		font-size: 0.8rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
 	}
 
 	.artist-heading {
@@ -442,13 +451,15 @@
 		font-size: 0.8rem;
 	}
 
-	.status-pill {
-		font-size: 0.7rem;
-	}
-
 	.action-pill {
 		text-decoration: none;
 		font-size: 0.75rem;
+	}
+
+	.issue-status-pill {
+		font-size: 0.75rem;
+		font-weight: 700;
+		text-transform: uppercase;
 	}
 
 	.subtext-small {
@@ -473,10 +484,6 @@
 
 	.note-author-name {
 		font-weight: 600;
-	}
-
-	.note-badge {
-		font-size: 0.7rem;
 	}
 
 	.note-action-btn {

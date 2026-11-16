@@ -39,3 +39,17 @@ Always use CSS logical properties instead of directional properties:
 - `margin-inline` / `margin-block` instead of `margin-left`/`right`, `margin-top`/`bottom`
 - `padding-inline` / `padding-block` instead of `padding-left`/`right`, `padding-top`/`bottom`
 - `inset-inline-*` / `inset-block-*` instead of `top`, `bottom`, `left`, `right`
+
+## 5. Strict Prohibition on Inline Styles
+- **No inline styles whatsoever** (`style="..."` or `style:...` directives) are permitted anywhere across templates, components, routes, or `app.html`.
+- **Sole Exception**: Runtime dynamic UI necessities and animations:
+  1. **Dynamic CSS Custom Property Bindings**: Passing runtime database values into CSS variables (e.g., `style="--accent: {data.artist.accentColor};"`, `style="--cover-art: url('{data.artist.coverArtUrl}');"`).
+  2. **Dynamic Animation & Playback States**: Real-time progress values (e.g., audio playback progress bar `style="width: {progress}%;"`, equalizer height variables `style="--h: 40%"`).
+  3. **Runtime User Swatches**: Dynamic user-generated gradients or avatars (e.g., `style="background: {user.color};"`).
+- **Static Styling Forbidden in Markup**:
+  - ❌ `style="font-size: 0.85rem;"` -> Use semantic typography classes.
+  - ❌ `style="font-weight: 700; text-transform: uppercase;"` -> Use utility/component classes.
+  - ❌ `style="color: #FFFFFF;"` or `style="background: ..."` -> Use design token classes or stylesheet rules.
+  - ❌ `style="display: contents;"` or `style="display: flex;"` -> Use `.app-shell` or layout primitives.
+  - ❌ Static background image URLs -> Place in component `<style>` block.
+- All static layout, typography, borders, and colors must strictly live in CUBE CSS stylesheet layers (`@layer layouts`, `@layer components`, `@layer utilities`) or Elemental layout primitives (`<Stack>`, `<Cluster>`, `<Box>`, `<Grid>`, etc.).

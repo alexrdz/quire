@@ -22,7 +22,7 @@
 		<Stack gap="lg">
 			<header class="cover-header">
 				<a href="/dashboard" class="glass-pill text-highlight link-clean">← Back to Dashboard</a>
-				<span class="glass-pill tag-accent">Master Template</span>
+				<span class="header-eyebrow">Master Template</span>
 			</header>
 
 			<Box variant="raised" padding="xl" radius="lg">
@@ -47,7 +47,7 @@
 							<!-- Accent Color Picker -->
 							<Stack gap="xs">
 								<label for="accentColor" class="input-label">
-									Custom Artist Accent Color (<span style="color: {accentColor};">{accentColor}</span>)
+									Custom Artist Accent Color (<span class="accent-color-preview">{accentColor}</span>)
 								</label>
 								<Cluster align="center" gap="sm">
 									<input
@@ -135,6 +135,14 @@
 		text-decoration: none;
 	}
 
+	.header-eyebrow {
+		font-size: 0.85rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--accent);
+	}
+
 	.template-title {
 		font-size: 1.8rem;
 		font-weight: 800;
@@ -155,6 +163,11 @@
 		font-size: 0.8rem;
 		font-weight: 600;
 		color: var(--paper);
+	}
+
+	.accent-color-preview {
+		color: var(--accent);
+		font-weight: 700;
 	}
 
 	.subtext-small {

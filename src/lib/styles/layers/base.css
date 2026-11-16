@@ -115,3 +115,8 @@ body {
 	outline: 2px solid var(--highlight);
 	outline-offset: 2px;
 }
+
+/* App root container */
+.app-shell {
+	display: contents;
+}

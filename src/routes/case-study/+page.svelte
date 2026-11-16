@@ -11,11 +11,11 @@
 		<Stack gap="xl">
 			<header class="cover-header">
 				<a href="/" class="glass-pill text-highlight link-clean">← Quire Home</a>
-				<span class="glass-pill">Engineering Case Study</span>
+				<span class="text-muted header-eyebrow">Engineering Case Study</span>
 			</header>
 
 			<Stack gap="xs">
-				<span class="tag-highlight glass-pill tag-inline">Architectural Deep Dive</span>
+				<span class="text-highlight font-mono page-eyebrow">Architectural Deep Dive</span>
 				<h1 class="case-study-title">
 					How Quire Was Built
 				</h1>
@@ -28,7 +28,7 @@
 			<Box variant="raised" padding="xl" radius="lg" as="section">
 				<Stack gap="md">
 					<Cluster justify="between" align="center">
-						<span class="glass-pill tag-highlight">Decision 01</span>
+						<span class="text-highlight font-mono decision-badge">Decision 01</span>
 						<span class="text-muted adr-label">ADR 0001</span>
 					</Cluster>
 					<h2 class="decision-heading">
@@ -47,7 +47,7 @@
 			<Box variant="raised" padding="xl" radius="lg" as="section">
 				<Stack gap="md">
 					<Cluster justify="between" align="center">
-						<span class="glass-pill tag-support">Decision 02</span>
+						<span class="text-support font-mono decision-badge">Decision 02</span>
 						<span class="text-muted adr-label">ADR 0003</span>
 					</Cluster>
 					<h2 class="decision-heading">
@@ -66,7 +66,7 @@
 			<Box variant="raised" padding="xl" radius="lg" as="section">
 				<Stack gap="md">
 					<Cluster justify="between" align="center">
-						<span class="glass-pill tag-accent">Decision 03</span>
+						<span class="text-accent font-mono decision-badge">Decision 03</span>
 						<span class="text-muted adr-label">SPEC §5</span>
 					</Cluster>
 					<h2 class="decision-heading">
@@ -85,7 +85,7 @@
 			<Box variant="raised" padding="xl" radius="lg" as="section">
 				<Stack gap="md">
 					<Cluster justify="between" align="center">
-						<span class="glass-pill">Decision 04</span>
+						<span class="text-muted font-mono decision-badge">Decision 04</span>
 						<span class="text-muted adr-label">ADR 0002</span>
 					</Cluster>
 					<h2 class="decision-heading">
@@ -106,7 +106,7 @@
 			<Box variant="raised" padding="xl" radius="lg" as="section">
 				<Stack gap="md">
 					<Cluster justify="between" align="center">
-						<span class="glass-pill tag-highlight">Decision 05</span>
+						<span class="text-highlight font-mono decision-badge">Decision 05</span>
 						<span class="text-muted adr-label">ADR 0004</span>
 					</Cluster>
 					<h2 class="decision-heading">
@@ -143,8 +143,25 @@
 		text-decoration: none;
 	}
 
-	.tag-inline {
-		inline-size: fit-content;
+	.header-eyebrow {
+		font-size: 0.85rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+	}
+
+	.page-eyebrow {
+		font-size: 0.85rem;
+		font-weight: 700;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+	}
+
+	.decision-badge {
+		font-size: 0.85rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
 	}
 
 	.case-study-title {

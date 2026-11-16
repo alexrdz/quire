@@ -31,7 +31,7 @@
 					<h2 class="text-highlight section-heading">
 						Attended Gig Stubs ({data.stamped.length})
 					</h2>
-					<span class="glass-pill tag-highlight">Verified Attendance</span>
+					<span class="text-highlight header-eyebrow">Verified Attendance</span>
 				</Cluster>
 
 				{#if data.stamped.length === 0}
@@ -48,8 +48,8 @@
 						{#each data.stamped as item}
 							<div class="ticket-stub stub-card-padding">
 								<Cluster justify="between" align="center">
-									<span class="tag-highlight glass-pill">{item.issue.date}</span>
-									<span class="glass-pill admit-badge">
+									<span class="text-highlight font-mono stub-date">{item.issue.date}</span>
+									<span class="text-muted font-mono admit-text">
 										ADMIT ONE
 									</span>
 								</Cluster>
@@ -72,7 +72,7 @@
 									>
 										Open Issue Zine →
 									</a>
-									<span class="tag-highlight glass-pill attended-pill">✓ ATTENDED</span>
+									<span class="text-highlight font-mono attended-text">✓ ATTENDED</span>
 								</Cluster>
 							</div>
 						{/each}
@@ -86,7 +86,7 @@
 					<h2 class="section-heading-white">
 						Saved Bookmarks ({data.saved.length})
 					</h2>
-					<span class="glass-pill">Reading List</span>
+					<span class="text-muted header-eyebrow">Reading List</span>
 				</Cluster>
 
 				{#if data.saved.length === 0}
@@ -171,9 +171,28 @@
 		padding: var(--space-m);
 	}
 
-	.admit-badge {
-		font-family: var(--font-mono);
+	.header-eyebrow {
+		font-size: 0.8rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+	}
+
+	.stub-date {
+		font-size: 0.85rem;
+		font-weight: 700;
+	}
+
+	.admit-text {
 		font-size: 0.75rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+	}
+
+	.attended-text {
+		font-size: 0.8rem;
+		font-weight: 700;
+		letter-spacing: 0.05em;
 	}
 
 	:global(.stub-middle-content) {
@@ -200,10 +219,6 @@
 		font-size: 0.85rem;
 		font-weight: 600;
 		text-decoration: none;
-	}
-
-	.attended-pill {
-		font-size: 0.7rem;
 	}
 
 	:global(.empty-bookmarks-box) {

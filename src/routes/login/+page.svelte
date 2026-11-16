@@ -17,9 +17,9 @@
 			<Stack gap="lg">
 				<header>
 					<Stack gap="xs" align="center">
-						<div class="glass-pill text-highlight">
-							Quire
-						</div>
+						<span class="text-highlight font-mono login-brand">
+							QUIRE
+						</span>
 						<h1 class="login-title">
 							{isSignUp ? 'Create Band Account' : 'Artist Login'}
 						</h1>
@@ -137,6 +137,12 @@
 		color: #ffffff;
 		margin-block-start: var(--space-2xs);
 		text-align: center;
+	}
+
+	.login-brand {
+		font-size: 0.9rem;
+		font-weight: 800;
+		letter-spacing: 0.15em;
 	}
 
 	.login-subtext {

@@ -58,11 +58,9 @@
 					<!-- Hero Left Column: Copy & CTAs -->
 					<div class="hero-content">
 						<Stack gap="lg">
-							<div class="hero-badge-wrap">
-								<span class="hero-pill-badge">
-									<span class="live-ping"></span>
-									THE DIGITAL ZINE FOR LIVE MUSIC
-								</span>
+							<div class="hero-eyebrow">
+								<span class="live-ping"></span>
+								<span>THE DIGITAL ZINE FOR LIVE MUSIC</span>
 							</div>
 
 							<h1 class="hero-headline">
@@ -128,7 +126,7 @@
 					<div class="hero-preview-col" id="simulator">
 						<Stack gap="sm" align="center">
 							<div class="simulator-callout-header">
-								<span class="preview-badge">LIVE INTERACTIVE PROTOTYPE</span>
+								<span class="preview-eyebrow">LIVE INTERACTIVE PROTOTYPE</span>
 								<p class="preview-hint">Tap tabs, play audio, or simulate a tip:</p>
 							</div>
 							<ZineSimulator />
@@ -143,7 +141,7 @@
 			<Container width="main" padding="none">
 				<Center max="md" centerText>
 					<Stack gap="sm" align="center" class="section-header-centered">
-						<span class="section-tag-pill">DESIGNED FOR GIGS</span>
+						<span class="section-eyebrow">DESIGNED FOR GIGS</span>
 						<h2 class="section-title">A Living Artifact For Every Show</h2>
 						<p class="section-subtitle">
 							Traditional link trees feel like corporate spreadsheets. Quire captures the raw,
@@ -177,7 +175,7 @@
 					<Grid min="md" gap="lg">
 						<Box variant="raised" padding="xl" radius="lg" class="feature-card">
 							<div class="feature-card-glow cyan"></div>
-							<div class="card-icon-badge cyan">
+							<div class="card-icon-box cyan">
 								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 									<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
 								</svg>
@@ -190,14 +188,14 @@
 								</p>
 							</Stack>
 							<Cluster gap="xs" class="card-tag-row">
-								<span class="card-sub-pill">Apple Pay / Google Pay</span>
-								<span class="card-sub-pill">Instant Payouts</span>
+								<span class="card-feature-item">Apple Pay / Google Pay</span>
+								<span class="card-feature-item">Instant Payouts</span>
 							</Cluster>
 						</Box>
 
 						<Box variant="raised" padding="xl" radius="lg" class="feature-card">
 							<div class="feature-card-glow pink"></div>
-							<div class="card-icon-badge pink">
+							<div class="card-icon-box pink">
 								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 									<rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
 									<line x1="8" y1="12" x2="16" y2="12" />
@@ -212,14 +210,14 @@
 								</p>
 							</Stack>
 							<Cluster gap="xs" class="card-tag-row">
-								<span class="card-sub-pill">Bookbinder Engine</span>
-								<span class="card-sub-pill">Mobile Friendly</span>
+								<span class="card-feature-item">Bookbinder Engine</span>
+								<span class="card-feature-item">Mobile Friendly</span>
 							</Cluster>
 						</Box>
 
 						<Box variant="raised" padding="xl" radius="lg" class="feature-card">
 							<div class="feature-card-glow mint"></div>
-							<div class="card-icon-badge mint">
+							<div class="card-icon-box mint">
 								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 									<path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
 								</svg>
@@ -232,14 +230,14 @@
 								</p>
 							</Stack>
 							<Cluster gap="xs" class="card-tag-row">
-								<span class="card-sub-pill">Cryptographic HMAC</span>
-								<span class="card-sub-pill">No Location Prompts</span>
+								<span class="card-feature-item">Cryptographic HMAC</span>
+								<span class="card-feature-item">No Location Prompts</span>
 							</Cluster>
 						</Box>
 
 						<Box variant="raised" padding="xl" radius="lg" class="feature-card">
 							<div class="feature-card-glow purple"></div>
-							<div class="card-icon-badge purple">
+							<div class="card-icon-box purple">
 								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 									<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
 								</svg>
@@ -252,8 +250,8 @@
 								</p>
 							</Stack>
 							<Cluster gap="xs" class="card-tag-row">
-								<span class="card-sub-pill">Verified Artist Badge</span>
-								<span class="card-sub-pill">Built-in Moderation</span>
+								<span class="card-feature-item">Verified Artist Badge</span>
+								<span class="card-feature-item">Built-in Moderation</span>
 							</Cluster>
 						</Box>
 					</Grid>
@@ -261,7 +259,7 @@
 					<Grid min="md" gap="lg">
 						<Box variant="raised" padding="xl" radius="lg" class="feature-card">
 							<div class="feature-card-glow cyan"></div>
-							<div class="card-icon-badge cyan">
+							<div class="card-icon-box cyan">
 								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 									<rect x="2" y="4" width="20" height="16" rx="2" />
 									<line x1="2" y1="10" x2="22" y2="10" />
@@ -275,14 +273,14 @@
 								</p>
 							</Stack>
 							<Cluster gap="xs" class="card-tag-row">
-								<span class="card-sub-pill">Permanent Wallet</span>
-								<span class="card-sub-pill">Concert Lore</span>
+								<span class="card-feature-item">Permanent Wallet</span>
+								<span class="card-feature-item">Concert Lore</span>
 							</Cluster>
 						</Box>
 
 						<Box variant="raised" padding="xl" radius="lg" class="feature-card">
 							<div class="feature-card-glow mint"></div>
-							<div class="card-icon-badge mint">
+							<div class="card-icon-box mint">
 								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 									<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
 									<path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
@@ -296,14 +294,14 @@
 								</p>
 							</Stack>
 							<Cluster gap="xs" class="card-tag-row">
-								<span class="card-sub-pill">Exclusive Audio</span>
-								<span class="card-sub-pill">Behind-The-Scenes</span>
+								<span class="card-feature-item">Exclusive Audio</span>
+								<span class="card-feature-item">Behind-The-Scenes</span>
 							</Cluster>
 						</Box>
 
 						<Box variant="raised" padding="xl" radius="lg" class="feature-card">
 							<div class="feature-card-glow pink"></div>
-							<div class="card-icon-badge pink">
+							<div class="card-icon-box pink">
 								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 									<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
 								</svg>
@@ -316,14 +314,14 @@
 								</p>
 							</Stack>
 							<Cluster gap="xs" class="card-tag-row">
-								<span class="card-sub-pill">Direct Love</span>
-								<span class="card-sub-pill">Zero App Friction</span>
+								<span class="card-feature-item">Direct Love</span>
+								<span class="card-feature-item">Zero App Friction</span>
 							</Cluster>
 						</Box>
 
 						<Box variant="raised" padding="xl" radius="lg" class="feature-card">
 							<div class="feature-card-glow purple"></div>
-							<div class="card-icon-badge purple">
+							<div class="card-icon-box purple">
 								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 									<path d="M12 20h9" />
 									<path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
@@ -337,8 +335,8 @@
 								</p>
 							</Stack>
 							<Cluster gap="xs" class="card-tag-row">
-								<span class="card-sub-pill">Direct Conversation</span>
-								<span class="card-sub-pill">Community History</span>
+								<span class="card-feature-item">Direct Conversation</span>
+								<span class="card-feature-item">Community History</span>
 							</Cluster>
 						</Box>
 					</Grid>
@@ -351,7 +349,7 @@
 			<Container width="main" padding="none">
 				<Center max="md" centerText>
 					<Stack gap="sm" align="center" class="section-header-centered">
-						<span class="section-tag-pill mint">CURRENT RUNNING TOUR</span>
+						<span class="section-eyebrow mint">CURRENT RUNNING TOUR</span>
 						<h2 class="section-title">The Neon Velvet — East Coast Fall Run</h2>
 						<p class="section-subtitle">
 							Explore real live issues currently published on the platform.
@@ -365,7 +363,7 @@
 					<Box variant="raised" padding="xl" radius="lg" class="gig-card highlight-border">
 						<Stack gap="md">
 							<Cluster justify="between" align="center" class="gig-status-strip">
-								<span class="live-status-pill">
+								<span class="live-status-tag">
 									<span class="live-pulse"></span> GIG 01 · ACTIVE
 								</span>
 								<span class="gig-date">OCT 12, 2026</span>
@@ -401,7 +399,7 @@
 					<Box variant="raised" padding="xl" radius="lg" class="gig-card">
 						<Stack gap="md">
 							<Cluster justify="between" align="center" class="gig-status-strip">
-								<span class="upcoming-status-pill">GIG 02 · READY</span>
+								<span class="upcoming-status-tag">GIG 02 · READY</span>
 								<span class="gig-date">OCT 15, 2026</span>
 							</Cluster>
 
@@ -432,7 +430,7 @@
 					<Box variant="raised" padding="xl" radius="lg" class="gig-card">
 						<Stack gap="md">
 							<Cluster justify="between" align="center" class="gig-status-strip">
-								<span class="upcoming-status-pill">GIG 03 · READY</span>
+								<span class="upcoming-status-tag">GIG 03 · READY</span>
 								<span class="gig-date">OCT 18, 2026</span>
 							</Cluster>
 
@@ -485,7 +483,7 @@
 			<Container width="main" padding="none">
 				<Center max="md" centerText>
 					<Stack gap="sm" align="center" class="section-header-centered">
-						<span class="section-tag-pill cyan">THE 3-STEP PIPELINE</span>
+						<span class="section-eyebrow cyan">THE 3-STEP PIPELINE</span>
 						<h2 class="section-title">Zero Friction From Stage to Pocket</h2>
 						<p class="section-subtitle">
 							Built for artists who want to spend their time making noise, not managing social media platforms.
@@ -497,7 +495,7 @@
 					<!-- Step 1 -->
 					<Box variant="raised" padding="xl" radius="lg" class="step-card">
 						<Stack gap="sm">
-							<div class="step-num-badge">01</div>
+							<div class="step-number">01</div>
 							<h3 class="step-heading">Create Master Template</h3>
 							<p class="step-body">
 								Build your recurring tour pages once in the Bookbinder: band bio, merch links,
@@ -510,7 +508,7 @@
 					<!-- Step 2 -->
 					<Box variant="raised" padding="xl" radius="lg" class="step-card">
 						<Stack gap="sm">
-							<div class="step-num-badge">02</div>
+							<div class="step-number">02</div>
 							<h3 class="step-heading">Clone Before Soundcheck</h3>
 							<p class="step-body">
 								Before hitting the stage, enter tonight's city and venue. Attach today's demo or setlist.
@@ -523,7 +521,7 @@
 					<!-- Step 3 -->
 					<Box variant="raised" padding="xl" radius="lg" class="step-card">
 						<Stack gap="sm">
-							<div class="step-num-badge">03</div>
+							<div class="step-number">03</div>
 							<h3 class="step-heading">Fans Scan & Connect</h3>
 							<p class="step-body">
 								Fans scan with their native phone camera. No app download. They tip via Apple Pay,
@@ -541,7 +539,7 @@
 			<Container width="main" padding="none">
 				<Center max="md" centerText>
 					<Stack gap="sm" align="center" class="section-header-centered">
-						<span class="section-tag-pill pink">WHY IT MATTERS</span>
+						<span class="section-eyebrow pink">WHY IT MATTERS</span>
 						<h2 class="section-title">Why Bands Dumped Venmo Signs & Link Trees</h2>
 						<p class="section-subtitle">
 							Compare how traditional gig tactics stack up against a purpose-built digital zine.
@@ -601,7 +599,7 @@
 				<Box variant="raised" padding="xl" radius="lg" class="final-cta-card">
 					<Center max="md" centerText>
 						<Stack gap="md" align="center" class="cta-inner">
-							<span class="cta-pill-tag">TOUR READY IN 60 SECONDS</span>
+							<span class="cta-eyebrow">TOUR READY IN 60 SECONDS</span>
 							<h2 class="cta-headline">Turn Tonight's Crowd Into A Lifelong Community.</h2>
 							<p class="cta-description">
 								No platform gatekeepers. No social media algorithms hiding your art.
@@ -639,7 +637,7 @@
 				<Stack gap="sm" class="footer-col-brand">
 					<Cluster align="center" gap="xs">
 						<span class="brand-text-footer">QUIRE.</span>
-						<span class="live-pill-mini">STG-2026</span>
+						<span class="footer-version-tag">STG-2026</span>
 					</Cluster>
 					<p class="footer-bio">
 						Digital zines for touring artists and buskers. Preserving the physical intimacy of live music in the web era.
@@ -778,14 +776,10 @@
 	}
 
 	.brand-tagline {
-		font-size: 0.65rem;
+		font-size: 0.72rem;
 		font-weight: 700;
 		letter-spacing: 0.12em;
 		color: #01ffc3;
-		background: rgba(1, 255, 195, 0.1);
-		border: 1px solid rgba(1, 255, 195, 0.25);
-		padding: 2px 7px;
-		border-radius: 4px;
 	}
 
 	.nav-menu {
@@ -871,19 +865,15 @@
 		flex-direction: column;
 	}
 
-	.hero-pill-badge {
+	.hero-eyebrow {
 		display: inline-flex;
 		align-items: center;
 		gap: 8px;
-		font-size: 0.72rem;
+		font-size: 0.78rem;
 		font-weight: 700;
-		letter-spacing: 0.08em;
+		letter-spacing: 0.12em;
 		color: #01ffc3;
-		background: rgba(1, 255, 195, 0.1);
-		border: 1px solid rgba(1, 255, 195, 0.3);
-		padding: 5px 14px;
-		border-radius: 9999px;
-		backdrop-filter: blur(10px);
+		text-transform: uppercase;
 	}
 
 	.live-ping {
@@ -1046,15 +1036,12 @@
 		margin-bottom: 16px;
 	}
 
-	.preview-badge {
-		font-size: 0.65rem;
+	.preview-eyebrow {
+		font-size: 0.75rem;
 		font-weight: 800;
-		letter-spacing: 0.1em;
+		letter-spacing: 0.12em;
 		color: #05d9e8;
-		background: rgba(5, 217, 232, 0.12);
-		border: 1px solid rgba(5, 217, 232, 0.3);
-		padding: 3px 10px;
-		border-radius: 9999px;
+		text-transform: uppercase;
 	}
 
 	.preview-hint {
@@ -1073,33 +1060,24 @@
 	}
 
 
-	.section-tag-pill {
-		font-size: 0.7rem;
+	.section-eyebrow {
+		font-size: 0.78rem;
 		font-weight: 800;
-		letter-spacing: 0.1em;
+		letter-spacing: 0.14em;
 		color: #05d9e8;
-		background: rgba(5, 217, 232, 0.1);
-		border: 1px solid rgba(5, 217, 232, 0.25);
-		padding: 4px 12px;
-		border-radius: 9999px;
+		text-transform: uppercase;
 	}
 
-	.section-tag-pill.mint {
+	.section-eyebrow.mint {
 		color: #01ffc3;
-		background: rgba(1, 255, 195, 0.1);
-		border-color: rgba(1, 255, 195, 0.25);
 	}
 
-	.section-tag-pill.cyan {
+	.section-eyebrow.cyan {
 		color: #05d9e8;
-		background: rgba(5, 217, 232, 0.1);
-		border-color: rgba(5, 217, 232, 0.25);
 	}
 
-	.section-tag-pill.pink {
+	.section-eyebrow.pink {
 		color: #ff2a6d;
-		background: rgba(255, 42, 109, 0.1);
-		border-color: rgba(255, 42, 109, 0.25);
 	}
 
 	.section-title {
@@ -1165,7 +1143,7 @@
 	.feature-card-glow.mint { background: #01ffc3; }
 	.feature-card-glow.purple { background: #9d4edd; }
 
-	.card-icon-badge {
+	.card-icon-box {
 		width: 44px;
 		height: 44px;
 		border-radius: 12px;
@@ -1175,30 +1153,30 @@
 		margin-bottom: 4px;
 	}
 
-	.card-icon-badge svg {
+	.card-icon-box svg {
 		width: 22px;
 		height: 22px;
 	}
 
-	.card-icon-badge.cyan {
+	.card-icon-box.cyan {
 		background: rgba(5, 217, 232, 0.12);
 		border: 1px solid rgba(5, 217, 232, 0.3);
 		color: #05d9e8;
 	}
 
-	.card-icon-badge.pink {
+	.card-icon-box.pink {
 		background: rgba(255, 42, 109, 0.12);
 		border: 1px solid rgba(255, 42, 109, 0.3);
 		color: #ff2a6d;
 	}
 
-	.card-icon-badge.mint {
+	.card-icon-box.mint {
 		background: rgba(1, 255, 195, 0.12);
 		border: 1px solid rgba(1, 255, 195, 0.3);
 		color: #01ffc3;
 	}
 
-	.card-icon-badge.purple {
+	.card-icon-box.purple {
 		background: rgba(157, 78, 221, 0.15);
 		border: 1px solid rgba(157, 78, 221, 0.35);
 		color: #c77dff;
@@ -1218,14 +1196,16 @@
 		margin: 0;
 	}
 
-	.card-sub-pill {
-		font-size: 0.72rem;
+	.card-feature-item {
+		font-size: 0.76rem;
 		font-weight: 600;
-		color: #d4d4d8;
-		background: rgba(255, 255, 255, 0.05);
-		border: 1px solid rgba(255, 255, 255, 0.1);
-		padding: 3px 8px;
-		border-radius: 6px;
+		color: #a1a1aa;
+	}
+
+	.card-feature-item::before {
+		content: '·';
+		margin-right: 6px;
+		color: #05d9e8;
 	}
 
 	/* TOUR SHOWCASE SECTION */
@@ -1244,17 +1224,14 @@
 		transform: translateY(-3px);
 	}
 
-	.live-status-pill {
+	.live-status-tag {
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
-		font-size: 0.68rem;
+		font-size: 0.74rem;
 		font-weight: 800;
+		letter-spacing: 0.06em;
 		color: #01ffc3;
-		background: rgba(1, 255, 195, 0.14);
-		border: 1px solid rgba(1, 255, 195, 0.35);
-		padding: 3px 8px;
-		border-radius: 6px;
 	}
 
 	.live-pulse {
@@ -1265,14 +1242,11 @@
 		animation: pulse 1.6s infinite;
 	}
 
-	.upcoming-status-pill {
-		font-size: 0.68rem;
+	.upcoming-status-tag {
+		font-size: 0.74rem;
 		font-weight: 700;
-		color: #a1a1aa;
-		background: rgba(255, 255, 255, 0.06);
-		border: 1px solid rgba(255, 255, 255, 0.12);
-		padding: 3px 8px;
-		border-radius: 6px;
+		letter-spacing: 0.06em;
+		color: #71717a;
 	}
 
 	.gig-date {
@@ -1403,7 +1377,7 @@
 		flex: 1;
 	}
 
-	.step-num-badge {
+	.step-number {
 		font-size: 1.8rem;
 		font-weight: 900;
 		color: #01ffc3;
@@ -1487,15 +1461,12 @@
 		padding-bottom: 100px;
 	}
 
-	.cta-pill-tag {
-		font-size: 0.72rem;
+	.cta-eyebrow {
+		font-size: 0.78rem;
 		font-weight: 800;
-		letter-spacing: 0.1em;
+		letter-spacing: 0.14em;
 		color: #ff2a6d;
-		background: rgba(255, 42, 109, 0.12);
-		border: 1px solid rgba(255, 42, 109, 0.3);
-		padding: 4px 12px;
-		border-radius: 9999px;
+		text-transform: uppercase;
 	}
 
 	.cta-headline {
@@ -1526,14 +1497,11 @@
 		color: #ffffff;
 	}
 
-	.live-pill-mini {
-		font-size: 0.65rem;
+	.footer-version-tag {
+		font-size: 0.72rem;
 		font-weight: 700;
+		letter-spacing: 0.08em;
 		color: #05d9e8;
-		background: rgba(5, 217, 232, 0.1);
-		border: 1px solid rgba(5, 217, 232, 0.25);
-		padding: 2px 6px;
-		border-radius: 4px;
 	}
 
 	.footer-bio {

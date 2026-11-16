@@ -36,10 +36,10 @@
 				<Box variant="raised" padding="xl" radius="lg" class="header-card">
 					<Stack gap="md">
 						<Cluster justify="between" align="center">
-							<Cluster align="center" gap="xs">
-								<span class="glass-pill text-highlight">Artist Back Page</span>
+							<Cluster align="center" gap="sm">
+								<span class="text-highlight header-eyebrow">Artist Back Page</span>
 								{#if data.artist.verified}
-									<span class="glass-pill tag-highlight">✓ Verified Artist</span>
+									<span class="text-highlight verified-eyebrow">✓ Verified Artist</span>
 								{/if}
 							</Cluster>
 
@@ -112,7 +112,7 @@
 											<Box variant="raised" padding="md" radius="md" class="issue-card-box">
 												<Stack gap="xs">
 													<Cluster justify="between" align="center">
-														<span class="glass-pill tag-highlight date-badge">{issue.date}</span>
+														<span class="text-highlight font-mono date-label">{issue.date}</span>
 														<span class="text-muted zine-num">Zine #{issue.slug}</span>
 													</Cluster>
 													<h4 class="issue-city-title">
@@ -144,7 +144,7 @@
 							<h2 class="section-title">General Wall</h2>
 							<p class="text-muted subtext-small">Open guestbook for {data.artist.displayName}.</p>
 						</div>
-						<span class="glass-pill">Public Notes</span>
+						<span class="text-muted section-label">Public Notes</span>
 					</Cluster>
 
 					<!-- Note Submission Form -->
@@ -404,8 +404,30 @@
 		transform: translateY(-2px);
 	}
 
-	.date-badge {
-		font-size: 0.7rem;
+	.header-eyebrow {
+		font-size: 0.8rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+	}
+
+	.verified-eyebrow {
+		font-size: 0.8rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.date-label {
+		font-size: 0.8rem;
+		font-weight: 700;
+	}
+
+	.section-label {
+		font-size: 0.8rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
 	}
 
 	.zine-num {

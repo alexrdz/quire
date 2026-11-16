@@ -63,22 +63,24 @@
 	style="--accent: {data.artist.accentColor || '#05D9E8'};"
 >
 	<!-- PAGE 1: The Cover -->
-	<section id="page-0" class="page cover" style="background-image: {data.artist.coverArtUrl ? `linear-gradient(to bottom, rgba(9, 7, 16, 0.4), rgba(9, 7, 16, 0.95)), url('${data.artist.coverArtUrl}')` : 'none'}; background-size: cover; background-position: center;">
+	<section id="page-0" class="page cover" style="--cover-art: {data.artist.coverArtUrl ? `linear-gradient(to bottom, rgba(9, 7, 16, 0.4), rgba(9, 7, 16, 0.95)), url('${data.artist.coverArtUrl}')` : 'none'};">
 		<div class="page-inner">
 			<header class="cover-header">
 				<a href="/a/{data.artist.slug}" class="glass-pill text-highlight link-clean">
 					← {data.artist.displayName}
 				</a>
 				{#if data.isScanVerified}
-					<span class="glass-pill tag-highlight">● Attended Stamp Eligible</span>
+					<span class="text-highlight font-semibold stamp-eligible-badge">● Attended Stamp Eligible</span>
 				{/if}
 			</header>
 
 			<Stack gap="md" class="cover-middle-stack">
-				<Cluster align="center" gap="xs">
-					<span class="glass-pill tag-highlight">{data.issue.date}</span>
-					<span class="glass-pill">{data.issue.city}</span>
-					<span class="glass-pill text-muted">{data.issue.venue}</span>
+				<Cluster align="center" gap="sm">
+					<span class="text-highlight font-mono meta-date">{data.issue.date}</span>
+					<span class="text-muted">/</span>
+					<span class="meta-city">{data.issue.city}</span>
+					<span class="text-muted">@</span>
+					<span class="text-muted meta-venue">{data.issue.venue}</span>
 				</Cluster>
 
 				<h1 class="cover-title">
@@ -124,7 +126,7 @@
 				<div class="page-inner">
 					<Stack gap="md">
 						<header class="cover-header">
-							<span class="glass-pill tag-accent">Bespoke Page</span>
+							<span class="text-accent page-eyebrow">Bespoke Page</span>
 							<span class="text-muted subtext-page">Page {idx + 2}</span>
 						</header>
 
@@ -165,7 +167,7 @@
 			<div class="page-inner">
 				<Stack gap="md">
 					<header class="cover-header">
-						<span class="glass-pill tag-accent">Gig Notes</span>
+						<span class="text-accent page-eyebrow">Gig Notes</span>
 						<span class="text-muted subtext-page">Page 2</span>
 					</header>
 
@@ -192,7 +194,7 @@
 		<div class="page-inner">
 			<Stack gap="md">
 				<header class="cover-header">
-					<span class="glass-pill tag-highlight">The Wall</span>
+					<span class="text-highlight page-eyebrow">The Wall</span>
 					<span class="text-muted subtext-page">Public Guestbook</span>
 				</header>
 
@@ -313,7 +315,7 @@
 		<div class="page-inner">
 			<Stack gap="lg">
 				<header class="cover-header">
-					<span class="glass-pill endpaper-pill">Endpaper</span>
+					<span class="text-muted page-eyebrow">Endpaper</span>
 					<span class="endpaper-admit">Admit One</span>
 				</header>
 
@@ -322,8 +324,8 @@
 						<!-- Ticket Stub Frame -->
 						<div class="ticket-stub endpaper-stub">
 							<Cluster justify="between" align="center">
-								<span class="tag-highlight glass-pill">{data.issue.date}</span>
-								<span class="glass-pill font-mono">STUB #{data.issue.id.slice(0, 8)}</span>
+								<span class="text-highlight font-mono stub-meta-date">{data.issue.date}</span>
+								<span class="text-muted font-mono stub-id">STUB #{data.issue.id.slice(0, 8)}</span>
 							</Cluster>
 
 							<Stack gap="xs" class="stub-main-content">
@@ -339,9 +341,9 @@
 								</div>
 
 								{#if data.collectionStatus === 'stamped'}
-									<span class="tag-highlight glass-pill stub-status-pill">✓ STAMPED</span>
+									<span class="text-highlight font-mono stub-status-badge">✓ STAMPED</span>
 								{:else if data.collectionStatus === 'saved'}
-									<span class="glass-pill">BOOKMARKED (SAVED)</span>
+									<span class="text-muted font-mono stub-status-badge">BOOKMARKED (SAVED)</span>
 								{/if}
 							</Cluster>
 						</div>
@@ -485,6 +487,48 @@
 {/if}
 
 <style>
+	.cover {
+		background-size: cover;
+		background-position: center;
+		background-image: var(--cover-art, none);
+	}
+
+	.stamp-eligible-badge {
+		font-size: 0.8rem;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+	}
+
+	.meta-date {
+		font-size: 0.85rem;
+		font-weight: 700;
+	}
+
+	.meta-city {
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: #ffffff;
+	}
+
+	.meta-venue {
+		font-size: 0.85rem;
+	}
+
+	.stub-meta-date {
+		font-size: 0.85rem;
+		font-weight: 700;
+	}
+
+	.stub-id {
+		font-size: 0.8rem;
+	}
+
+	.stub-status-badge {
+		font-size: 0.85rem;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+	}
+
 	.link-clean {
 		text-decoration: none;
 	}
@@ -631,14 +675,16 @@
 		font-size: 0.85rem;
 	}
 
+	.page-eyebrow {
+		font-size: 0.8rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+	}
+
 	.endpaper-canvas {
 		background-color: var(--endpaper);
 		color: #1a1a1a;
-	}
-
-	.endpaper-pill {
-		color: #1a1a1a;
-		border-color: rgba(0, 0, 0, 0.2);
 	}
 
 	.endpaper-admit {
@@ -679,10 +725,6 @@
 		font-family: var(--font-mono);
 		font-size: 0.75rem;
 		color: #888888;
-	}
-
-	.stub-status-pill {
-		font-weight: 700;
 	}
 
 	:global(.stamped-congrats-box) {

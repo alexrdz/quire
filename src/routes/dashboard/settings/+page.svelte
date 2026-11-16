@@ -22,7 +22,7 @@
 		<Stack gap="lg">
 			<header class="cover-header">
 				<a href="/dashboard" class="glass-pill text-highlight link-clean">← Back to Dashboard</a>
-				<span class="glass-pill">Settings & Security</span>
+				<span class="text-muted header-eyebrow">Settings & Security</span>
 			</header>
 
 			<Box variant="raised" padding="xl" radius="lg">
@@ -54,9 +54,9 @@
 								</Stack>
 
 								{#if payoutsEnabled}
-									<span class="glass-pill tag-highlight">● Payouts Active</span>
+									<span class="text-highlight font-semibold payout-status-badge">● Payouts Active</span>
 								{:else}
-									<span class="glass-pill tag-support">Pending Setup</span>
+									<span class="text-support font-semibold payout-status-badge">Pending Setup</span>
 								{/if}
 							</Cluster>
 
@@ -120,6 +120,13 @@
 		text-decoration: none;
 	}
 
+	.header-eyebrow {
+		font-size: 0.85rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+	}
+
 	.settings-title {
 		font-size: 1.8rem;
 		font-weight: 800;
@@ -142,6 +149,10 @@
 	}
 
 	.subtext-small {
+		font-size: 0.85rem;
+	}
+
+	.payout-status-badge {
 		font-size: 0.85rem;
 	}
 
