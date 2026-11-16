@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { Center, Box, Stack, Cluster } from '$lib/components/layout';
 
 	let { data, form } = $props();
 
@@ -16,78 +17,153 @@
 	<title>Artist Settings & Payouts | Quire</title>
 </svelte:head>
 
-<div style="background-color: var(--ink); min-block-size: 100vh; --accent: {data.artist.accentColor || '#05D9E8'};">
-	<div data-center style="padding-block: 2rem;" data-stack="lg">
-		<header class="cover-header">
-			<a href="/dashboard" class="glass-pill text-highlight" style="text-decoration: none;">← Back to Dashboard</a>
-			<span class="glass-pill">Settings & Security</span>
-		</header>
+<div class="settings-root" style="--accent: {data.artist.accentColor || '#05D9E8'};">
+	<Center max="md" padding="md" class="settings-canvas">
+		<Stack gap="lg">
+			<header class="cover-header">
+				<a href="/dashboard" class="glass-pill text-highlight link-clean">← Back to Dashboard</a>
+				<span class="glass-pill">Settings & Security</span>
+			</header>
 
-		<div class="glass-panel" style="padding: 2rem;" data-stack="lg">
-			<div data-stack="xs">
-				<h1 style="font-size: 1.8rem; font-weight: 800; color: #FFFFFF;">
-					Settings & Payouts
-				</h1>
-				<p class="text-muted" style="font-size: 0.9rem;">
-					Manage Stripe Connect payout account and guestbook moderation rules.
-				</p>
-			</div>
-
-			{#if form?.success}
-				<div class="glass-panel" style="padding: 0.75rem; border-color: var(--highlight); color: var(--highlight); font-size: 0.85rem;">
-					✓ Settings updated successfully!
-				</div>
-			{/if}
-
-			<!-- Stripe Connect Box -->
-			<div class="glass-panel" style="padding: 1.5rem;" data-stack="sm">
-				<div data-cluster="between">
-					<div data-stack="xs">
-						<span style="font-weight: 700; color: #FFFFFF;">Stripe Connect (Express Payouts)</span>
-						<p class="text-muted" style="font-size: 0.85rem;">
-							Direct bank deposits for live gig tips. Bandcamp-style 5% platform cut is automatically transferred.
+			<Box variant="raised" padding="xl" radius="lg">
+				<Stack gap="lg">
+					<Stack gap="xs">
+						<h1 class="settings-title">
+							Settings & Payouts
+						</h1>
+						<p class="text-muted settings-subtitle">
+							Manage Stripe Connect payout account and guestbook moderation rules.
 						</p>
-					</div>
+					</Stack>
 
-					{#if payoutsEnabled}
-						<span class="glass-pill tag-highlight">● Payouts Active</span>
-					{:else}
-						<span class="glass-pill tag-support">Pending Setup</span>
+					{#if form?.success}
+						<Box variant="subtle" padding="sm" radius="md" class="success-box">
+							✓ Settings updated successfully!
+						</Box>
 					{/if}
-				</div>
 
-				<div style="padding-block-start: 0.75rem;">
-					<label data-cluster style="cursor: pointer; font-size: 0.85rem; color: var(--paper);">
-						<input type="checkbox" bind:checked={payoutsEnabled} />
-						<span>Enable test mode tipping (Simulate verified Stripe Express account)</span>
-					</label>
-				</div>
-			</div>
+					<!-- Stripe Connect Box -->
+					<Box variant="subtle" padding="md" radius="md">
+						<Stack gap="sm">
+							<Cluster justify="between" align="center">
+								<Stack gap="xs">
+									<span class="box-section-title">Stripe Connect (Express Payouts)</span>
+									<p class="text-muted subtext-small">
+										Direct bank deposits for live gig tips. Bandcamp-style 5% platform cut is automatically transferred.
+									</p>
+								</Stack>
 
-			<!-- Moderation Preferences Form -->
-			<form method="POST" action="?/updateSettings" use:enhance data-stack="md">
-				<input type="hidden" name="simulatePayouts" value={String(payoutsEnabled)} />
+								{#if payoutsEnabled}
+									<span class="glass-pill tag-highlight">● Payouts Active</span>
+								{:else}
+									<span class="glass-pill tag-support">Pending Setup</span>
+								{/if}
+							</Cluster>
 
-				<div class="glass-panel" style="padding: 1.5rem;" data-stack="sm">
-					<span style="font-weight: 700; color: #FFFFFF;">General Wall Moderation</span>
-					<p class="text-muted" style="font-size: 0.85rem;">
-						Controls whether notes posted on your Back Page appear immediately or require approval.
-					</p>
+							<div class="checkbox-strip">
+								<label class="pointer-cursor">
+									<Cluster align="center" gap="xs">
+										<input type="checkbox" bind:checked={payoutsEnabled} />
+										<span class="checkbox-label">Enable test mode tipping (Simulate verified Stripe Express account)</span>
+									</Cluster>
+								</label>
+							</div>
+						</Stack>
+					</Box>
 
-					<label data-cluster style="cursor: pointer; font-size: 0.85rem; color: var(--paper); margin-block-start: 0.5rem;">
-						<input type="checkbox" name="generalWallApproveFirst" value="true" bind:checked={generalWallApproveFirst} />
-						<span>Require artist approval before General Wall notes go live</span>
-					</label>
-				</div>
+					<!-- Moderation Preferences Form -->
+					<form method="POST" action="?/updateSettings" use:enhance>
+						<Stack gap="md">
+							<input type="hidden" name="simulatePayouts" value={String(payoutsEnabled)} />
 
-				<button
-					type="submit"
-					class="floating-tip-btn"
-					style="position: static; inline-size: 100%; justify-content: center; padding: 0.85rem; font-size: 1rem; box-shadow: none;"
-				>
-					Save Changes
-				</button>
-			</form>
-		</div>
-	</div>
+							<Box variant="subtle" padding="md" radius="md">
+								<Stack gap="sm">
+									<span class="box-section-title">General Wall Moderation</span>
+									<p class="text-muted subtext-small">
+										Controls whether notes posted on your Back Page appear immediately or require approval.
+									</p>
+
+									<label class="pointer-cursor">
+										<Cluster align="center" gap="xs">
+											<input type="checkbox" name="generalWallApproveFirst" value="true" bind:checked={generalWallApproveFirst} />
+											<span class="checkbox-label">Require artist approval before General Wall notes go live</span>
+										</Cluster>
+									</label>
+								</Stack>
+							</Box>
+
+							<button
+								type="submit"
+								class="floating-tip-btn btn-save"
+							>
+								Save Changes
+							</button>
+						</Stack>
+					</form>
+				</Stack>
+			</Box>
+		</Stack>
+	</Center>
 </div>
+
+<style>
+	.settings-root {
+		background-color: var(--ink);
+		min-block-size: 100vh;
+	}
+
+	:global(.settings-canvas) {
+		padding-block: var(--space-xl);
+	}
+
+	.link-clean {
+		text-decoration: none;
+	}
+
+	.settings-title {
+		font-size: 1.8rem;
+		font-weight: 800;
+		color: #ffffff;
+	}
+
+	.settings-subtitle {
+		font-size: 0.9rem;
+	}
+
+	:global(.success-box) {
+		border-color: var(--highlight);
+		color: var(--highlight);
+		font-size: 0.85rem;
+	}
+
+	.box-section-title {
+		font-weight: 700;
+		color: #ffffff;
+	}
+
+	.subtext-small {
+		font-size: 0.85rem;
+	}
+
+	.checkbox-strip {
+		padding-block-start: var(--space-xs);
+	}
+
+	.pointer-cursor {
+		cursor: pointer;
+	}
+
+	.checkbox-label {
+		font-size: 0.85rem;
+		color: var(--paper);
+	}
+
+	.btn-save {
+		position: static;
+		inline-size: 100%;
+		justify-content: center;
+		padding: 0.85rem;
+		font-size: 1rem;
+		box-shadow: none;
+	}
+</style>

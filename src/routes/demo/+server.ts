@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { db, schema } from '$lib/server/db';
 import { eq } from 'drizzle-orm';
 import { seedDatabase } from '$lib/server/seed';
+import { makeSignature } from 'better-auth/crypto';
 
 export const GET: RequestHandler = async ({ cookies }) => {
 	// Ensure seeded
@@ -30,8 +31,12 @@ export const GET: RequestHandler = async ({ cookies }) => {
 		updatedAt: new Date()
 	});
 
+	const secret = process.env.BETTER_AUTH_SECRET || 'quire_development_secret_at_least_32_characters_long';
+	const signature = await makeSignature(sessionToken, secret);
+	const signedCookie = `${sessionToken}.${signature}`;
+
 	// Set Better Auth session cookie
-	cookies.set('better-auth.session_token', sessionToken, {
+	cookies.set('better-auth.session_token', signedCookie, {
 		path: '/',
 		httpOnly: true,
 		secure: process.env.NODE_ENV === 'production',

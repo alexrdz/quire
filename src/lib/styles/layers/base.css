@@ -23,6 +23,45 @@
 
 	/* Dynamic Page Spacing */
 	--page-padding: clamp(1.25rem, 3.5vh, 2.75rem) clamp(1rem, 3vw, 2.5rem);
+
+	/* Fluid Utopia Spacing Scale */
+	--space-3xs: clamp(0.25rem, 0.25rem + 0vw, 0.25rem);          /* 4px */
+	--space-2xs: clamp(0.5rem, 0.5rem + 0vw, 0.5rem);             /* 8px */
+	--space-xs:  clamp(0.75rem, 0.7283rem + 0.1087vw, 0.8125rem);  /* 12px -> 13px */
+	--space-s:   clamp(1rem, 0.9565rem + 0.2174vw, 1.125rem);      /* 16px -> 18px */
+	--space-m:   clamp(1.5rem, 1.4348rem + 0.3261vw, 1.6875rem);   /* 24px -> 27px */
+	--space-l:   clamp(2rem, 1.913rem + 0.4348vw, 2.25rem);        /* 32px -> 36px */
+	--space-xl:  clamp(3rem, 2.8696rem + 0.6522vw, 3.375rem);      /* 48px -> 54px */
+	--space-2xl: clamp(4rem, 3.8261rem + 0.8696vw, 4.5rem);        /* 64px -> 72px */
+	--space-3xl: clamp(6rem, 5.7391rem + 1.3043vw, 6.75rem);       /* 96px -> 108px */
+
+	/* Token Aliases */
+	--space-sm: var(--space-s);
+	--space-md: var(--space-m);
+	--space-lg: var(--space-l);
+
+	/* Corner Radii */
+	--radius-none: 0px;
+	--radius-sm: 0.25rem;
+	--radius-md: 0.5rem;
+	--radius-lg: 1rem;
+	--radius-full: 9999px;
+
+	/* Reading Measure Bounds */
+	--measure-narrow: clamp(35ch, 45ch + 1vw, 50ch);
+	--measure:        clamp(45ch, 60ch + 2vw, 75ch);
+	--measure-wide:   clamp(65ch, 80ch + 2vw, 90ch);
+
+	/* Container Sizes */
+	--container-size-sm:   clamp(36rem, 85vw, 65rem);
+	--container-size-md:   clamp(48rem, 90vw, 75rem);
+	--container-size-lg:   clamp(64rem, 95vw, 84.375rem);
+	--container-size-main: 88rem;
+
+	/* Fluid Container Padding */
+	--layout-container-padding-sm: clamp(1rem, 2vw + 0.5rem, 1.75rem);
+	--layout-container-padding-md: clamp(1.5rem, 3.5vw + 0.5rem, 3rem);
+	--layout-container-padding-lg: clamp(2rem, 5vw + 0.5rem, 4.5rem);
 }
 
 *,

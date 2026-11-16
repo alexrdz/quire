@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { Box, Stack, Cluster, Split } from '$lib/components/layout';
 
 	let { data, form } = $props();
 
@@ -18,129 +19,141 @@
 
 <div class="bookbinder-workbench">
 	<!-- LEFT PANE: MODULAR BLOCK BUILDER -->
-	<div class="editor-pane" data-stack="lg">
-		<header class="cover-header">
-			<a href="/dashboard" class="glass-pill text-highlight" style="text-decoration: none;">← Dashboard</a>
-			<div data-cluster>
-				<span class="glass-pill tag-highlight">Desktop Bookbinder</span>
-				<a href="/i/{data.issue.slug}" target="_blank" class="glass-pill" style="text-decoration: none;">
-					Open Tab ↗
-				</a>
-			</div>
-		</header>
+	<div class="editor-pane">
+		<Stack gap="lg">
+			<header class="cover-header">
+				<a href="/dashboard" class="glass-pill text-highlight link-clean">← Dashboard</a>
+				<Cluster align="center" gap="xs">
+					<span class="glass-pill tag-highlight">Desktop Bookbinder</span>
+					<a href="/i/{data.issue.slug}" target="_blank" class="glass-pill link-clean">
+						Open Tab ↗
+					</a>
+				</Cluster>
+			</header>
 
-		<div data-stack="xs">
-			<h1 style="font-size: 2rem; font-weight: 800; color: #FFFFFF;">
-				Designing: {data.issue.city}
-			</h1>
-			<p class="text-muted" style="font-size: 0.9rem;">
-				Changes to blocks update your mobile preview frame on the right in real time.
-			</p>
-		</div>
+			<Stack gap="xs">
+				<h1 class="bookbinder-title">
+					Designing: {data.issue.city}
+				</h1>
+				<p class="text-muted subtext-small">
+					Changes to blocks update your mobile preview frame on the right in real time.
+				</p>
+			</Stack>
 
-		<!-- Main Issue Details -->
-		<div class="glass-panel" style="padding: 1.5rem;" data-stack="md">
-			<h2 style="font-size: 1.2rem; font-weight: 700; color: #FFFFFF;">Cover Block</h2>
+			<!-- Main Issue Details -->
+			<Box variant="raised" padding="md" radius="md">
+				<Stack gap="md">
+					<h2 class="card-title">Cover Block</h2>
 
-			<form method="POST" action="?/save" use:enhance={() => () => refreshPreview()} data-stack="sm">
-				<div data-split style="--split-ratio: 1fr 1fr;">
-					<div data-stack="xs">
-						<label for="city" style="font-size: 0.75rem; color: var(--paper);">City</label>
-						<input
-							id="city"
-							type="text"
-							name="city"
-							value={data.issue.city}
-							style="inline-size: 100%; background: rgba(0,0,0,0.5); border: 1px solid var(--glass-border); border-radius: 8px; color: #FFFFFF; padding: 0.6rem;"
-						/>
-					</div>
+					<form method="POST" action="?/save" use:enhance={() => () => refreshPreview()}>
+						<Stack gap="sm">
+							<Split ratio="1-1" gap="md" collapse="sm">
+								<Stack gap="xs">
+									<label for="city" class="input-label-sm">City</label>
+									<input
+										id="city"
+										type="text"
+										name="city"
+										value={data.issue.city}
+										class="bookbinder-input"
+									/>
+								</Stack>
 
-					<div data-stack="xs">
-						<label for="venue" style="font-size: 0.75rem; color: var(--paper);">Venue</label>
-						<input
-							id="venue"
-							type="text"
-							name="venue"
-							value={data.issue.venue}
-							style="inline-size: 100%; background: rgba(0,0,0,0.5); border: 1px solid var(--glass-border); border-radius: 8px; color: #FFFFFF; padding: 0.6rem;"
-						/>
-					</div>
-				</div>
+								<Stack gap="xs">
+									<label for="venue" class="input-label-sm">Venue</label>
+									<input
+										id="venue"
+										type="text"
+										name="venue"
+										value={data.issue.venue}
+										class="bookbinder-input"
+									/>
+								</Stack>
+							</Split>
 
-				<div data-stack="xs">
-					<label for="coverNote" style="font-size: 0.75rem; color: var(--paper);">Cover Note</label>
-					<textarea
-						id="coverNote"
-						name="coverNote"
-						rows="2"
-						style="inline-size: 100%; background: rgba(0,0,0,0.5); border: 1px solid var(--glass-border); border-radius: 8px; color: #FFFFFF; padding: 0.6rem;"
-					>{data.issue.coverNote}</textarea>
-				</div>
+							<Stack gap="xs">
+								<label for="coverNote" class="input-label-sm">Cover Note</label>
+								<textarea
+									id="coverNote"
+									name="coverNote"
+									rows="2"
+									class="bookbinder-input"
+								>{data.issue.coverNote}</textarea>
+							</Stack>
 
-				<div data-cluster="between">
-					<span class="text-muted" style="font-size: 0.75rem;">Status: {data.issue.status}</span>
-					<button type="submit" class="glass-pill tag-highlight" style="cursor: pointer; padding: 0.5rem 1rem;">
-						Save Cover
-					</button>
-				</div>
-			</form>
-		</div>
+							<Cluster justify="between" align="center">
+								<span class="text-muted status-text">Status: {data.issue.status}</span>
+								<button type="submit" class="glass-pill tag-highlight save-btn">
+									Save Cover
+								</button>
+							</Cluster>
+						</Stack>
+					</form>
+				</Stack>
+			</Box>
 
-		<!-- Bespoke Pages Stack -->
-		<div data-stack="md">
-			<div data-cluster="between">
-				<h2 style="font-size: 1.2rem; font-weight: 700; color: #FFFFFF;">
-					Bespoke Pages ({data.pages.length})
-				</h2>
-				<span class="glass-pill">Zine Sequence</span>
-			</div>
+			<!-- Bespoke Pages Stack -->
+			<Stack gap="md">
+				<Cluster justify="between" align="center">
+					<h2 class="card-title">
+						Bespoke Pages ({data.pages.length})
+					</h2>
+					<span class="glass-pill">Zine Sequence</span>
+				</Cluster>
 
-			{#each data.pages as page, idx}
-				<div class="glass-panel" style="padding: 1.25rem;" data-stack="sm">
-					<div data-cluster="between">
-						<span class="glass-pill tag-accent">Page {idx + 2}: {page.kind.toUpperCase()}</span>
-						<form method="POST" action="?/deletePage" use:enhance={() => () => refreshPreview()}>
-							<input type="hidden" name="pageId" value={page.id} />
-							<button type="submit" class="glass-pill text-muted" style="background: none; border: none; cursor: pointer;">
-								✕ Remove
-							</button>
+				{#each data.pages as page, idx}
+					<Box variant="raised" padding="md" radius="md">
+						<Stack gap="sm">
+							<Cluster justify="between" align="center">
+								<span class="glass-pill tag-accent">Page {idx + 2}: {page.kind.toUpperCase()}</span>
+								<form method="POST" action="?/deletePage" use:enhance={() => () => refreshPreview()}>
+									<input type="hidden" name="pageId" value={page.id} />
+									<button type="submit" class="glass-pill text-muted delete-page-btn">
+										✕ Remove
+									</button>
+								</form>
+							</Cluster>
+
+							<p class="text-muted subtext-small">
+								{page.contentJson}
+							</p>
+						</Stack>
+					</Box>
+				{/each}
+
+				<!-- Add Bespoke Page Form -->
+				<Box variant="raised" padding="md" radius="md">
+					<Stack gap="sm">
+						<h3 class="add-page-title">+ Add Bespoke Page Block</h3>
+						<form method="POST" action="?/addPage" use:enhance={() => () => refreshPreview()}>
+							<Stack gap="sm">
+								<Split ratio="1-3" gap="sm" collapse="sm">
+									<select
+										name="kind"
+										class="select-kind-input"
+									>
+										<option value="text">Story / Note</option>
+										<option value="setlist">Setlist</option>
+										<option value="photo">Photo Story</option>
+									</select>
+
+									<input
+										type="text"
+										name="body"
+										placeholder="Page content or story..."
+										class="bookbinder-input"
+									/>
+								</Split>
+
+								<button type="submit" class="glass-pill tag-highlight btn-append">
+									+ Append to Zine
+								</button>
+							</Stack>
 						</form>
-					</div>
-
-					<p class="text-muted" style="font-size: 0.85rem;">
-						{page.contentJson}
-					</p>
-				</div>
-			{/each}
-
-			<!-- Add Bespoke Page Form -->
-			<div class="glass-panel" style="padding: 1.25rem;" data-stack="sm">
-				<h3 style="font-size: 1rem; font-weight: 600; color: #FFFFFF;">+ Add Bespoke Page Block</h3>
-				<form method="POST" action="?/addPage" use:enhance={() => () => refreshPreview()} data-stack="sm">
-					<div data-split style="--split-ratio: 140px 1fr;">
-						<select
-							name="kind"
-							style="background: rgba(0,0,0,0.5); border: 1px solid var(--glass-border); border-radius: 8px; color: #FFFFFF; padding: 0.5rem;"
-						>
-							<option value="text">Story / Note</option>
-							<option value="setlist">Setlist</option>
-							<option value="photo">Photo Story</option>
-						</select>
-
-						<input
-							type="text"
-							name="body"
-							placeholder="Page content or story..."
-							style="inline-size: 100%; background: rgba(0,0,0,0.5); border: 1px solid var(--glass-border); border-radius: 8px; color: #FFFFFF; padding: 0.5rem;"
-						/>
-					</div>
-
-					<button type="submit" class="glass-pill tag-highlight" style="cursor: pointer; inline-size: fit-content;">
-						+ Append to Zine
-					</button>
-				</form>
-			</div>
-		</div>
+					</Stack>
+				</Box>
+			</Stack>
+		</Stack>
 	</div>
 
 	<!-- RIGHT PANE: STICKY MOBILE DEVICE PREVIEW -->
@@ -154,3 +167,73 @@
 		</div>
 	</div>
 </div>
+
+<style>
+	.link-clean {
+		text-decoration: none;
+	}
+
+	.bookbinder-title {
+		font-size: 2rem;
+		font-weight: 800;
+		color: #ffffff;
+	}
+
+	.subtext-small {
+		font-size: 0.85rem;
+	}
+
+	.card-title {
+		font-size: 1.2rem;
+		font-weight: 700;
+		color: #ffffff;
+	}
+
+	.input-label-sm {
+		font-size: 0.75rem;
+		color: var(--paper);
+	}
+
+	.bookbinder-input {
+		inline-size: 100%;
+		background: rgba(0, 0, 0, 0.5);
+		border: 1px solid var(--glass-border);
+		border-radius: var(--radius-md);
+		color: #ffffff;
+		padding: 0.6rem;
+	}
+
+	.status-text {
+		font-size: 0.75rem;
+	}
+
+	.save-btn {
+		cursor: pointer;
+		padding: 0.5rem 1rem;
+	}
+
+	.delete-page-btn {
+		background: none;
+		border: none;
+		cursor: pointer;
+	}
+
+	.add-page-title {
+		font-size: 1rem;
+		font-weight: 600;
+		color: #ffffff;
+	}
+
+	.select-kind-input {
+		background: rgba(0, 0, 0, 0.5);
+		border: 1px solid var(--glass-border);
+		border-radius: var(--radius-md);
+		color: #ffffff;
+		padding: 0.5rem;
+	}
+
+	.btn-append {
+		cursor: pointer;
+		inline-size: fit-content;
+	}
+</style>

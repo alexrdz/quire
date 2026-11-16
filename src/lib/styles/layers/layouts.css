@@ -1,71 +1,551 @@
-/* Elemental Layout Primitives */
+/* ==========================================================================
+   Elemental Layout Primitives (CUBE CSS - Objects Layer)
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Stack Primitive ([data-stack])
+   Vertical flow with consistent sibling rhythm
+   -------------------------------------------------------------------------- */
 [data-stack] {
+	--stack-gap: var(--space-m, 1rem);
+	--stack-align: stretch;
+
 	display: flex;
 	flex-direction: column;
 	justify-content: flex-start;
+	gap: var(--stack-gap);
+	align-items: var(--stack-align);
 }
-[data-stack] > * + * {
-	margin-block-start: var(--stack-gap, 1rem);
-}
-[data-stack="sm"] > * + * { margin-block-start: 0.5rem; }
-[data-stack="md"] > * + * { margin-block-start: 1rem; }
-[data-stack="lg"] > * + * { margin-block-start: 1.5rem; }
-[data-stack="xl"] > * + * { margin-block-start: 2rem; }
 
+/* Gap scale */
+[data-stack~="gap:none"] { --stack-gap: 0; }
+[data-stack~="gap:3xs"], [data-stack~="gap3xs"] { --stack-gap: var(--space-3xs); }
+[data-stack~="gap:2xs"], [data-stack~="gap2xs"] { --stack-gap: var(--space-2xs); }
+[data-stack~="gap:xs"],  [data-stack~="gapxs"]  { --stack-gap: var(--space-xs); }
+[data-stack~="gap:s"],
+[data-stack~="gap:sm"],
+[data-stack~="gapsm"],
+[data-stack~="gap:1"],
+[data-stack="sm"]       { --stack-gap: var(--space-s); }
+[data-stack~="gap:m"],
+[data-stack~="gap:md"],
+[data-stack~="gapmd"],
+[data-stack~="gap:2"],
+[data-stack="md"]       { --stack-gap: var(--space-m); }
+[data-stack~="gap:l"],
+[data-stack~="gap:lg"],
+[data-stack~="gaplg"],
+[data-stack~="gap:3"],
+[data-stack="lg"]       { --stack-gap: var(--space-l); }
+[data-stack~="gap:xl"],
+[data-stack~="gapxl"],
+[data-stack="xl"]       { --stack-gap: var(--space-xl); }
+[data-stack~="gap:2xl"], [data-stack~="gap2xl"] { --stack-gap: var(--space-2xl); }
+[data-stack~="gap:3xl"], [data-stack~="gap3xl"] { --stack-gap: var(--space-3xl); }
+
+/* Alignment */
+[data-stack~="align:start"],   [data-stack~="alignstart"]   { --stack-align: flex-start; }
+[data-stack~="align:center"],  [data-stack~="aligncenter"]  { --stack-align: center; }
+[data-stack~="align:end"],     [data-stack~="alignend"]     { --stack-align: flex-end; }
+[data-stack~="align:stretch"], [data-stack~="alignstretch"] { --stack-align: stretch; }
+
+[data-stack~="only-child"]:only-child {
+	block-size: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   2. Box Primitive ([data-box])
+   Visual enclosure, padded container, plate/panel
+   -------------------------------------------------------------------------- */
+[data-box] {
+	--box-padding: var(--space-m, 1.25rem);
+	--box-border-width: 1px;
+	--box-border-color: var(--glass-border);
+	--box-bg: transparent;
+	--box-color: inherit;
+	--box-radius: 12px;
+
+	display: block;
+	padding: var(--box-padding);
+	border: var(--box-border-width) solid var(--box-border-color);
+	background-color: var(--box-bg);
+	color: var(--box-color);
+	border-radius: var(--box-radius);
+}
+
+/* Surfaces & Variations */
+[data-box~="variant:raised"] {
+	--box-bg: var(--glass-surface);
+	--box-border-color: var(--glass-border);
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
+}
+
+[data-box~="variant:subtle"] {
+	--box-bg: rgba(255, 255, 255, 0.04);
+	--box-border-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-box~="variant:muted"] {
+	--box-bg: rgba(0, 0, 0, 0.4);
+	--box-border-color: var(--glass-border);
+}
+
+[data-box~="invert"] {
+	--box-bg: var(--paper);
+	--box-color: var(--ink);
+	--box-border-color: transparent;
+}
+
+[data-box~="border:none"], [data-box~="bordernone"] {
+	--box-border-width: 0px;
+}
+
+/* Radii */
+[data-box~="radius:none"] { --box-radius: 0px; }
+[data-box~="radius:sm"]   { --box-radius: var(--radius-sm, 4px); }
+[data-box~="radius:md"]   { --box-radius: var(--radius-md, 8px); }
+[data-box~="radius:lg"]   { --box-radius: 16px; }
+
+/* Padding scale */
+[data-box~="padding:none"] { --box-padding: 0; }
+[data-box~="padding:xs"],  [data-box~="paddingxs"]  { --box-padding: var(--space-xs); }
+[data-box~="padding:s"],
+[data-box~="padding:sm"],
+[data-box~="paddingsm"],
+[data-box~="padding:1"]    { --box-padding: var(--space-s); }
+[data-box~="padding:m"],
+[data-box~="padding:md"],
+[data-box~="paddingmd"],
+[data-box~="padding:2"]    { --box-padding: var(--space-m); }
+[data-box~="padding:l"],
+[data-box~="padding:lg"],
+[data-box~="paddinglg"],
+[data-box~="padding:3"]    { --box-padding: var(--space-l); }
+[data-box~="padding:xl"],  [data-box~="paddingxl"]  { --box-padding: var(--space-xl); }
+
+/* --------------------------------------------------------------------------
+   3. Cluster Primitive ([data-cluster])
+   Inline items that wrap naturally and align
+   -------------------------------------------------------------------------- */
 [data-cluster] {
+	--cluster-gap: var(--space-s, 0.75rem);
+	--cluster-justify: flex-start;
+	--cluster-align: center;
+
 	display: flex;
 	flex-wrap: wrap;
-	gap: var(--cluster-gap, 0.75rem);
+	gap: var(--cluster-gap);
+	justify-content: var(--cluster-justify);
+	align-items: var(--cluster-align);
+}
+
+/* Gap scale */
+[data-cluster~="gap:none"] { --cluster-gap: 0; }
+[data-cluster~="gap:3xs"]  { --cluster-gap: var(--space-3xs); }
+[data-cluster~="gap:2xs"]  { --cluster-gap: var(--space-2xs); }
+[data-cluster~="gap:xs"], [data-cluster~="gapxs"] { --cluster-gap: var(--space-xs); }
+[data-cluster~="gap:sm"], [data-cluster~="gapsm"], [data-cluster~="gap:1"] { --cluster-gap: var(--space-s); }
+[data-cluster~="gap:md"], [data-cluster~="gapmd"], [data-cluster~="gap:2"] { --cluster-gap: var(--space-m); }
+[data-cluster~="gap:lg"], [data-cluster~="gaplg"], [data-cluster~="gap:3"] { --cluster-gap: var(--space-l); }
+[data-cluster~="gap:xl"], [data-cluster~="gapxl"] { --cluster-gap: var(--space-xl); }
+
+/* Justification */
+[data-cluster~="justify:start"],   [data-cluster~="justifystart"]   { --cluster-justify: flex-start; }
+[data-cluster~="justify:center"],  [data-cluster~="justifycenter"], [data-cluster="center"] { --cluster-justify: center; }
+[data-cluster~="justify:end"],     [data-cluster~="justifyend"]     { --cluster-justify: flex-end; }
+[data-cluster~="justify:between"], [data-cluster~="justifybetween"], [data-cluster="between"] { --cluster-justify: space-between; }
+[data-cluster~="justify:around"],  [data-cluster~="justifyaround"]  { --cluster-justify: space-around; }
+[data-cluster~="justify:evenly"],  [data-cluster~="justifyevenly"]  { --cluster-justify: space-evenly; }
+
+/* Alignment */
+[data-cluster~="align:start"],    [data-cluster~="alignstart"]    { --cluster-align: flex-start; }
+[data-cluster~="align:center"],   [data-cluster~="aligncenter"]   { --cluster-align: center; }
+[data-cluster~="align:end"],      [data-cluster~="alignend"]      { --cluster-align: flex-end; }
+[data-cluster~="align:baseline"], [data-cluster~="alignbaseline"] { --cluster-align: baseline; }
+[data-cluster~="align:stretch"],  [data-cluster~="alignstretch"]  { --cluster-align: stretch; }
+
+[data-cluster~="nowrap"] {
+	flex-wrap: nowrap;
+}
+
+[data-cluster~="distribute:equally"] > * {
+	flex: 1 1 0;
+}
+
+/* --------------------------------------------------------------------------
+   4. Center Primitive ([data-center])
+   Centering by readable measure or intrinsic width
+   -------------------------------------------------------------------------- */
+[data-center] {
+	--measure: clamp(45ch, 60ch + 2vw, 75ch);
+	--center-padding: 1rem;
+
+	display: block;
+	box-sizing: content-box;
+	max-inline-size: var(--measure);
+	margin-inline: auto;
+	padding-inline: var(--center-padding);
+}
+
+/* Width Bounds */
+[data-center~="max:measure"], [data-center~="maxmeasure"] { --measure: clamp(45ch, 60ch + 2vw, 75ch); }
+[data-center~="max:xs"]       { --measure: 26rem; }
+[data-center~="max:sm"],      [data-center~="maxsm"]      { --measure: var(--container-size-sm, 36rem); }
+[data-center~="max:md"],      [data-center~="maxmd"]      { --measure: var(--container-size-md, 48rem); }
+[data-center~="max:lg"],      [data-center~="maxlg"]      { --measure: var(--container-size-lg, 64rem); }
+
+/* Padding */
+[data-center~="padding:none"] { --center-padding: 0; }
+[data-center~="padding:sm"], [data-center~="paddingsm"] { --center-padding: var(--space-s); }
+[data-center~="padding:md"], [data-center~="paddingmd"] { --center-padding: var(--space-m); }
+[data-center~="padding:lg"], [data-center~="paddinglg"] { --center-padding: var(--space-l); }
+
+/* Centering Behavior */
+[data-center~="center:children"], [data-center~="centerchildren"] {
+	display: flex;
+	flex-direction: column;
 	align-items: center;
 }
-[data-cluster="between"] {
-	justify-content: space-between;
+
+[data-center~="center:text"], [data-center~="centertext"] {
+	text-align: center;
 }
-[data-cluster="center"] {
+
+[data-center~="center:vertically"] {
+	display: flex;
+	flex-direction: column;
 	justify-content: center;
+	min-block-size: 100%;
 }
 
-[data-center] {
-	box-sizing: content-box;
-	margin-inline: auto;
-	max-inline-size: var(--center-max, 65ch);
-	padding-inline: 1rem;
+[data-center~="intrinsic"] {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
 }
 
-[data-split] {
-	display: grid;
-	grid-template-columns: 1fr;
-	gap: var(--split-gap, 1.5rem);
-}
-@media (min-width: 768px) {
-	[data-split] {
-		grid-template-columns: var(--split-ratio, 1fr 1fr);
-	}
-}
-
+/* --------------------------------------------------------------------------
+   5. Grid Primitive ([data-grid])
+   Auto-fitting 2D responsive card grid based on min-width
+   -------------------------------------------------------------------------- */
 [data-grid] {
+	--min-width: 17.5rem; /* ~280px */
+	--grid-gap: var(--space-m, 1.25rem);
+
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--grid-min, 280px)), 1fr));
-	gap: var(--grid-gap, 1.25rem);
+	gap: var(--grid-gap);
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--min-width)), 1fr));
 }
 
-[data-box] {
-	padding: var(--box-pad, 1.25rem);
-	border: 1px solid var(--glass-border);
-	border-radius: 12px;
+/* Gap scale */
+[data-grid~="gap:none"] { --grid-gap: 0; }
+[data-grid~="gap:xs"], [data-grid~="gapxs"] { --grid-gap: var(--space-xs); }
+[data-grid~="gap:sm"], [data-grid~="gapsm"], [data-grid~="gap:1"] { --grid-gap: var(--space-s); }
+[data-grid~="gap:md"], [data-grid~="gapmd"], [data-grid~="gap:2"] { --grid-gap: var(--space-m); }
+[data-grid~="gap:lg"], [data-grid~="gaplg"], [data-grid~="gap:3"] { --grid-gap: var(--space-l); }
+[data-grid~="gap:xl"], [data-grid~="gapxl"] { --grid-gap: var(--space-xl); }
+
+/* Min Column Widths */
+[data-grid~="min:2xs"], [data-grid~="min2xs"] { --min-width: 10rem; }
+[data-grid~="min:xs"],  [data-grid~="minxs"]  { --min-width: 12rem; }
+[data-grid~="min:sm"],  [data-grid~="minsm"]  { --min-width: 16rem; }
+[data-grid~="min:md"],  [data-grid~="minmd"]  { --min-width: 20rem; }
+[data-grid~="min:lg"],  [data-grid~="minlg"]  { --min-width: 25rem; }
+[data-grid~="min:xl"],  [data-grid~="minxl"]  { --min-width: 30rem; }
+
+/* --------------------------------------------------------------------------
+   6. Split Primitive ([data-split])
+   Two-region asymmetric layout with threshold collapse
+   -------------------------------------------------------------------------- */
+[data-split] {
+	--split-gap: var(--space-m, 1.5rem);
+	--split-align: stretch;
+	--collapse-at: 48rem;
+
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--split-gap);
+	align-items: var(--split-align);
 }
 
+[data-split] > * {
+	flex-grow: 1;
+}
+
+[data-split] > :first-child {
+	flex-basis: calc((var(--collapse-at) - 100%) * 999);
+	min-inline-size: 0;
+}
+
+[data-split] > :last-child {
+	flex-basis: 0;
+	flex-grow: 999;
+	min-inline-size: 0;
+}
+
+/* Ratios */
+[data-split~="ratio:1-4"] > :first-child { flex-grow: 1; }
+[data-split~="ratio:1-4"] > :last-child  { flex-grow: 4; }
+
+[data-split~="ratio:1-3"] > :first-child { flex-grow: 1; }
+[data-split~="ratio:1-3"] > :last-child  { flex-grow: 3; }
+
+[data-split~="ratio:1-2"] > :first-child { flex-grow: 1; }
+[data-split~="ratio:1-2"] > :last-child  { flex-grow: 2; }
+
+[data-split~="ratio:1-1"] > :first-child { flex-grow: 1; }
+[data-split~="ratio:1-1"] > :last-child  { flex-grow: 1; }
+
+[data-split~="ratio:2-1"] > :first-child { flex-grow: 2; }
+[data-split~="ratio:2-1"] > :last-child  { flex-grow: 1; }
+
+[data-split~="ratio:2-3"] > :first-child { flex-grow: 2; }
+[data-split~="ratio:2-3"] > :last-child  { flex-grow: 3; }
+
+[data-split~="ratio:3-4"] > :first-child { flex-grow: 3; }
+[data-split~="ratio:3-4"] > :last-child  { flex-grow: 4; }
+
+/* Collapse Thresholds */
+[data-split~="collapse:sm"] { --collapse-at: 36rem; }
+[data-split~="collapse:md"] { --collapse-at: 48rem; }
+[data-split~="collapse:lg"] { --collapse-at: 64rem; }
+
+/* Gap Scale */
+[data-split~="gap:sm"], [data-split~="gapsm"] { --split-gap: var(--space-s); }
+[data-split~="gap:md"], [data-split~="gapmd"] { --split-gap: var(--space-m); }
+[data-split~="gap:lg"], [data-split~="gaplg"] { --split-gap: var(--space-l); }
+
+/* --------------------------------------------------------------------------
+   7. Switcher Primitive ([data-switcher])
+   Multi-item row that automatically stacks when crowded
+   -------------------------------------------------------------------------- */
+[data-switcher] {
+	--switcher-gap: var(--space-m, 1.5rem);
+	--collapse-at: 48rem;
+
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--switcher-gap);
+}
+
+[data-switcher] > * {
+	flex-grow: 1;
+	flex-basis: calc((var(--collapse-at) - 100%) * 999);
+}
+
+[data-switcher] > :nth-last-child(n + 5),
+[data-switcher] > :nth-last-child(n + 5) ~ * {
+	flex-basis: 100%;
+}
+
+/* Limits */
+[data-switcher~="limit:2"] > :nth-last-child(n + 3),
+[data-switcher~="limit:2"] > :nth-last-child(n + 3) ~ * { flex-basis: 100%; }
+
+[data-switcher~="limit:3"] > :nth-last-child(n + 4),
+[data-switcher~="limit:3"] > :nth-last-child(n + 4) ~ * { flex-basis: 100%; }
+
+[data-switcher~="limit:4"] > :nth-last-child(n + 5),
+[data-switcher~="limit:4"] > :nth-last-child(n + 5) ~ * { flex-basis: 100%; }
+
+[data-switcher~="limit:5"] > :nth-last-child(n + 6),
+[data-switcher~="limit:5"] > :nth-last-child(n + 6) ~ * { flex-basis: 100%; }
+
+/* Collapse Thresholds */
+[data-switcher~="collapse:sm"] { --collapse-at: 36rem; }
+[data-switcher~="collapse:md"] { --collapse-at: 48rem; }
+[data-switcher~="collapse:lg"] { --collapse-at: 64rem; }
+
+/* Gaps */
+[data-switcher~="gap:sm"], [data-switcher~="gapsm"] { --switcher-gap: var(--space-s); }
+[data-switcher~="gap:md"], [data-switcher~="gapmd"] { --switcher-gap: var(--space-m); }
+[data-switcher~="gap:lg"], [data-switcher~="gaplg"] { --switcher-gap: var(--space-l); }
+
+/* Align */
+[data-switcher~="align:start"]  { align-items: flex-start; }
+[data-switcher~="align:center"] { align-items: center; }
+[data-switcher~="align:end"]    { align-items: flex-end; }
+
+/* --------------------------------------------------------------------------
+   8. Container Primitive ([data-container])
+   Top-level page section shell with max width & gutter
+   -------------------------------------------------------------------------- */
+[data-container] {
+	--container-size: var(--container-size-main, 88rem);
+	--container-padding: var(--layout-container-padding-md, var(--space-m));
+
+	display: block;
+	box-sizing: border-box;
+	max-inline-size: var(--container-size);
+	margin-inline: auto;
+	padding-inline: var(--container-padding);
+}
+
+[data-container~="width:sm"],   [data-container~="widthsm"]   { --container-size: var(--container-size-sm, 65rem); }
+[data-container~="width:md"],   [data-container~="widthmd"]   { --container-size: var(--container-size-md, 75rem); }
+[data-container~="width:lg"],   [data-container~="widthlg"]   { --container-size: var(--container-size-lg, 84.375rem); }
+[data-container~="width:main"], [data-container~="widthmain"] { --container-size: var(--container-size-main, 88rem); }
+
+[data-container~="padding:none"] { --container-padding: 0; }
+[data-container~="padding:sm"], [data-container~="paddingsm"] { --container-padding: var(--layout-container-padding-sm, var(--space-s)); }
+[data-container~="padding:md"], [data-container~="paddingmd"] { --container-padding: var(--layout-container-padding-md, var(--space-m)); }
+[data-container~="padding:lg"], [data-container~="paddinglg"] { --container-padding: var(--layout-container-padding-lg, var(--space-l)); }
+
+/* --------------------------------------------------------------------------
+   9. Cover Primitive ([data-cover])
+   Full/partial-height container with pinned top/main/bottom
+   -------------------------------------------------------------------------- */
+[data-cover] {
+	--cover-padding: var(--layout-container-padding-sm, 1rem);
+	--cover-margin: var(--space-s, 1rem);
+	--block-size: 100dvh;
+
+	display: flex;
+	flex-direction: column;
+	min-block-size: var(--block-size);
+	padding: var(--cover-padding);
+}
+
+[data-cover] > * {
+	margin-block: var(--cover-margin);
+}
+
+[data-cover] > :first-child:not([data-cover-main]) {
+	margin-block-start: 0;
+}
+
+[data-cover] > :last-child:not([data-cover-main]) {
+	margin-block-end: 0;
+}
+
+[data-cover] > [data-cover-main] {
+	margin-block: auto;
+}
+
+/* Padding scale */
+[data-cover~="padding:none"] { --cover-padding: 0; }
+[data-cover~="padding:sm"],
+[data-cover~="padding:1"]    { --cover-padding: var(--layout-container-padding-sm); }
+[data-cover~="padding:md"],
+[data-cover~="padding:2"]    { --cover-padding: var(--layout-container-padding-md); }
+[data-cover~="padding:lg"],
+[data-cover~="padding:3"]    { --cover-padding: var(--layout-container-padding-lg); }
+
+/* Height / Min-block-size */
+[data-cover~="height:25"]  { --block-size: 25dvh; }
+[data-cover~="height:50"]  { --block-size: 50dvh; }
+[data-cover~="height:75"]  { --block-size: 75dvh; }
+[data-cover~="height:100"] { --block-size: 100dvh; }
+
+/* --------------------------------------------------------------------------
+   10. Frame Primitive ([data-frame])
+   Strict aspect-ratio enclosure for media
+   -------------------------------------------------------------------------- */
 [data-frame] {
-	aspect-ratio: var(--frame-ratio, 16 / 9);
+	--ratio: 16 / 9;
+
+	display: block;
+	aspect-ratio: var(--ratio);
 	overflow: hidden;
 	position: relative;
 }
+
 [data-frame] > img,
-[data-frame] > video {
+[data-frame] > video,
+[data-frame] > iframe {
 	inline-size: 100%;
 	block-size: 100%;
 	object-fit: cover;
 }
+
+/* Ratios */
+[data-frame~="ratio:1"],
+[data-frame~="ratio:1-1"],
+[data-frame~="ratio:square"],
+[data-frame~="ratio1"]   { --ratio: 1 / 1; }
+
+[data-frame~="ratio:16-9"],
+[data-frame~="ratio:16/9"],
+[data-frame~="ratio:video"],
+[data-frame~="ratio169"] { --ratio: 16 / 9; }
+
+[data-frame~="ratio:4-3"],
+[data-frame~="ratio:4/3"],
+[data-frame~="ratio43"]  { --ratio: 4 / 3; }
+
+[data-frame~="ratio:3-2"],
+[data-frame~="ratio:3/2"] { --ratio: 3 / 2; }
+
+[data-frame~="ratio:21-9"],
+[data-frame~="ratio:21/9"] { --ratio: 21 / 9; }
+
+/* --------------------------------------------------------------------------
+   11. Reel Primitive ([data-reel])
+   Horizontally scrolling sequence with optional snap
+   -------------------------------------------------------------------------- */
+[data-reel] {
+	--reel-gap: var(--space-s, 1rem);
+	--reel-padding: 0;
+	--reel-item-width: auto;
+
+	display: flex;
+	gap: var(--reel-gap);
+	padding: var(--reel-padding);
+	overflow-x: auto;
+	overflow-y: hidden;
+	overscroll-behavior-inline: contain;
+	-webkit-overflow-scrolling: touch;
+	scroll-snap-type: inline mandatory;
+	scroll-padding-inline: var(--reel-padding);
+}
+
+[data-reel] > * {
+	flex: 0 0 var(--reel-item-width);
+	scroll-snap-align: start;
+}
+
+/* Items visible */
+[data-reel~="items:2"] { --reel-item-width: calc((100% - var(--reel-gap)) / 2); }
+[data-reel~="items:3"] { --reel-item-width: calc((100% - var(--reel-gap) * 2) / 3); }
+[data-reel~="items:4"] { --reel-item-width: calc((100% - var(--reel-gap) * 3) / 4); }
+[data-reel~="items:5"] { --reel-item-width: calc((100% - var(--reel-gap) * 4) / 5); }
+
+/* Snap */
+[data-reel~="snap:center"] > * { scroll-snap-align: center; }
+[data-reel~="snap:end"] > *    { scroll-snap-align: end; }
+
+/* Gap */
+[data-reel~="gap:xs"] { --reel-gap: var(--space-xs); }
+[data-reel~="gap:sm"], [data-reel~="gap:1"] { --reel-gap: var(--space-s); }
+[data-reel~="gap:md"], [data-reel~="gap:2"] { --reel-gap: var(--space-m); }
+[data-reel~="gap:lg"], [data-reel~="gap:3"] { --reel-gap: var(--space-l); }
+
+/* --------------------------------------------------------------------------
+   12. Imposter Primitive ([data-imposter])
+   Contained or viewport-centered overlay
+   -------------------------------------------------------------------------- */
+[data-imposter] {
+	--imposter-position: absolute;
+	position: var(--imposter-position);
+	inset-block-start: 50%;
+	inset-inline-start: 50%;
+	transform: translate(-50%, -50%);
+}
+
+[data-imposter~="position:fixed"] {
+	--imposter-position: fixed;
+}
+
+[data-imposter~="contain:true"] {
+	overflow: auto;
+	max-inline-size: calc(100% - var(--space-m) * 2);
+	max-block-size: calc(100% - var(--space-m) * 2);
+}
+
+/* ==========================================================================
+   Quire App-Specific Book Engine Layouts
+   ========================================================================== */
 
 /* Horizontal Scroll-Snap Book Engine */
 .book-container {

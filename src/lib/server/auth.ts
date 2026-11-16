@@ -5,6 +5,7 @@ import { db, schema } from './db';
 export const auth = betterAuth({
 	database: drizzleAdapter(db, {
 		provider: 'sqlite',
+		usePlural: true,
 		schema: {
 			users: schema.users,
 			sessions: schema.sessions,
@@ -32,7 +33,12 @@ export const auth = betterAuth({
 			}
 		}
 	},
-	secret: process.env.BETTER_AUTH_SECRET || 'quire_development_secret_at_least_32_characters_long'
+	secret: process.env.BETTER_AUTH_SECRET || 'quire_development_secret_at_least_32_characters_long',
+	experimental: {
+		instrumentation: {
+			enabled: false
+		}
+	}
 });
 
 export type Auth = typeof auth;

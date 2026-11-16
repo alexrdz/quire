@@ -4,6 +4,7 @@ import { db, schema } from '$lib/server/db';
 import { eq } from 'drizzle-orm';
 import { seedDatabase } from '$lib/server/seed';
 import crypto from 'node:crypto';
+import { makeSignature } from 'better-auth/crypto';
 
 describe('Dashboard +page.server', () => {
 	it('executes load function successfully for demo artist', async () => {
@@ -28,19 +29,36 @@ describe('Dashboard +page.server', () => {
 			updatedAt: new Date()
 		});
 
+		const secret = process.env.BETTER_AUTH_SECRET || 'quire_development_secret_at_least_32_characters_long';
+		const signature = await makeSignature(sessionToken, secret);
+		const signedCookie = `${sessionToken}.${signature}`;
+
 		const req = new Request('http://localhost:4173/dashboard', {
 			headers: {
-				cookie: `better-auth.session_token=${sessionToken}`
+				cookie: `better-auth.session_token=${signedCookie}`
 			}
 		});
 
+		const data = (await (load as any)({ request: req })) as any;
+		expect(data.artist).toBeDefined();
+		expect(data.artist.displayName).toBe('The Neon Velvet');
+		expect(data.issues).toBeDefined();
+		expect(data.issues.length).toBeGreaterThan(0);
+		expect(data.pendingNotes).toBeDefined();
+		expect(data.latestRecap).toBeDefined();
+	});
+
+	it('redirects unauthenticated requests to /login?redirect=/dashboard', async () => {
+		const req = new Request('http://localhost:4173/dashboard', {
+			headers: {}
+		});
+
 		try {
-			const data = await (load as any)({ request: req });
-			console.log('LOAD RETURNED DATA:', Object.keys(data));
-			expect(data.artist).toBeDefined();
-		} catch (err: any) {
-			console.error('LOAD THREW ERROR:', err);
-			throw err;
+			await (load as any)({ request: req });
+			expect.unreachable('Should have thrown redirect');
+		} catch (redirectErr: any) {
+			expect(redirectErr.status).toBe(303);
+			expect(redirectErr.location).toBe('/login?redirect=/dashboard');
 		}
 	});
 });
