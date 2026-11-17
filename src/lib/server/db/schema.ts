@@ -1,5 +1,6 @@
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { relations } from 'drizzle-orm';
+import { TIP_STATUSES, TipStatus } from '../../domain/tipping';
 
 /**
  * Better Auth Tables (Extended with accountType)
@@ -231,8 +232,8 @@ export const tips = sqliteTable(
 		amountNet: integer('amount_net').notNull(), // in cents
 		fanCoveredFees: integer('fan_covered_fees', { mode: 'boolean' }).default(false).notNull(),
 		stripePaymentId: text('stripe_payment_id').notNull().unique(),
-		status: text('status', { enum: ['succeeded', 'refunded', 'disputed'] })
-			.default('succeeded')
+		status: text('status', { enum: TIP_STATUSES })
+			.default(TipStatus.Succeeded)
 			.notNull(),
 		refundedAt: integer('refunded_at', { mode: 'timestamp' }),
 		createdAt: integer('created_at', { mode: 'timestamp' }).notNull()

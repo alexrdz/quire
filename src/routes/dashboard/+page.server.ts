@@ -11,6 +11,11 @@ import {
 } from '$lib/server/services/moderation';
 import { generateArtistQrSvg } from '$lib/server/services/qr';
 import { replyNoteSchema } from '$schemas/wall';
+import {
+	calculateTipReversalCents,
+	summarizeArtistTips,
+	type TipStatus
+} from '$domain/tipping';
 
 const DEFAULT_SIGNUP_BIO = 'Live digital zines and tour archive on Quire.';
 
@@ -44,7 +49,7 @@ export const load: ServerLoad = async ({ request, url }) => {
 		throw redirect(303, '/login');
 	}
 
-	// Calculate stats for latest gig recap
+	// Calculate stats for latest gig recap using pure domain aggregation
 	const latestIssue = artist.issues[0] || null;
 	let latestRecap = null;
 
@@ -52,20 +57,20 @@ export const load: ServerLoad = async ({ request, url }) => {
 		const tips = latestIssue.tips || [];
 		const collections = latestIssue.collections || [];
 		const issueNotes = latestIssue.notes || [];
-
-		const totalGrossCents = tips.reduce((acc, t) => acc + t.amountGross, 0);
-		const totalFeesCents = tips.reduce((acc, t) => acc + t.feeStripe + t.feePlatform, 0);
-		const totalNetCents = tips.reduce((acc, t) => acc + t.amountNet, 0);
+		const tipSummary = summarizeArtistTips(tips);
 
 		const stampedCount = collections.filter((c) => c.kind === 'stamped').length;
 		const savedCount = collections.filter((c) => c.kind === 'saved').length;
 
 		latestRecap = {
 			issue: latestIssue,
-			totalGrossCents,
-			totalFeesCents,
-			totalNetCents,
-			tipCount: tips.length,
+			totalGrossCents: tipSummary.grossCents,
+			totalFeesCents: tipSummary.feesCents,
+			reversalsCents: tipSummary.reversalsCents,
+			totalNetCents: tipSummary.netCents,
+			tipCount: tipSummary.tipCount,
+			refundCount: tipSummary.refundCount,
+			disputeCount: tipSummary.disputeCount,
 			stampedCount,
 			savedCount,
 			noteCount: issueNotes.length
@@ -80,13 +85,51 @@ export const load: ServerLoad = async ({ request, url }) => {
 		where: and(eq(schema.notes.artistId, artist.id), isNull(schema.notes.issueId))
 	});
 
+	const generalTipSummary = summarizeArtistTips(generalTips);
 	const generalRow = {
-		grossCents: generalTips.reduce((acc, t) => acc + t.amountGross, 0),
-		feesCents: generalTips.reduce((acc, t) => acc + t.feeStripe + t.feePlatform, 0),
-		netCents: generalTips.reduce((acc, t) => acc + t.amountNet, 0),
-		tipCount: generalTips.length,
+		grossCents: generalTipSummary.grossCents,
+		feesCents: generalTipSummary.feesCents,
+		reversalsCents: generalTipSummary.reversalsCents,
+		netCents: generalTipSummary.netCents,
+		tipCount: generalTipSummary.tipCount,
+		refundCount: generalTipSummary.refundCount,
+		disputeCount: generalTipSummary.disputeCount,
 		noteCount: generalNotes.length
 	};
+
+	const issuesWithTipSummary = artist.issues.map((issue) => ({
+		...issue,
+		tipSummary: summarizeArtistTips(issue.tips || [])
+	}));
+
+	// Individual tip breakdown ledger (SPEC.md §6.5: each tip shows gross, fees, reversals, and net)
+	const allTips = await db.query.tips.findMany({
+		where: eq(schema.tips.artistId, artist.id),
+		orderBy: [desc(schema.tips.createdAt)],
+		with: {
+			issue: {
+				columns: { id: true, city: true, venue: true, date: true, slug: true }
+			}
+		}
+	});
+
+	const tipLedger = allTips.map((tip) => ({
+		id: tip.id,
+		issueId: tip.issueId,
+		sourceLabel: tip.issue
+			? `${tip.issue.city} @ ${tip.issue.venue}`
+			: 'General (Back Page)',
+		issueSlug: tip.issue?.slug ?? null,
+		amountGross: tip.amountGross,
+		feeStripe: tip.feeStripe,
+		feePlatform: tip.feePlatform,
+		reversalCents: calculateTipReversalCents(tip),
+		amountNet: tip.amountNet,
+		fanCoveredFees: tip.fanCoveredFees,
+		status: tip.status as TipStatus,
+		refundedAt: tip.refundedAt,
+		createdAt: tip.createdAt
+	}));
 
 	// Fetch notes across all artist walls for moderation & replies (flagged/pending prioritized)
 	const allNotes = await db.query.notes.findMany({
@@ -125,8 +168,9 @@ export const load: ServerLoad = async ({ request, url }) => {
 	return {
 		artist,
 		latestRecap,
-		issues: artist.issues,
+		issues: issuesWithTipSummary,
 		generalRow,
+		tipLedger,
 		pendingNotes: allNotes,
 		artistQrSvg,
 		artistBackPageUrl,

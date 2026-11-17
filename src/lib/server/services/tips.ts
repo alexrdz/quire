@@ -3,7 +3,13 @@ import type Stripe from 'stripe';
 import { z } from 'zod';
 import { db, schema } from '$lib/server/db';
 import { and, eq } from 'drizzle-orm';
-import { calculateTipBreakdown, type TipBreakdown } from '$domain/tipping';
+import {
+	calculateTipBaseNetCents,
+	calculateTipBreakdown,
+	TipReversalStatus,
+	TipStatus,
+	type TipBreakdown
+} from '$domain/tipping';
 import { type Result, type DomainError, ok, err } from '$domain/types';
 import {
 	initiateTipSchema,
@@ -429,7 +435,7 @@ export async function createTipCheckout(params: {
 		amountNet: breakdown.netArtistCents,
 		fanCoveredFees: breakdown.fanCoveredFees,
 		stripePaymentId: simulatedPaymentId,
-		status: 'succeeded',
+		status: TipStatus.Succeeded,
 		createdAt: new Date()
 	});
 
@@ -528,18 +534,22 @@ async function recordSucceededTipIdempotent(params: {
 		amountNet: breakdown.netArtistCents,
 		fanCoveredFees: breakdown.fanCoveredFees,
 		stripePaymentId: params.stripePaymentId,
-		status: 'succeeded',
+		status: TipStatus.Succeeded,
 		createdAt: new Date()
 	});
 
 	return ok('recorded');
 }
 
-async function applyTipReversalIdempotent(params: {
+export interface ApplyTipReversalParams {
 	stripePaymentId: string;
-	status: 'refunded' | 'disputed';
+	status: TipReversalStatus;
 	deductionCents: number;
-}): Promise<'adjusted' | 'not_found'> {
+}
+
+async function applyTipReversalIdempotent(
+	params: ApplyTipReversalParams
+): Promise<'adjusted' | 'not_found'> {
 	const existing = await db.query.tips.findFirst({
 		where: eq(schema.tips.stripePaymentId, params.stripePaymentId)
 	});
@@ -547,10 +557,7 @@ async function applyTipReversalIdempotent(params: {
 		return 'not_found';
 	}
 
-	const baseNet = existing.fanCoveredFees
-		? existing.amountGross - existing.feePlatform
-		: Math.max(0, existing.amountGross - existing.feePlatform - existing.feeStripe);
-
+	const baseNet = calculateTipBaseNetCents(existing);
 	const updatedNet = baseNet - params.deductionCents;
 
 	if (existing.amountNet !== updatedNet || existing.status !== params.status) {
@@ -662,7 +669,7 @@ export async function handleStripeWebhookEvent(
 
 			const outcome = await applyTipReversalIdempotent({
 				stripePaymentId: paymentIntentId,
-				status: 'refunded',
+				status: TipReversalStatus.Refunded,
 				deductionCents: chargeObj.amount_refunded
 			});
 
@@ -686,7 +693,7 @@ export async function handleStripeWebhookEvent(
 
 			const outcome = await applyTipReversalIdempotent({
 				stripePaymentId: paymentIntentId,
-				status: 'disputed',
+				status: TipReversalStatus.Disputed,
 				deductionCents: disputeObj.amount
 			});
 

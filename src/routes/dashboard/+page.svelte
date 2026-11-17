@@ -3,6 +3,7 @@
 	import { Container, Box, Stack, Cluster, Grid } from '$lib/components/layout';
 	import ArtistTopNav from '$lib/components/dashboard/ArtistTopNav.svelte';
 	import QrCaseDisplay from '$lib/components/dashboard/QrCaseDisplay.svelte';
+	import { formatUsdCents, isTipReversed, TipStatus } from '$domain/tipping';
 
 	let { data } = $props();
 
@@ -10,6 +11,26 @@
 	let replyText = $state('');
 	let showArtistQrModal = $state(false);
 	let showCaseDisplay = $state(false);
+	let tipFilter = $state<'all' | 'issues' | 'general' | 'reversals'>('all');
+
+	const filteredTipLedger = $derived(
+		(data.tipLedger ?? []).filter((tip) => {
+			if (tipFilter === 'issues') return tip.issueId !== null;
+			if (tipFilter === 'general') return tip.issueId === null;
+			if (tipFilter === 'reversals') return isTipReversed(tip.status);
+			return true;
+		})
+	);
+
+	function formatTipTimestamp(value: Date | string): string {
+		const dateObj = value instanceof Date ? value : new Date(value);
+		if (Number.isNaN(dateObj.getTime())) return '';
+		return dateObj.toLocaleDateString('en-US', {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric'
+		});
+	}
 </script>
 
 <svelte:head>
@@ -281,10 +302,10 @@
 									<Stack gap="2xs">
 										<span class="text-muted metric-label">Gross Tips</span>
 										<span class="text-support metric-value">
-											${(data.latestRecap.totalGrossCents / 100).toFixed(2)}
+											{formatUsdCents(data.latestRecap.totalGrossCents)}
 										</span>
 										<span class="text-muted metric-sub">
-											{data.latestRecap.tipCount} tippers · ${(data.latestRecap.totalFeesCents / 100).toFixed(2)} fees
+											{data.latestRecap.tipCount} tippers · {formatUsdCents(data.latestRecap.totalFeesCents)} fees
 										</span>
 									</Stack>
 								</Box>
@@ -293,9 +314,15 @@
 									<Stack gap="2xs">
 										<span class="text-muted metric-label">Net Artist Payout</span>
 										<span class="metric-value metric-white">
-											${(data.latestRecap.totalNetCents / 100).toFixed(2)}
+											{formatUsdCents(data.latestRecap.totalNetCents)}
 										</span>
-										<span class="text-muted metric-sub">After Stripe & 5% platform cut</span>
+										{#if data.latestRecap.reversalsCents > 0}
+											<span class="text-support metric-sub">
+												Refunds & chargebacks: -{formatUsdCents(data.latestRecap.reversalsCents)} ({data.latestRecap.refundCount + data.latestRecap.disputeCount})
+											</span>
+										{:else}
+											<span class="text-muted metric-sub">After Stripe & 5% platform cut</span>
+										{/if}
 									</Stack>
 								</Box>
 
@@ -361,10 +388,7 @@
 							</thead>
 							<tbody>
 								{#each data.issues as issue}
-									{@const tips = (issue.tips as Array<{ amountGross: number; feeStripe: number; feePlatform: number; amountNet: number }> | undefined) || []}
-									{@const gross = tips.reduce((s, t) => s + t.amountGross, 0)}
-									{@const fees = tips.reduce((s, t) => s + t.feeStripe + t.feePlatform, 0)}
-									{@const net = tips.reduce((s, t) => s + t.amountNet, 0)}
+									{@const summary = issue.tipSummary}
 									{@const stamps = ((issue.collections as Array<{ kind: string }> | undefined) || []).filter((c) => c.kind === 'stamped').length}
 									{@const noteCount = ((issue.notes as Array<unknown> | undefined) || []).length}
 									<tr class="table-body-row">
@@ -379,9 +403,13 @@
 											</span>
 										</td>
 										<td class="table-cell font-mono">
-											<div class="cell-primary-text">${(gross / 100).toFixed(2)} gross</div>
+											<div class="cell-primary-text">{formatUsdCents(summary.grossCents)} gross</div>
 											<div class="text-muted cell-subtext">
-												-${(fees / 100).toFixed(2)} fees → <strong class="text-highlight">${(net / 100).toFixed(2)} net</strong>
+												-{formatUsdCents(summary.feesCents)} fees
+												{#if summary.reversalsCents > 0}
+													· <span class="text-support">-{formatUsdCents(summary.reversalsCents)} reversals</span>
+												{/if}
+												→ <strong class="text-highlight">{formatUsdCents(summary.netCents)} net</strong>
 											</div>
 										</td>
 										<td class="table-cell font-semibold">{stamps}</td>
@@ -417,9 +445,13 @@
 											<span class="meta-chip meta-accent">Always Live</span>
 										</td>
 										<td class="table-cell font-mono">
-											<div class="cell-primary-text">${(data.generalRow.grossCents / 100).toFixed(2)} gross</div>
+											<div class="cell-primary-text">{formatUsdCents(data.generalRow.grossCents)} gross</div>
 											<div class="text-muted cell-subtext">
-												-${(data.generalRow.feesCents / 100).toFixed(2)} fees → <strong class="text-highlight">${(data.generalRow.netCents / 100).toFixed(2)} net</strong>
+												-{formatUsdCents(data.generalRow.feesCents)} fees
+												{#if data.generalRow.reversalsCents > 0}
+													· <span class="text-support">-{formatUsdCents(data.generalRow.reversalsCents)} reversals</span>
+												{/if}
+												→ <strong class="text-highlight">{formatUsdCents(data.generalRow.netCents)} net</strong>
 											</div>
 										</td>
 										<td class="table-cell text-muted">—</td>
@@ -435,6 +467,114 @@
 											</Cluster>
 										</td>
 									</tr>
+								{/if}
+							</tbody>
+						</table>
+					</Box>
+				</Stack>
+			{/if}
+
+			<!-- PER-TIP BREAKDOWN LEDGER (SPEC.md §5.4 & §6.5) -->
+			{#if data.tipLedger && data.tipLedger.length > 0}
+				<Stack as="section" gap="md">
+					<Cluster justify="between" align="center" gap="md">
+						<Stack gap="3xs">
+							<h2 class="section-heading">Tip Breakdown Ledger</h2>
+							<p class="text-muted subtext-small">
+								Individual gross amount, Stripe &amp; 5% platform fees, absorbed refunds or chargebacks, and net artist payout.
+							</p>
+						</Stack>
+
+						<Cluster gap="xs" role="tablist" aria-label="Filter tips">
+							<button
+								type="button"
+								class="btn-filter-tab {tipFilter === 'all' ? 'is-active' : ''}"
+								onclick={() => (tipFilter = 'all')}
+							>
+								All ({data.tipLedger.length})
+							</button>
+							<button
+								type="button"
+								class="btn-filter-tab {tipFilter === 'issues' ? 'is-active' : ''}"
+								onclick={() => (tipFilter = 'issues')}
+							>
+								Issues
+							</button>
+							<button
+								type="button"
+								class="btn-filter-tab {tipFilter === 'general' ? 'is-active' : ''}"
+								onclick={() => (tipFilter = 'general')}
+							>
+								General
+							</button>
+							<button
+								type="button"
+								class="btn-filter-tab {tipFilter === 'reversals' ? 'is-active' : ''}"
+								onclick={() => (tipFilter = 'reversals')}
+							>
+								Refunds &amp; Disputes
+							</button>
+						</Cluster>
+					</Cluster>
+
+					<Box variant="raised" padding="none" class="table-container-shell">
+						<table class="gigs-table">
+							<thead>
+								<tr class="table-header-row">
+									<th class="table-cell">Date</th>
+									<th class="table-cell">Source</th>
+									<th class="table-cell">Status</th>
+									<th class="table-cell">Gross</th>
+									<th class="table-cell">Fees &amp; Reversals</th>
+									<th class="table-cell align-end">Net Payout</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#if filteredTipLedger.length === 0}
+									<tr class="table-body-row">
+										<td class="table-cell text-muted" colspan="6">
+											No tips match this filter yet.
+										</td>
+									</tr>
+								{:else}
+									{#each filteredTipLedger as tip (tip.id)}
+										<tr class="table-body-row">
+											<td class="table-cell font-mono">{formatTipTimestamp(tip.createdAt)}</td>
+											<td class="table-cell">
+												<div class="cell-primary-text">{tip.sourceLabel}</div>
+												{#if tip.fanCoveredFees}
+													<span class="meta-chip meta-highlight">Fan covered Stripe fee</span>
+												{/if}
+											</td>
+											<td class="table-cell">
+												<span
+													class="status-badge {tip.status === TipStatus.Succeeded
+														? ''
+														: 'status-cancelled'}"
+												>
+													{tip.status}
+												</span>
+											</td>
+											<td class="table-cell font-mono cell-primary-text">
+												{formatUsdCents(tip.amountGross)}
+											</td>
+											<td class="table-cell font-mono">
+												<div class="text-muted cell-subtext">
+													Stripe {formatUsdCents(tip.feeStripe)} · Quire 5% {formatUsdCents(tip.feePlatform)}
+												</div>
+												{#if tip.reversalCents > 0}
+													<div class="text-support cell-subtext">
+														{tip.status === TipStatus.Disputed ? 'Chargeback' : 'Refund'} absorbed: -{formatUsdCents(tip.reversalCents)}
+													</div>
+												{/if}
+											</td>
+											<td class="table-cell align-end font-mono">
+												<strong class={tip.amountNet < 0 ? 'text-support' : 'text-highlight'}>
+													{formatUsdCents(tip.amountNet)}
+												</strong>
+											</td>
+										</tr>
+									{/each}
 								{/if}
 							</tbody>
 						</table>
@@ -1081,5 +1221,31 @@
 	.btn-reply-trigger:hover {
 		background: rgba(5, 217, 232, 0.22);
 		border-color: rgba(5, 217, 232, 0.6);
+	}
+
+	.btn-filter-tab {
+		display: inline-flex;
+		align-items: center;
+		padding-block: 0.35rem;
+		padding-inline: 0.75rem;
+		border-radius: 6px;
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		color: var(--ink-muted);
+		font-size: 0.76rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+	}
+
+	.btn-filter-tab:hover {
+		background: rgba(255, 255, 255, 0.09);
+		color: #ffffff;
+	}
+
+	.btn-filter-tab.is-active {
+		background: rgba(5, 217, 232, 0.14);
+		border-color: rgba(5, 217, 232, 0.45);
+		color: var(--accent);
 	}
 </style>
