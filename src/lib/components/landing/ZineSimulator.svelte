@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { Stack, Cluster } from '$lib/components/layout';
+
 	// Interactive Zine Phone Simulator adapted from ui-prototype/index.html
 
 	let activeTab = $state<'audio' | 'photo' | 'notes' | 'wall'>('audio');
@@ -20,7 +22,7 @@
 			initials: 'JD',
 			color: 'linear-gradient(135deg, #01FFC3, #05D9E8)',
 			time: '2h ago',
-			text: 'Saw you guys at Baby\'s All Right! That new track blew my mind. When is it dropping on streaming?',
+			text: "Saw you guys at Baby's All Right! That new track blew my mind. When is it dropping on streaming?",
 			reply: {
 				author: 'The Neon Velvet (Artist)',
 				time: '1h ago',
@@ -82,7 +84,7 @@
 
 	function submitTip() {
 		showTipDrawer = false;
-		triggerToast('Tip Confirmed! 🎉', `Thank you for sending $${tipAmount} directly to The Neon Velvet!`);
+		triggerToast('Tip Confirmed', `Thank you for sending $${tipAmount} directly to The Neon Velvet!`);
 	}
 
 	function submitComment() {
@@ -98,7 +100,7 @@
 		});
 		newCommentText = '';
 		showCommentDrawer = false;
-		triggerToast('Mark Left on Wall ✍️', 'Your note is live on the Brooklyn tour wall!');
+		triggerToast('Mark Left on Wall', 'Your note is live on the Brooklyn tour wall!');
 		activeTab = 'wall';
 	}
 </script>
@@ -107,39 +109,37 @@
 	<!-- Phone Container -->
 	<div class="phone-frame">
 		<!-- Phone Speaker Notch / Status bar -->
-		<div class="phone-status-bar">
+		<Cluster justify="between" align="center" class="phone-status-bar">
 			<span class="status-time">9:41</span>
 			<div class="dynamic-island">
 				<div class="island-camera"></div>
 			</div>
-			<div class="status-signals">
+			<Cluster align="center" gap="2xs" class="status-signals">
 				<span class="signal-dot">●●●</span>
-				<span class="battery-icon">⚡ 98%</span>
-			</div>
-		</div>
+				<span class="battery-icon">98%</span>
+			</Cluster>
+		</Cluster>
 
 		<!-- Top Header Bar -->
-		<header class="zine-header">
-			<div class="brand-wrap">
+		<Cluster as="header" justify="between" align="center" class="zine-header">
+			<Cluster align="center" gap="2xs" class="brand-wrap">
 				<span class="brand-text">QUIRE.</span>
 				<span class="live-indicator">
 					<span class="pulse-dot"></span> LIVE ZINE
 				</span>
-			</div>
-			<div class="header-actions">
-				<a href="/login" class="login-chip">Artist Login</a>
-			</div>
-		</header>
+			</Cluster>
+			<a href="/login" class="login-chip">Artist Login</a>
+		</Cluster>
 
 		<!-- Subnav Tabs -->
-		<nav class="zine-nav-tabs" aria-label="Zine Sections">
+		<Cluster as="nav" distributeEqually gap="2xs" class="zine-nav-tabs" aria-label="Zine Sections">
 			<button
 				type="button"
 				class="nav-tab-btn"
 				class:active={activeTab === 'audio'}
 				onclick={() => (activeTab = 'audio')}
 			>
-				<span class="tab-icon">🎵</span> Track
+				Track
 			</button>
 			<button
 				type="button"
@@ -147,7 +147,7 @@
 				class:active={activeTab === 'photo'}
 				onclick={() => (activeTab = 'photo')}
 			>
-				<span class="tab-icon">📸</span> Photo
+				Photo
 			</button>
 			<button
 				type="button"
@@ -155,7 +155,7 @@
 				class:active={activeTab === 'notes'}
 				onclick={() => (activeTab = 'notes')}
 			>
-				<span class="tab-icon">📝</span> Notes
+				Notes
 			</button>
 			<button
 				type="button"
@@ -163,9 +163,9 @@
 				class:active={activeTab === 'wall'}
 				onclick={() => (activeTab = 'wall')}
 			>
-				<span class="tab-icon">💬</span> Wall
+				Wall
 			</button>
-		</nav>
+		</Cluster>
 
 		<!-- Main Screen Body -->
 		<main class="zine-screen-body">
@@ -177,7 +177,7 @@
 					</div>
 
 					<!-- Play / Pause Center Overlay -->
-					<div class="media-center-action">
+					<Stack gap="2xs" align="center" class="media-center-action">
 						<button
 							type="button"
 							class="play-circle-btn"
@@ -199,21 +199,23 @@
 						<span class="play-hint-text">
 							{isPlaying ? 'TAP TO PAUSE' : 'TAP TO LISTEN'}
 						</span>
-					</div>
+					</Stack>
 
 					<!-- Bottom Meta & Controls -->
-					<div class="card-bottom-content">
-						<div class="meta-row">
+					<Stack gap="xs" class="card-bottom-content">
+						<Cluster align="center" gap="xs" class="meta-row">
 							<span class="meta-tag mint">OCT 12</span>
 							<span class="meta-tag muted">BROOKLYN, NY</span>
 							<span class="time-stamp">{isPlaying ? '01:24' : '00:00'} / 03:42</span>
-						</div>
+						</Cluster>
 
-						<h2 class="card-headline">Studio Session 04</h2>
-						<p class="card-subtext">Rough mix of the new bridge from Greenpoint rehearsal. Needs more fuzz.</p>
+						<Stack gap="3xs">
+							<h2 class="card-headline">Studio Session 04</h2>
+							<p class="card-subtext">Rough mix of the new bridge from Greenpoint rehearsal. Needs more fuzz.</p>
+						</Stack>
 
 						<!-- Animated Equalizer Waveform -->
-						<div class="audio-waveform-row">
+						<Stack gap="2xs" class="audio-waveform-row">
 							<div class="waveform-bars" class:animating={isPlaying}>
 								<span style="--h: 40%"></span>
 								<span style="--h: 75%"></span>
@@ -233,12 +235,12 @@
 								<span style="--h: 60%"></span>
 							</div>
 							<div class="track-progress-bar">
-								<div class="track-progress-fill" style="width: {isPlaying ? playProgress : 15}%;"></div>
+								<div class="track-progress-fill" style="inline-size: {isPlaying ? playProgress : 15}%;"></div>
 							</div>
-						</div>
+						</Stack>
 
 						<!-- Action Buttons -->
-						<div class="action-grid">
+						<Cluster distributeEqually gap="2xs" class="action-grid">
 							<button
 								type="button"
 								class="action-btn tip-btn"
@@ -260,8 +262,8 @@
 								</svg>
 								<span>{comments.length} Notes</span>
 							</button>
-						</div>
-					</div>
+						</Cluster>
+					</Stack>
 				</div>
 
 			{:else if activeTab === 'photo'}
@@ -275,17 +277,19 @@
 						<span>35MM FILM STUB</span>
 					</div>
 
-					<div class="card-bottom-content">
-						<div class="meta-row">
+					<Stack gap="xs" class="card-bottom-content">
+						<Cluster align="center" gap="xs" class="meta-row">
 							<span class="meta-tag mint">OCT 10</span>
 							<span class="meta-tag muted">CHICAGO</span>
 							<span class="meta-tag cyan">SOLD OUT</span>
-						</div>
+						</Cluster>
 
-						<h2 class="card-headline">Tour Diary: CHI</h2>
-						<p class="card-subtext">Sold out the Metro. You animals. First night playing the unreleased second set.</p>
+						<Stack gap="3xs">
+							<h2 class="card-headline">Tour Diary: CHI</h2>
+							<p class="card-subtext">Sold out the Metro. You animals. First night playing the unreleased second set.</p>
+						</Stack>
 
-						<div class="action-grid">
+						<Cluster distributeEqually gap="2xs" class="action-grid">
 							<button
 								type="button"
 								class="action-btn tip-btn"
@@ -307,22 +311,22 @@
 								</svg>
 								<span>Leave Memory</span>
 							</button>
-						</div>
-					</div>
+						</Cluster>
+					</Stack>
 				</div>
 
 			{:else if activeTab === 'notes'}
 				<!-- Card 3: Deep Cut Liner Notes -->
 				<div class="card-page notes-card">
-					<div class="notes-scrollable-area">
-						<div class="meta-row">
+					<Stack gap="sm" class="notes-scrollable-area">
+						<Cluster align="center" gap="xs" class="meta-row">
 							<span class="meta-tag mint">OCT 14</span>
 							<span class="meta-tag muted">LINER NOTES</span>
-						</div>
+						</Cluster>
 
 						<h2 class="notes-title">Thoughts on the New Record</h2>
 
-						<div class="notes-prose">
+						<Stack gap="xs" class="notes-prose">
 							<p>
 								Been locked in the studio for the last three weeks. The energy here is different. We stripped back a lot of the heavy production we leaned on for the last album. Everything feels more raw, more intentional.
 							</p>
@@ -332,11 +336,11 @@
 							<p>
 								I want this record to feel like you're sitting in the room with us. No polish, just the truth. Thanks to everyone who's been supporting the tour and tipping through Quire.
 							</p>
-						</div>
-					</div>
+						</Stack>
+					</Stack>
 
 					<div class="card-bottom-fixed">
-						<div class="action-grid">
+						<Cluster distributeEqually gap="2xs" class="action-grid">
 							<button
 								type="button"
 								class="action-btn tip-btn"
@@ -357,54 +361,54 @@
 								</svg>
 								<span>Reply to Band</span>
 							</button>
-						</div>
+						</Cluster>
 					</div>
 				</div>
 
 			{:else if activeTab === 'wall'}
 				<!-- Card 4: Digital Guestbook Wall -->
 				<div class="card-page wall-card">
-					<div class="wall-header-area">
-						<div class="meta-row">
+					<Stack gap="3xs" class="wall-header-area">
+						<Cluster align="center" gap="xs" class="meta-row">
 							<span class="meta-tag cyan">COMMUNITY WALL</span>
 							<span class="meta-tag muted">{comments.length} ENTRIES</span>
-						</div>
+						</Cluster>
 						<h2 class="wall-title">Digital Guestbook</h2>
 						<p class="wall-sub">Read the wall or leave your own mark on tonight's gig.</p>
-					</div>
+					</Stack>
 
 					<!-- Comments List -->
-					<div class="wall-feed-scroll">
+					<Stack gap="sm" class="wall-feed-scroll">
 						{#each comments as c (c.id)}
-							<div class="fan-comment-item">
+							<Cluster align="start" gap="2xs" nowrap class="fan-comment-item">
 								<div class="fan-avatar" style="background: {c.color};">
 									{c.initials}
 								</div>
-								<div class="fan-content">
-									<div class="fan-meta">
+								<Stack gap="3xs" class="fan-content">
+									<Cluster align="baseline" gap="2xs" class="fan-meta">
 										<span class="fan-name">{c.author}</span>
 										<span class="fan-time">{c.time}</span>
-									</div>
+									</Cluster>
 									<div class="fan-bubble">
 										{c.text}
 									</div>
 
 									{#if c.reply}
-										<div class="artist-reply-block">
-											<div class="artist-verified-row">
+										<Stack gap="3xs" class="artist-reply-block">
+											<Cluster align="center" gap="3xs" class="artist-verified-row">
 												<span class="verified-icon">✓</span>
 												<span class="artist-reply-name">{c.reply.author}</span>
 												<span class="artist-reply-time">{c.reply.time}</span>
-											</div>
+											</Cluster>
 											<div class="artist-reply-bubble">
 												{c.reply.text}
 											</div>
-										</div>
+										</Stack>
 									{/if}
-								</div>
-							</div>
+								</Stack>
+							</Cluster>
 						{/each}
-					</div>
+					</Stack>
 
 					<div class="card-bottom-fixed">
 						<button
@@ -426,9 +430,9 @@
 		<!-- Bottom Drawer: Support / Tip Modal -->
 		{#if showTipDrawer}
 			<button type="button" class="drawer-scrim" onclick={() => (showTipDrawer = false)} aria-label="Close drawer"></button>
-			<div class="slide-drawer glass-drawer">
+			<Stack gap="xs" class="slide-drawer glass-drawer">
 				<div class="drawer-handle"></div>
-				<div class="drawer-header">
+				<Cluster justify="between" align="center" class="drawer-header">
 					<h3 class="drawer-title">Support The Neon Velvet</h3>
 					<button
 						type="button"
@@ -436,11 +440,11 @@
 						onclick={() => (showTipDrawer = false)}
 						aria-label="Close"
 					>✕</button>
-				</div>
+				</Cluster>
 				<p class="drawer-sub">Directly fund studio recording time & van gas. 100% direct to artist.</p>
 
 				<!-- Tip Presets -->
-				<div class="tip-preset-grid">
+				<Cluster distributeEqually gap="2xs" class="tip-preset-grid">
 					{#each [3, 5, 10, 25] as amount}
 						<button
 							type="button"
@@ -451,7 +455,7 @@
 							${amount}
 						</button>
 					{/each}
-				</div>
+				</Cluster>
 
 				<!-- Custom Tip Input -->
 				<div class="custom-tip-wrapper">
@@ -473,15 +477,15 @@
 				>
 					Send ${tipAmount} Tip →
 				</button>
-			</div>
+			</Stack>
 		{/if}
 
 		<!-- Bottom Drawer: Add Note Modal -->
 		{#if showCommentDrawer}
 			<button type="button" class="drawer-scrim" onclick={() => (showCommentDrawer = false)} aria-label="Close drawer"></button>
-			<div class="slide-drawer glass-drawer">
+			<Stack gap="xs" class="slide-drawer glass-drawer">
 				<div class="drawer-handle"></div>
-				<div class="drawer-header">
+				<Cluster justify="between" align="center" class="drawer-header">
 					<h3 class="drawer-title">Leave Your Mark</h3>
 					<button
 						type="button"
@@ -489,29 +493,27 @@
 						onclick={() => (showCommentDrawer = false)}
 						aria-label="Close"
 					>✕</button>
-				</div>
+				</Cluster>
 				<p class="drawer-sub">Write a note for tonight's wall. The band reads every single one.</p>
 
-				<div class="comment-input-box">
-					<textarea
-						bind:value={newCommentText}
-						placeholder="Say something to the band, mention your favorite song, or show love from your city..."
-						rows="3"
-						class="comment-textarea"
-					></textarea>
-				</div>
+				<textarea
+					bind:value={newCommentText}
+					placeholder="Say something to the band, mention your favorite song, or show love from your city..."
+					rows="3"
+					class="comment-textarea"
+				></textarea>
 
 				<button
 					type="button"
 					class="btn-checkout-primary mint-theme"
 					onclick={submitComment}
 				>
-					Post Note to Wall ✨
+					Post Note to Wall →
 				</button>
-			</div>
+			</Stack>
 		{/if}
 
-		<!-- Toast Notification Notification -->
+		<!-- Toast Notification -->
 		{#if toastMessage}
 			<div class="in-phone-toast">
 				<div class="toast-title">{toastMessage.title}</div>
@@ -526,15 +528,15 @@
 		display: flex;
 		justify-content: center;
 		align-items: center;
-		width: 100%;
+		inline-size: 100%;
 		perspective: 1000px;
 	}
 
 	.phone-frame {
 		position: relative;
-		width: 100%;
-		max-width: 390px;
-		height: 690px;
+		inline-size: 100%;
+		max-inline-size: 390px;
+		block-size: 690px;
 		background: #090710;
 		border-radius: 44px;
 		border: 1px solid rgba(255, 255, 255, 0.15);
@@ -549,11 +551,10 @@
 	}
 
 	/* Top Status bar */
-	.phone-status-bar {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 10px 22px 4px;
+	:global(.phone-status-bar) {
+		padding-block-start: 10px;
+		padding-block-end: 4px;
+		padding-inline: 22px;
 		font-size: 0.72rem;
 		font-weight: 600;
 		color: #e4e4e7;
@@ -565,8 +566,8 @@
 	}
 
 	.dynamic-island {
-		width: 80px;
-		height: 18px;
+		inline-size: 80px;
+		block-size: 18px;
 		background: #000;
 		border-radius: 20px;
 		display: flex;
@@ -575,33 +576,23 @@
 	}
 
 	.island-camera {
-		width: 7px;
-		height: 7px;
+		inline-size: 7px;
+		block-size: 7px;
 		background: #151124;
 		border-radius: 50%;
 		border: 1px solid rgba(255, 255, 255, 0.15);
 	}
 
-	.status-signals {
-		display: flex;
-		gap: 6px;
+	:global(.status-signals) {
 		font-size: 0.65rem;
 		color: #a1a1aa;
 	}
 
 	/* Zine Header */
-	.zine-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 8px 18px;
+	:global(.zine-header) {
+		padding-block: 8px;
+		padding-inline: 18px;
 		z-index: 40;
-	}
-
-	.brand-wrap {
-		display: flex;
-		align-items: center;
-		gap: 8px;
 	}
 
 	.brand-text {
@@ -613,7 +604,7 @@
 	}
 
 	.live-indicator {
-		display: flex;
+		display: inline-flex;
 		align-items: center;
 		gap: 5px;
 		font-size: 0.68rem;
@@ -623,8 +614,8 @@
 	}
 
 	.pulse-dot {
-		width: 5px;
-		height: 5px;
+		inline-size: 5px;
+		block-size: 5px;
 		background: #01ffc3;
 		border-radius: 50%;
 		box-shadow: 0 0 6px #01ffc3;
@@ -642,7 +633,8 @@
 		color: #d4d4d8;
 		background: rgba(255, 255, 255, 0.08);
 		border: 1px solid rgba(255, 255, 255, 0.12);
-		padding: 4px 10px;
+		padding-block: 4px;
+		padding-inline: 10px;
 		border-radius: 9999px;
 		text-decoration: none;
 		transition: all 0.2s;
@@ -654,21 +646,21 @@
 	}
 
 	/* Nav Tabs */
-	.zine-nav-tabs {
-		display: flex;
-		gap: 6px;
-		padding: 4px 16px 10px;
+	:global(.zine-nav-tabs) {
+		padding-block-start: 4px;
+		padding-block-end: 10px;
+		padding-inline: 16px;
 		z-index: 40;
 		background: linear-gradient(to bottom, rgba(9, 7, 16, 0.95), rgba(9, 7, 16, 0.7));
 	}
 
 	.nav-tab-btn {
-		flex: 1;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		gap: 4px;
-		padding: 6px 4px;
+		padding-block: 6px;
+		padding-inline: 4px;
 		background: rgba(255, 255, 255, 0.04);
 		border: 1px solid rgba(255, 255, 255, 0.08);
 		border-radius: 10px;
@@ -731,21 +723,17 @@
 	}
 
 	/* Media center play action */
-	.media-center-action {
+	:global(.media-center-action) {
 		position: absolute;
-		top: 36%;
-		left: 50%;
+		inset-block-start: 36%;
+		inset-inline-start: 50%;
 		transform: translate(-50%, -50%);
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 8px;
 		z-index: 20;
 	}
 
 	.play-circle-btn {
-		width: 64px;
-		height: 64px;
+		inline-size: 64px;
+		block-size: 64px;
 		border-radius: 50%;
 		background: rgba(21, 17, 36, 0.8);
 		border: 1px solid rgba(255, 255, 255, 0.25);
@@ -772,8 +760,8 @@
 	}
 
 	.icon-svg {
-		width: 28px;
-		height: 28px;
+		inline-size: 28px;
+		block-size: 28px;
 	}
 
 	.play-hint-text {
@@ -785,18 +773,13 @@
 	}
 
 	/* Card bottom content */
-	.card-bottom-content {
+	:global(.card-bottom-content) {
 		position: relative;
 		z-index: 25;
-		padding: 16px 18px 20px;
+		padding-block-start: 16px;
+		padding-block-end: 20px;
+		padding-inline: 18px;
 		background: linear-gradient(to top, #090710 75%, transparent 100%);
-	}
-
-	.meta-row {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		margin-bottom: 8px;
 	}
 
 	.meta-tag {
@@ -822,7 +805,7 @@
 		font-size: 0.7rem;
 		font-weight: 600;
 		color: #05d9e8;
-		margin-left: auto;
+		margin-inline-start: auto;
 		font-variant-numeric: tabular-nums;
 	}
 
@@ -831,7 +814,7 @@
 		font-weight: 800;
 		color: #ffffff;
 		letter-spacing: -0.02em;
-		margin: 0 0 4px;
+		margin: 0;
 		text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
 	}
 
@@ -839,16 +822,13 @@
 		font-size: 0.8rem;
 		line-height: 1.4;
 		color: #a1a1aa;
-		margin: 0 0 14px;
+		margin: 0;
 	}
 
 	/* Waveform visualizer */
-	.audio-waveform-row {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		margin-bottom: 14px;
-		padding: 8px 12px;
+	:global(.audio-waveform-row) {
+		padding-block: 8px;
+		padding-inline: 12px;
 		background: rgba(255, 255, 255, 0.03);
 		border: 1px solid rgba(255, 255, 255, 0.08);
 		border-radius: 12px;
@@ -858,7 +838,7 @@
 		display: flex;
 		align-items: flex-end;
 		justify-content: space-between;
-		height: 22px;
+		block-size: 22px;
 		gap: 3px;
 	}
 
@@ -866,8 +846,8 @@
 		flex: 1;
 		background: rgba(5, 217, 232, 0.35);
 		border-radius: 2px;
-		height: var(--h);
-		transition: height 0.2s ease, background 0.2s ease;
+		block-size: var(--h);
+		transition: block-size 0.2s ease, background 0.2s ease;
 	}
 
 	.waveform-bars.animating span {
@@ -885,33 +865,26 @@
 	}
 
 	@keyframes eqBounce {
-		0% { height: 25%; }
-		100% { height: 95%; }
+		0% { block-size: 25%; }
+		100% { block-size: 95%; }
 	}
 
 	.track-progress-bar {
-		width: 100%;
-		height: 3px;
+		inline-size: 100%;
+		block-size: 3px;
 		background: rgba(255, 255, 255, 0.1);
 		border-radius: 2px;
 		overflow: hidden;
 	}
 
 	.track-progress-fill {
-		height: 100%;
+		block-size: 100%;
 		background: linear-gradient(90deg, #05d9e8, #01ffc3);
-		transition: width 0.3s ease;
-	}
-
-	/* Action Grid */
-	.action-grid {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 8px;
+		transition: inline-size 0.3s ease;
 	}
 
 	.action-btn {
-		height: 42px;
+		block-size: 42px;
 		border-radius: 12px;
 		display: flex;
 		align-items: center;
@@ -949,8 +922,8 @@
 	}
 
 	.action-svg {
-		width: 17px;
-		height: 17px;
+		inline-size: 17px;
+		block-size: 17px;
 	}
 
 	.pink-svg {
@@ -964,8 +937,8 @@
 	/* Photo Card Specific */
 	.top-film-label {
 		position: absolute;
-		top: 14px;
-		right: 18px;
+		inset-block-start: 14px;
+		inset-inline-end: 18px;
 		color: #e4e4e7;
 		font-size: 0.68rem;
 		font-weight: 700;
@@ -976,17 +949,18 @@
 	/* Notes Card */
 	.notes-card {
 		background: linear-gradient(160deg, #151124 0%, #090710 100%);
-		padding: 16px 18px 0;
+		padding-block-start: 16px;
+		padding-inline: 18px;
 	}
 
-	.notes-scrollable-area {
+	:global(.notes-scrollable-area) {
 		flex: 1;
 		overflow-y: auto;
-		padding-bottom: 70px;
+		padding-block-end: 70px;
 		scrollbar-width: none;
 	}
 
-	.notes-scrollable-area::-webkit-scrollbar {
+	:global(.notes-scrollable-area)::-webkit-scrollbar {
 		display: none;
 	}
 
@@ -994,23 +968,24 @@
 		font-size: 1.4rem;
 		font-weight: 800;
 		color: #ffffff;
-		margin: 8px 0 14px;
+		margin: 0;
 		letter-spacing: -0.02em;
 	}
 
-	.notes-prose p {
+	:global(.notes-prose) p {
 		font-size: 0.82rem;
 		line-height: 1.6;
 		color: #d4d4d8;
-		margin-bottom: 12px;
+		margin: 0;
 	}
 
 	.card-bottom-fixed {
 		position: absolute;
-		bottom: 0;
-		left: 0;
-		right: 0;
-		padding: 14px 18px 18px;
+		inset-block-end: 0;
+		inset-inline: 0;
+		padding-block-start: 14px;
+		padding-block-end: 18px;
+		padding-inline: 18px;
 		background: linear-gradient(to top, #090710 80%, transparent 100%);
 		z-index: 20;
 	}
@@ -1018,18 +993,19 @@
 	/* Wall Card */
 	.wall-card {
 		background: linear-gradient(to bottom, #151124 0%, #090710 100%);
-		padding: 16px 18px 0;
+		padding-block-start: 16px;
+		padding-inline: 18px;
 	}
 
-	.wall-header-area {
-		margin-bottom: 12px;
+	:global(.wall-header-area) {
+		padding-block-end: 12px;
 	}
 
 	.wall-title {
 		font-size: 1.35rem;
 		font-weight: 800;
 		color: #ffffff;
-		margin: 6px 0 2px;
+		margin: 0;
 	}
 
 	.wall-sub {
@@ -1037,28 +1013,20 @@
 		color: #a1a1aa;
 	}
 
-	.wall-feed-scroll {
+	:global(.wall-feed-scroll) {
 		flex: 1;
 		overflow-y: auto;
-		padding-bottom: 76px;
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
+		padding-block-end: 76px;
 		scrollbar-width: none;
 	}
 
-	.wall-feed-scroll::-webkit-scrollbar {
+	:global(.wall-feed-scroll)::-webkit-scrollbar {
 		display: none;
 	}
 
-	.fan-comment-item {
-		display: flex;
-		gap: 9px;
-	}
-
 	.fan-avatar {
-		width: 28px;
-		height: 28px;
+		inline-size: 28px;
+		block-size: 28px;
 		border-radius: 50%;
 		display: flex;
 		align-items: center;
@@ -1069,15 +1037,8 @@
 		flex-shrink: 0;
 	}
 
-	.fan-content {
+	:global(.fan-content) {
 		flex: 1;
-	}
-
-	.fan-meta {
-		display: flex;
-		align-items: baseline;
-		gap: 6px;
-		margin-bottom: 3px;
 	}
 
 	.fan-name {
@@ -1096,27 +1057,21 @@
 		color: #d4d4d8;
 		background: rgba(255, 255, 255, 0.05);
 		border: 1px solid rgba(255, 255, 255, 0.08);
-		padding: 8px 12px;
+		padding-block: 8px;
+		padding-inline: 12px;
 		border-radius: 12px;
-		border-top-left-radius: 3px;
+		border-start-start-radius: 3px;
 		line-height: 1.45;
 	}
 
-	.artist-reply-block {
-		margin-top: 6px;
-		margin-left: 8px;
+	:global(.artist-reply-block) {
+		margin-inline-start: 8px;
 		background: rgba(5, 217, 232, 0.07);
 		border: 1px solid rgba(5, 217, 232, 0.22);
-		border-left: 3px solid #05d9e8;
-		padding: 7px 10px;
+		border-inline-start: 3px solid #05d9e8;
+		padding-block: 7px;
+		padding-inline: 10px;
 		border-radius: 10px;
-	}
-
-	.artist-verified-row {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-		margin-bottom: 2px;
 	}
 
 	.verified-icon {
@@ -1143,7 +1098,7 @@
 	}
 
 	.sign-wall-full {
-		width: 100%;
+		inline-size: 100%;
 		background: rgba(5, 217, 232, 0.12);
 		border: 1px solid rgba(5, 217, 232, 0.35);
 		color: #05d9e8;
@@ -1168,21 +1123,19 @@
 		margin: 0;
 	}
 
-	.slide-drawer {
+	:global(.slide-drawer) {
 		position: absolute;
-		bottom: 0;
-		left: 0;
-		right: 0;
+		inset-block-end: 0;
+		inset-inline: 0;
 		background: rgba(14, 11, 26, 0.96);
 		backdrop-filter: blur(28px);
-		border-top: 1px solid rgba(255, 255, 255, 0.15);
+		border-block-start: 1px solid rgba(255, 255, 255, 0.15);
 		border-radius: 28px 28px 0 0;
-		padding: 10px 18px 24px;
+		padding-block-start: 10px;
+		padding-block-end: 24px;
+		padding-inline: 18px;
 		z-index: 70;
 		animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
 	}
 
 	@keyframes slideUp {
@@ -1191,17 +1144,11 @@
 	}
 
 	.drawer-handle {
-		width: 38px;
-		height: 4px;
+		inline-size: 38px;
+		block-size: 4px;
 		background: rgba(255, 255, 255, 0.25);
 		border-radius: 2px;
-		margin: 0 auto 4px;
-	}
-
-	.drawer-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
+		margin-inline: auto;
 	}
 
 	.drawer-title {
@@ -1225,14 +1172,8 @@
 		line-height: 1.4;
 	}
 
-	.tip-preset-grid {
-		display: grid;
-		grid-template-columns: repeat(4, 1fr);
-		gap: 6px;
-	}
-
 	.tip-chip {
-		height: 38px;
+		block-size: 38px;
 		background: rgba(255, 255, 255, 0.05);
 		border: 1px solid rgba(255, 255, 255, 0.12);
 		border-radius: 10px;
@@ -1262,19 +1203,20 @@
 
 	.currency-symbol {
 		position: absolute;
-		left: 12px;
+		inset-inline-start: 12px;
 		color: #71717a;
 		font-weight: 700;
 		font-size: 0.85rem;
 	}
 
 	.custom-tip-input {
-		width: 100%;
-		height: 40px;
+		inline-size: 100%;
+		block-size: 40px;
 		background: rgba(0, 0, 0, 0.4);
 		border: 1px solid rgba(255, 255, 255, 0.12);
 		border-radius: 10px;
-		padding: 0 12px 0 28px;
+		padding-inline-start: 28px;
+		padding-inline-end: 12px;
 		color: #ffffff;
 		font-size: 0.82rem;
 		font-weight: 600;
@@ -1286,16 +1228,13 @@
 		background: rgba(255, 42, 109, 0.06);
 	}
 
-	.comment-input-box {
-		width: 100%;
-	}
-
 	.comment-textarea {
-		width: 100%;
+		inline-size: 100%;
 		background: rgba(0, 0, 0, 0.4);
 		border: 1px solid rgba(255, 255, 255, 0.14);
 		border-radius: 12px;
-		padding: 10px 12px;
+		padding-block: 10px;
+		padding-inline: 12px;
 		color: #ffffff;
 		font-size: 0.82rem;
 		font-family: inherit;
@@ -1309,8 +1248,8 @@
 	}
 
 	.btn-checkout-primary {
-		height: 44px;
-		width: 100%;
+		block-size: 44px;
+		inline-size: 100%;
 		border-radius: 12px;
 		background: #ff2a6d;
 		border: none;
@@ -1340,14 +1279,14 @@
 	/* In-phone toast notification */
 	.in-phone-toast {
 		position: absolute;
-		top: 48px;
-		left: 14px;
-		right: 14px;
+		inset-block-start: 48px;
+		inset-inline: 14px;
 		background: rgba(21, 17, 36, 0.95);
 		border: 1px solid rgba(5, 217, 232, 0.4);
 		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 15px rgba(5, 217, 232, 0.3);
 		border-radius: 14px;
-		padding: 10px 14px;
+		padding-block: 10px;
+		padding-inline: 14px;
 		z-index: 90;
 		animation: toastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 	}
@@ -1361,7 +1300,7 @@
 		font-size: 0.76rem;
 		font-weight: 800;
 		color: #05d9e8;
-		margin-bottom: 2px;
+		margin-block-end: 2px;
 	}
 
 	.toast-desc {

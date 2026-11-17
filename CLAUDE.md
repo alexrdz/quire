@@ -13,3 +13,4 @@ See [AGENTS.md](file:///Users/alexrodriguez/Sites/quire/AGENTS.md) and [docs/AGE
 2. **CUBE CSS & Native `@layer`**: No Tailwind, no CSS-in-JS. Hand-written semantic CSS categorized into `@layer vendor, base, layouts, components, sticker, bookbinder, utilities;`.
 3. **Layout Primitives**: Use `$lib/components/layout` (`<Stack>`, `<Cluster>`, `<Box>`, `<Grid>`, `<Center>`, `<Split>`, `<Switcher>`, `<Cover>`, `<Frame>`, `<Reel>`, `<Container>`).
 4. **CSS Logical Properties**: Exclusively use `inline-size`, `block-size`, `padding-block`, `padding-inline`, `margin-block`, `margin-inline`, `inset-block-*`, `inset-inline-*`.
+5. **Zero Emojis**: Never use emojis anywhere in UI templates, components, routes, seed scripts, console logs, tests, or documentation. Use clean inline SVGs or typographic labels.

@@ -1,9 +1,11 @@
 import { z } from 'zod';
 
 export const submitNoteSchema = z.object({
+	artistId: z.string().min(1).optional(),
 	issueId: z.string().nullable().optional(),
 	body: z
 		.string()
+		.trim()
 		.min(1, 'Note cannot be empty')
 		.max(500, 'Note cannot exceed 500 characters')
 		.refine((val) => !/(https?:\/\/|www\.|\.com|\.org|\.net|\.io|\.gg|\.me\b)/i.test(val), {
@@ -21,7 +23,11 @@ export type SubmitNoteInput = z.infer<typeof submitNoteSchema>;
 
 export const replyNoteSchema = z.object({
 	noteId: z.string().min(1, 'Note ID is required'),
-	body: z.string().min(1, 'Reply cannot be empty').max(300, 'Reply cannot exceed 300 characters')
+	body: z
+		.string()
+		.trim()
+		.min(1, 'Reply cannot be empty')
+		.max(300, 'Reply cannot exceed 300 characters')
 });
 
 export type ReplyNoteInput = z.infer<typeof replyNoteSchema>;
@@ -31,3 +37,17 @@ export const flagNoteSchema = z.object({
 });
 
 export type FlagNoteInput = z.infer<typeof flagNoteSchema>;
+
+export const moderateNoteSchema = z.object({
+	noteId: z.string().min(1, 'Note ID is required'),
+	action: z.enum(['approve', 'hide', 'restore', 'delete'])
+});
+
+export type ModerateNoteInput = z.infer<typeof moderateNoteSchema>;
+
+export const blockFanSchema = z.object({
+	fanUserId: z.string().min(1, 'Fan user ID is required'),
+	artistId: z.string().min(1).optional()
+});
+
+export type BlockFanInput = z.infer<typeof blockFanSchema>;

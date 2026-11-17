@@ -1,11 +1,74 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { enhance } from '$app/forms';
-	import { Center, Box, Stack, Cluster, Split } from '$lib/components/layout';
+	import { Container, Box, Stack, Cluster, Split } from '$lib/components/layout';
+	import ArtistTopNav from '$lib/components/dashboard/ArtistTopNav.svelte';
+	import QrCaseDisplay from '$lib/components/dashboard/QrCaseDisplay.svelte';
 
 	let { data, form } = $props();
 
-	// Default date to today
+	const BASE_TIMEZONES = [
+		{ value: 'America/New_York', label: 'Eastern (America/New_York)' },
+		{ value: 'America/Chicago', label: 'Central (America/Chicago)' },
+		{ value: 'America/Denver', label: 'Mountain (America/Denver)' },
+		{ value: 'America/Los_Angeles', label: 'Pacific (America/Los_Angeles)' },
+		{ value: 'Europe/London', label: 'UK (Europe/London)' },
+		{ value: 'Europe/Berlin', label: 'Central Europe (Europe/Berlin)' }
+	];
+
 	let today = new Date().toISOString().split('T')[0];
+
+	let city = $state('');
+	let venue = $state('');
+	let date = $state(today);
+	let timezone = $state('America/New_York');
+	let extraTimezones = $state<Array<{ value: string; label: string }>>([]);
+	let timezoneOptions = $derived([...BASE_TIMEZONES, ...extraTimezones]);
+	let timezoneTouched = $state(false);
+
+	let coverNote = $state('');
+	let setlistSongs = $state('');
+	let photoUrl = $state('');
+	let photoCaption = $state('');
+	let approveFirst = $state(false);
+	let duplicatedBanner = $state(false);
+	let caseDisplayOpen = $state(false);
+
+	function ensureTimezoneOption(tz: string, prefix = '') {
+		if (!tz) return;
+		const exists = BASE_TIMEZONES.some((t) => t.value === tz) || extraTimezones.some((t) => t.value === tz);
+		if (!exists) {
+			extraTimezones = [
+				...extraTimezones,
+				{ value: tz, label: prefix ? `${prefix} (${tz})` : tz }
+			];
+		}
+	}
+
+	onMount(() => {
+		try {
+			const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+			if (detected && !timezoneTouched) {
+				ensureTimezoneOption(detected, 'Detected');
+				timezone = detected;
+			}
+		} catch {
+			// Retain default timezone if Intl detection is unavailable
+		}
+	});
+
+	function duplicateLastIssue() {
+		if (!data.lastIssue) return;
+		// SPEC.md §6.2: "Duplicate last issue" copies everything except city and date
+		venue = data.lastIssue.venue;
+		timezoneTouched = true;
+		ensureTimezoneOption(data.lastIssue.timezone);
+		timezone = data.lastIssue.timezone;
+		coverNote = data.lastIssue.coverNote;
+		setlistSongs = data.lastIssue.setlist;
+		approveFirst = Boolean(data.lastIssue.approveFirst);
+		duplicatedBanner = true;
+	}
 </script>
 
 <svelte:head>
@@ -13,26 +76,21 @@
 </svelte:head>
 
 <div class="quick-issue-root" style="--accent: {data.artist.accentColor || '#05D9E8'};">
-	<Center max="md" padding="md" class="quick-issue-canvas">
-		<Stack gap="lg">
-			<header class="cover-header">
-				<a href="/dashboard" class="glass-pill text-highlight link-clean">← Back to Dashboard</a>
-				<span class="text-highlight header-eyebrow">60-Second Phone Flow</span>
-			</header>
+	<ArtistTopNav artist={data.artist} activeTab="quick" />
 
+	<Container as="main" width="md" padding="md" class="quick-issue-canvas">
+		<Stack gap="lg">
 			{#if form?.success && form?.qrSvg}
 				<!-- SUCCESS SCREEN: VECTOR STICKER ASSET -->
-				<Box variant="raised" padding="xl" radius="lg">
+				<Box as="section" variant="raised" padding="xl" radius="lg" class="card-shell">
 					<Stack gap="lg" align="center">
 						<Stack gap="xs" align="center">
-							<span class="text-highlight success-eyebrow">
-								✓ Issue Published Live!
-							</span>
+							<span class="meta-chip meta-highlight">✓ Issue Published Live</span>
 							<h1 class="success-title">
 								{form.city} @ {form.venue}
 							</h1>
 							<p class="text-muted subtext-center">
-								Physical QR code generated. Download the vector SVG for your merch sticker.
+								Physical QR code generated. Download the vector SVG for your merch sticker or prop this screen up next to your case.
 							</p>
 						</Stack>
 
@@ -46,32 +104,72 @@
 						</div>
 
 						<Cluster justify="center" gap="sm">
+							<button
+								type="button"
+								class="btn-action-accent"
+								onclick={() => (caseDisplayOpen = true)}
+							>
+								Full-Screen Case Display
+							</button>
+
 							<a
 								href="data:image/svg+xml;utf8,{encodeURIComponent(form.qrSvg)}"
 								download="quire-sticker-{form.slug}.svg"
-								class="floating-tip-btn btn-static"
+								class="btn-action-primary"
 							>
-								⬇ Download Vector Sticker SVG
+								Download Vector Sticker SVG
 							</a>
 
-							<a
-								href={form.issueUrl}
-								class="glass-pill text-highlight action-open-link"
-							>
+							<a href={form.issueUrl} class="btn-action-highlight">
 								Open Tonight's Zine ↗
 							</a>
+
+							{#if form.issueId}
+								<a href="/dashboard/bookbinder/{form.issueId}" class="btn-action-ghost">
+									Polish in Bookbinder →
+								</a>
+							{/if}
 						</Cluster>
 					</Stack>
 				</Box>
+
+				<QrCaseDisplay
+					open={caseDisplayOpen}
+					onClose={() => (caseDisplayOpen = false)}
+					qrSvg={form.qrSvg}
+					title="{form.city} @ {form.venue}"
+					subtitle="{data.artist.displayName} · {form.date}"
+					urlLabel={form.fullIssueUrl || form.issueUrl}
+					accentColor={data.artist.accentColor || '#05D9E8'}
+				/>
 			{:else}
-				<Box variant="raised" padding="xl" radius="lg">
-					<Stack gap="md">
-						<Stack gap="xs">
-							<h1 class="form-title">Publish Tonight's Issue</h1>
-							<p class="text-muted form-subtitle">
-								Enter city and venue. Your master template styling is applied automatically.
-							</p>
-						</Stack>
+				<Box as="section" variant="raised" padding="xl" radius="lg" class="card-shell">
+					<Stack gap="lg">
+						<Cluster justify="between" align="center" gap="md">
+							<Stack gap="2xs">
+								<span class="text-highlight font-mono eyebrow-small">60-SECOND PHONE FLOW</span>
+								<h1 class="form-title">Publish Tonight's Issue</h1>
+								<p class="text-muted form-subtitle">
+									Enter city, venue, and date. Your Master Template pages, links, Wall, and Endpaper are included automatically.
+								</p>
+							</Stack>
+
+							{#if data.lastIssue}
+								<button
+									type="button"
+									class="btn-action-accent"
+									onclick={duplicateLastIssue}
+								>
+									Duplicate Last Issue ({data.lastIssue.city})
+								</button>
+							{/if}
+						</Cluster>
+
+						{#if duplicatedBanner}
+							<Box variant="subtle" padding="sm" radius="md" class="duplicated-box">
+								✓ Copied venue, time zone, cover note, and setlist from {data.lastIssue?.city}. Enter tonight’s city & date to publish!
+							</Box>
+						{/if}
 
 						{#if form?.error}
 							<Box variant="subtle" padding="sm" radius="md" class="error-box">
@@ -79,101 +177,171 @@
 							</Box>
 						{/if}
 
-						<form method="POST" use:enhance>
-							<Stack gap="md">
-								<Split ratio="1-1" gap="md" collapse="sm">
-									<Stack gap="xs">
-										<label for="city" class="input-label">City</label>
-										<input
-											id="city"
-											type="text"
-											name="city"
-											required
-											placeholder="e.g. Philadelphia"
-											class="form-field-input"
-										/>
-									</Stack>
-
-									<Stack gap="xs">
-										<label for="venue" class="input-label">Venue</label>
-										<input
-											id="venue"
-											type="text"
-											name="venue"
-											required
-											placeholder="e.g. Johnny Brenda's"
-											class="form-field-input"
-										/>
-									</Stack>
-								</Split>
-
-								<Split ratio="1-1" gap="md" collapse="sm">
-									<Stack gap="xs">
-										<label for="date" class="input-label">Gig Date</label>
-										<input
-											id="date"
-											type="date"
-											name="date"
-											value={today}
-											required
-											class="form-field-input"
-										/>
-									</Stack>
-
-									<Stack gap="xs">
-										<label for="timezone" class="input-label">Venue Timezone</label>
-										<select
-											id="timezone"
-											name="timezone"
-											class="form-field-input"
-										>
-											<option value="America/New_York">Eastern (US & Canada)</option>
-											<option value="America/Chicago">Central (US & Canada)</option>
-											<option value="America/Denver">Mountain (US & Canada)</option>
-											<option value="America/Los_Angeles">Pacific (US & Canada)</option>
-											<option value="Europe/London">London (GMT)</option>
-											<option value="UTC">UTC</option>
-										</select>
-									</Stack>
-								</Split>
-
+						<form data-stack="gap:md" method="POST" enctype="multipart/form-data" use:enhance>
+							<Split ratio="1-1" gap="md" collapse="sm">
 								<Stack gap="xs">
-									<label for="coverNote" class="input-label">Cover Note (Optional)</label>
-									<textarea
-										id="coverNote"
-										name="coverNote"
-										rows="2"
-										placeholder="e.g. Doors at 8. Playing the new album front to back."
-										maxlength="300"
+									<label for="city" class="input-label">City *</label>
+									<input
+										id="city"
+										type="text"
+										name="city"
+										bind:value={city}
+										required
+										placeholder="e.g. Philadelphia"
 										class="form-field-input"
-									></textarea>
+									/>
 								</Stack>
 
-								<label class="pointer-cursor">
-									<Cluster align="center" gap="xs">
-										<input type="checkbox" name="approveFirst" value="true" />
-										<span class="checkbox-label">Approve Wall notes before they appear publicly</span>
-									</Cluster>
-								</label>
+								<Stack gap="xs">
+									<label for="venue" class="input-label">Venue or Busking Spot *</label>
+									<input
+										id="venue"
+										type="text"
+										name="venue"
+										bind:value={venue}
+										required
+										placeholder="e.g. Johnny Brenda's"
+										class="form-field-input"
+									/>
+								</Stack>
+							</Split>
 
-								<button
-									type="submit"
-									class="floating-tip-btn btn-publish"
-								>
-									Publish Issue & Generate QR Sticker →
-								</button>
+							<Split ratio="1-1" gap="md" collapse="sm">
+								<Stack gap="xs">
+									<label for="date" class="input-label">Gig Date *</label>
+									<input
+										id="date"
+										type="date"
+										name="date"
+										bind:value={date}
+										required
+										class="form-field-input font-mono"
+									/>
+								</Stack>
+
+								<Stack gap="xs">
+									<label for="timezone" class="input-label">Venue Time Zone</label>
+									<select
+										id="timezone"
+										name="timezone"
+										bind:value={timezone}
+										onchange={() => (timezoneTouched = true)}
+										class="form-field-input"
+									>
+										{#each timezoneOptions as tzOption}
+											<option value={tzOption.value}>{tzOption.label}</option>
+										{/each}
+									</select>
+								</Stack>
+							</Split>
+
+							<Stack gap="xs">
+								<label for="coverNote" class="input-label">One-Line Cover Note (Optional)</label>
+								<input
+									id="coverNote"
+									type="text"
+									name="coverNote"
+									bind:value={coverNote}
+									maxlength="280"
+									placeholder="e.g. Playing till 10pm! First 20 people at merch get a sticker."
+									class="form-field-input"
+								/>
 							</Stack>
+
+							<Stack gap="xs">
+								<label for="setlistSongs" class="input-label">
+									Tonight's Setlist (Optional — comma or newline separated)
+								</label>
+								<textarea
+									id="setlistSongs"
+									name="setlistSongs"
+									bind:value={setlistSongs}
+									rows="2"
+									placeholder="Static Bloom, Velvet Wire, Subway Static (Encore)"
+									class="form-field-input font-mono"
+								></textarea>
+							</Stack>
+
+							<Box variant="subtle" padding="md" radius="md" class="photo-optional-box">
+								<Stack gap="sm">
+									<span class="input-label">Optional Gig Photo (Upload from phone or paste URL)</span>
+									<Split ratio="1-1" gap="md" collapse="sm">
+										<Stack gap="xs">
+											<label for="photoFile" class="subtext-small text-muted">
+												Upload Photo (JPEG, PNG, WebP, AVIF, SVG)
+											</label>
+											<input
+												id="photoFile"
+												type="file"
+												name="photoFile"
+												accept="image/jpeg,image/png,image/webp,image/avif,image/svg+xml"
+												class="form-field-input"
+											/>
+										</Stack>
+
+										<Stack gap="xs">
+											<label for="photoUrl" class="subtext-small text-muted">
+												Or Photo URL
+											</label>
+											<input
+												id="photoUrl"
+												type="text"
+												name="photoUrl"
+												bind:value={photoUrl}
+												placeholder="https://... or /uploads/..."
+												class="form-field-input"
+											/>
+										</Stack>
+									</Split>
+
+									<Stack gap="xs">
+										<label for="photoCaption" class="subtext-small text-muted">
+											Photo Caption (Optional)
+										</label>
+										<input
+											id="photoCaption"
+											type="text"
+											name="photoCaption"
+											bind:value={photoCaption}
+											maxlength="280"
+											placeholder="e.g. Soundcheck from the balcony"
+											class="form-field-input"
+										/>
+									</Stack>
+								</Stack>
+							</Box>
+
+							<Cluster as="label" align="center" gap="xs" class="checkbox-label-wrap">
+								<input
+									type="checkbox"
+									name="approveFirst"
+									value="true"
+									bind:checked={approveFirst}
+								/>
+								<span class="checkbox-text">
+									Require artist approval before Wall notes go live on this issue
+								</span>
+							</Cluster>
+
+							<Split ratio="2-1" gap="sm" collapse="sm">
+								<button type="submit" name="saveMode" value="published" class="btn-publish-submit">
+									Publish Issue & Generate Venue QR →
+								</button>
+								<button type="submit" name="saveMode" value="draft" class="btn-draft-submit">
+									Save Draft & Open in Bookbinder →
+								</button>
+							</Split>
 						</form>
 					</Stack>
 				</Box>
 			{/if}
 		</Stack>
-	</Center>
+	</Container>
 </div>
 
 <style>
 	.quick-issue-root {
-		background-color: var(--ink);
+		background-color: var(--bg-void);
 		min-block-size: 100vh;
 	}
 
@@ -181,21 +349,13 @@
 		padding-block: var(--space-xl);
 	}
 
-	.link-clean {
-		text-decoration: none;
+	:global(.card-shell) {
+		border-color: var(--glass-border);
 	}
 
-	.header-eyebrow {
-		font-size: 0.85rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-	}
-
-	.success-eyebrow {
-		font-size: 0.9rem;
+	.eyebrow-small {
+		font-size: 0.72rem;
 		font-weight: 700;
-		text-transform: uppercase;
 		letter-spacing: 0.08em;
 	}
 
@@ -203,34 +363,29 @@
 		font-size: 2rem;
 		font-weight: 800;
 		color: #ffffff;
-		margin-block-start: var(--space-2xs);
-		text-align: center;
 	}
 
 	.subtext-center {
-		font-size: 0.9rem;
 		text-align: center;
-	}
-
-	.btn-static {
-		position: static;
-		text-decoration: none;
-		box-shadow: none;
-	}
-
-	.action-open-link {
-		text-decoration: none;
-		padding: 0.75rem 1.25rem;
+		max-inline-size: 46ch;
+		font-size: 0.9rem;
 	}
 
 	.form-title {
-		font-size: 1.8rem;
+		font-size: 1.85rem;
 		font-weight: 800;
 		color: #ffffff;
 	}
 
 	.form-subtitle {
 		font-size: 0.9rem;
+		max-inline-size: 55ch;
+	}
+
+	:global(.duplicated-box) {
+		border-color: var(--accent);
+		color: var(--accent);
+		font-size: 0.85rem;
 	}
 
 	:global(.error-box) {
@@ -240,35 +395,193 @@
 	}
 
 	.input-label {
-		font-size: 0.8rem;
+		font-size: 0.82rem;
 		font-weight: 600;
-		color: var(--paper);
+		color: #e4e4e7;
 	}
 
 	.form-field-input {
 		inline-size: 100%;
+		padding-block: 0.75rem;
+		padding-inline: 1rem;
 		background: rgba(0, 0, 0, 0.5);
 		border: 1px solid var(--glass-border);
 		border-radius: var(--radius-md);
 		color: #ffffff;
-		padding: 0.75rem;
+		font-size: 0.95rem;
+		font-family: inherit;
 	}
 
-	.pointer-cursor {
+	.font-mono {
+		font-family: var(--font-mono);
+	}
+
+	:global(.checkbox-label-wrap) {
 		cursor: pointer;
 	}
 
-	.checkbox-label {
+	.checkbox-text {
 		font-size: 0.85rem;
-		color: var(--paper);
+		color: #d4d2df;
 	}
 
-	.btn-publish {
-		position: static;
+	/* Sleek Buttons (No 9999px Pills) */
+	.btn-publish-submit {
 		inline-size: 100%;
+		display: inline-flex;
+		align-items: center;
 		justify-content: center;
-		padding: 1rem;
-		font-size: 1.1rem;
-		box-shadow: none;
+		padding-block: 0.95rem;
+		padding-inline: 1.5rem;
+		border-radius: 8px;
+		background: var(--support);
+		color: #ffffff;
+		border: 1px solid rgba(255, 42, 109, 0.5);
+		font-size: 0.95rem;
+		font-weight: 700;
+		cursor: pointer;
+		box-shadow: 0 0 24px rgba(255, 42, 109, 0.35);
+		transition: transform 0.15s ease, box-shadow 0.15s ease;
+	}
+
+	.btn-publish-submit:hover {
+		transform: translateY(-1px);
+		box-shadow: 0 0 30px rgba(255, 42, 109, 0.6);
+	}
+
+	.btn-draft-submit {
+		inline-size: 100%;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding-block: 0.95rem;
+		padding-inline: 1.25rem;
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.06);
+		color: #f4f4f0;
+		border: 1px solid rgba(255, 255, 255, 0.18);
+		font-size: 0.9rem;
+		font-weight: 700;
+		cursor: pointer;
+		transition: background-color 0.15s ease, border-color 0.15s ease;
+	}
+
+	.btn-draft-submit:hover {
+		background: rgba(255, 255, 255, 0.12);
+		border-color: var(--accent);
+	}
+
+	:global(.photo-optional-box) {
+		border-color: var(--glass-border);
+	}
+
+	.subtext-small {
+		font-size: 0.78rem;
+	}
+
+	.btn-action-primary {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding-block: 0.6rem;
+		padding-inline: 1.15rem;
+		border-radius: 8px;
+		background: var(--support);
+		color: #ffffff;
+		border: 1px solid rgba(255, 42, 109, 0.5);
+		font-size: 0.85rem;
+		font-weight: 700;
+		text-decoration: none;
+		box-shadow: 0 0 16px rgba(255, 42, 109, 0.3);
+		transition: transform 0.15s ease;
+	}
+
+	.btn-action-primary:hover {
+		transform: translateY(-1px);
+		color: #ffffff;
+	}
+
+	.btn-action-highlight {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding-block: 0.6rem;
+		padding-inline: 1.15rem;
+		border-radius: 8px;
+		background: rgba(1, 255, 195, 0.14);
+		color: var(--highlight);
+		border: 1px solid rgba(1, 255, 195, 0.4);
+		font-size: 0.85rem;
+		font-weight: 700;
+		text-decoration: none;
+		transition: background-color 0.15s ease;
+	}
+
+	.btn-action-highlight:hover {
+		background: rgba(1, 255, 195, 0.24);
+		color: var(--highlight);
+	}
+
+	.btn-action-ghost {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding-block: 0.6rem;
+		padding-inline: 1.15rem;
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.05);
+		color: #d4d4d8;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		font-size: 0.85rem;
+		font-weight: 600;
+		text-decoration: none;
+		transition: background-color 0.15s ease, color 0.15s ease;
+	}
+
+	.btn-action-ghost:hover {
+		background: rgba(255, 255, 255, 0.1);
+		color: #ffffff;
+	}
+
+	.btn-action-accent {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding-block: 0.45rem;
+		padding-inline: 0.95rem;
+		border-radius: 6px;
+		background: rgba(5, 217, 232, 0.12);
+		color: var(--accent);
+		border: 1px solid rgba(5, 217, 232, 0.35);
+		font-size: 0.8rem;
+		font-weight: 700;
+		cursor: pointer;
+		transition: background-color 0.15s ease;
+	}
+
+	.btn-action-accent:hover {
+		background: rgba(5, 217, 232, 0.22);
+	}
+
+	.meta-chip {
+		display: inline-flex;
+		align-items: center;
+		padding-block: 0.2rem;
+		padding-inline: 0.55rem;
+		border-radius: 4px;
+		font-size: 0.72rem;
+		font-weight: 700;
+		font-family: var(--font-mono);
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		background: rgba(255, 255, 255, 0.06);
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		color: #e4e4e7;
+	}
+
+	.meta-chip.meta-highlight {
+		background: rgba(1, 255, 195, 0.12);
+		border-color: rgba(1, 255, 195, 0.35);
+		color: var(--highlight);
 	}
 </style>

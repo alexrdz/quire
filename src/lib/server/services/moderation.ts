@@ -5,8 +5,7 @@ import {
 	screenNoteText,
 	flagNote,
 	restoreNote,
-	type NoteEntity,
-	FLAG_AUTO_HIDE_THRESHOLD
+	type NoteEntity
 } from '$domain/wall';
 import {
 	createArtistId,
@@ -29,11 +28,25 @@ export interface SubmitNoteParams {
 /**
  * Submits a new Wall note.
  * Screens text against anti-spam/URL/email/phone rules,
- * checks approveFirst setting on the Issue or Artist General Wall.
+ * checks if fan is blocked, and checks approveFirst setting on the Issue or Artist General Wall.
  */
 export async function submitWallNote(
 	params: SubmitNoteParams
 ): Promise<Result<{ noteId: string; status: 'live' | 'pending' }, DomainError>> {
+	const existingBlock = await db.query.blocks.findFirst({
+		where: and(
+			eq(schema.blocks.artistId, params.artistId),
+			eq(schema.blocks.fanUserId, params.fanUserId)
+		)
+	});
+
+	if (existingBlock) {
+		return err({
+			code: 'FAN_BLOCKED',
+			message: 'You have been blocked from posting on this artist’s Walls.'
+		});
+	}
+
 	const screen = screenNoteText(params.body);
 	if (!screen.valid) {
 		return err({
@@ -85,7 +98,6 @@ export async function flagWallNote(
 	noteId: string,
 	fanUserId: string
 ): Promise<Result<{ flagCount: number; status: 'live' | 'pending' | 'hidden' }, DomainError>> {
-	// Check if already flagged by this fan
 	const existingFlag = await db.query.noteFlags.findFirst({
 		where: and(
 			eq(schema.noteFlags.noteId, noteId),
@@ -105,7 +117,6 @@ export async function flagWallNote(
 		return err({ code: 'NOTE_NOT_FOUND', message: 'Note does not exist.' });
 	}
 
-	// Insert flag
 	await db.insert(schema.noteFlags).values({
 		id: crypto.randomUUID(),
 		noteId,
@@ -147,7 +158,7 @@ export async function flagWallNote(
 }
 
 /**
- * Restores a hidden note by the Artist.
+ * Restores a hidden/pending note by the Artist.
  * Decision 22: Restored notes become flag-immune.
  */
 export async function restoreWallNote(
@@ -234,8 +245,7 @@ export async function replyToWallNote(
 }
 
 /**
- * Deletes a note by its fan author or the artist.
- * Cascades to delete the reply.
+ * Hides or deletes a note by its fan author or the artist.
  */
 export async function deleteWallNote(
 	noteId: string,
@@ -249,7 +259,6 @@ export async function deleteWallNote(
 		return err({ code: 'NOTE_NOT_FOUND', message: 'Note not found.' });
 	}
 
-	// Check if requester is either the author or the artist owner
 	const artist = await db.query.artists.findFirst({
 		where: and(
 			eq(schema.artists.id, note.artistId),
@@ -264,12 +273,37 @@ export async function deleteWallNote(
 		return err({ code: 'UNAUTHORIZED', message: 'Not authorized to delete this note.' });
 	}
 
-	// Delete replies first
 	await db.delete(schema.noteReplies).where(eq(schema.noteReplies.noteId, noteId));
-	// Delete flags
 	await db.delete(schema.noteFlags).where(eq(schema.noteFlags.noteId, noteId));
-	// Delete note
 	await db.delete(schema.notes).where(eq(schema.notes.id, noteId));
+
+	return ok(undefined);
+}
+
+/**
+ * Blocks a fan from all of an Artist's Walls and hides their notes (SPEC.md §5.5).
+ */
+export async function blockFanFromWalls(
+	artistId: string,
+	fanUserId: string
+): Promise<Result<void, DomainError>> {
+	const existing = await db.query.blocks.findFirst({
+		where: and(eq(schema.blocks.artistId, artistId), eq(schema.blocks.fanUserId, fanUserId))
+	});
+
+	if (!existing) {
+		await db.insert(schema.blocks).values({
+			id: crypto.randomUUID(),
+			artistId,
+			fanUserId,
+			createdAt: new Date()
+		});
+	}
+
+	await db
+		.update(schema.notes)
+		.set({ status: 'hidden' })
+		.where(and(eq(schema.notes.artistId, artistId), eq(schema.notes.fanUserId, fanUserId)));
 
 	return ok(undefined);
 }

@@ -1,14 +1,17 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { Center, Box, Stack, Cluster, Grid } from '$lib/components/layout';
+	import { Container, Box, Stack, Cluster, Grid } from '$lib/components/layout';
 
 	let { data, form } = $props();
 
 	let tipDrawerOpen = $state(false);
+	let authDrawerOpen = $state(false);
 	let selectedTipCents = $state(500);
 	let customAmountStr = $state('');
 	let fanCoveredFees = $state(false);
+	let tipMessage = $state('');
 	let noteBody = $state('');
+	let wallMessage = $state('');
 
 	function handleTipPreset(amount: number) {
 		selectedTipCents = amount * 100;
@@ -29,66 +32,89 @@
 </svelte:head>
 
 <div class="artist-page-root" style="--accent: {data.artist.accentColor || '#05D9E8'};">
-	<Center max="lg" padding="md" class="artist-page-canvas">
+	<!-- Top Navigation -->
+	<header class="app-topbar">
+		<Container width="lg" padding="none">
+			<Cluster justify="between" align="center" gap="md">
+				<Cluster align="center" gap="sm">
+					<a href="/" class="btn-back-link">← Quire Portal</a>
+					<span class="text-highlight font-mono eyebrow-tag">ARTIST BACK PAGE</span>
+				</Cluster>
+
+				<Cluster align="center" gap="xs">
+					<a href="/me/stubs" class="btn-nav-ghost">My Stubs</a>
+					{#if data.session?.user}
+						<a href="/logout?redirect=/a/{data.artist.slug}" class="btn-nav-ghost">
+							Sign Out ({data.session.user.name})
+						</a>
+					{:else}
+						<button type="button" class="btn-nav-primary" onclick={() => (authDrawerOpen = true)}>
+							Fan Sign In
+						</button>
+					{/if}
+				</Cluster>
+			</Cluster>
+		</Container>
+	</header>
+
+	<Container as="main" width="lg" padding="md" class="artist-page-canvas">
 		<Stack gap="xl">
-			<!-- Header / Bio -->
-			<header>
-				<Box variant="raised" padding="xl" radius="lg" class="header-card">
-					<Stack gap="md">
-						<Cluster justify="between" align="center">
-							<Cluster align="center" gap="sm">
-								<span class="text-highlight header-eyebrow">Artist Back Page</span>
-								{#if data.artist.verified}
-									<span class="text-highlight verified-eyebrow">✓ Verified Artist</span>
-								{/if}
-							</Cluster>
-
-							<button
-								type="button"
-								class="floating-tip-btn btn-support-static"
-								onclick={() => (tipDrawerOpen = true)}
-							>
-								Support (${(selectedTipCents / 100).toFixed(2)})
-							</button>
-						</Cluster>
-
-						<Stack gap="xs" class="bio-section">
-							<h1 class="artist-name-title">
-								{data.artist.displayName}
-							</h1>
-							{#if data.artist.bio}
-								<p class="text-muted artist-bio-text">
-									{data.artist.bio}
-								</p>
-							{/if}
-						</Stack>
-
-						<!-- External Links (Bandcamp, Tickets, Merch) -->
-						{#if data.links.length > 0}
-							<div class="links-strip">
-								<Cluster gap="xs">
-									{#each data.links as link}
-										<a
-											href={link.url}
-											target="_blank"
-											rel="noopener noreferrer"
-											class="glass-pill link-external"
-										>
-											↗ {link.label}
-										</a>
-									{/each}
-								</Cluster>
-							</div>
+			<!-- Artist Hero Card -->
+			<Stack
+				as="section"
+				gap="md"
+				class="artist-hero-banner"
+				style="--cover-art: {data.artist.coverArtUrl
+					? `linear-gradient(to bottom, rgba(9, 7, 16, 0.55), rgba(9, 7, 16, 0.96)), url('${data.artist.coverArtUrl}')`
+					: 'none'};"
+			>
+				<Cluster justify="between" align="center" gap="sm">
+					<Cluster align="center" gap="xs">
+						<span class="meta-chip meta-accent">PERMANENT ARTIST HUB</span>
+						{#if data.artist.verified}
+							<span class="meta-chip meta-highlight">✓ Verified Artist</span>
 						{/if}
-					</Stack>
-				</Box>
-			</header>
+					</Cluster>
+
+					{#if data.artist.payoutsEnabled}
+						<button
+							type="button"
+							class="btn-hero-support"
+							onclick={() => (tipDrawerOpen = true)}
+						>
+							Support {data.artist.displayName} (${(selectedTipCents / 100).toFixed(2)})
+						</button>
+					{/if}
+				</Cluster>
+
+				<Stack gap="xs">
+					<h1 class="artist-name-title">{data.artist.displayName}</h1>
+					{#if data.artist.bio}
+						<p class="artist-bio-text">{data.artist.bio}</p>
+					{/if}
+				</Stack>
+
+				{#if data.links.length > 0}
+					<Cluster gap="xs" class="links-cluster">
+						{#each data.links as link}
+							<a
+								href={link.url}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="btn-artist-link"
+							>
+								↗ {link.label}
+							</a>
+						{/each}
+					</Cluster>
+				{/if}
+			</Stack>
 
 			<!-- All Issues Grouped by Month -->
-			<Stack gap="md" as="section">
+			<Stack as="section" gap="md">
 				<Cluster justify="between" align="center">
 					<h2 class="section-title">All Gig Issues</h2>
-					<span class="text-muted subtext-small">Permanent archive</span>
+					<span class="text-muted subtext-small">City-specific tour zines</span>
 				</Cluster>
 
 				{#if data.groupedIssues.length === 0}
@@ -99,35 +125,37 @@
 					<Stack gap="lg">
 						{#each data.groupedIssues as group}
 							<Stack gap="sm">
-								<h3 class="text-highlight group-month-heading">
-									{group.month}
-								</h3>
+								<h3 class="text-highlight group-month-heading">{group.month}</h3>
 
 								<Grid min="sm" gap="md">
 									{#each group.issues as issue}
-										<a
+										<Box
+											as="a"
 											href="/i/{issue.slug}"
-											class="issue-card-link"
+											variant="raised"
+											padding="lg"
+											radius="lg"
+											class="issue-card-box"
 										>
-											<Box variant="raised" padding="md" radius="md" class="issue-card-box">
-												<Stack gap="xs">
-													<Cluster justify="between" align="center">
-														<span class="text-highlight font-mono date-label">{issue.date}</span>
-														<span class="text-muted zine-num">Zine #{issue.slug}</span>
-													</Cluster>
-													<h4 class="issue-city-title">
-														{issue.city}
-													</h4>
-													<p class="text-muted issue-venue-text">
-														{issue.venue}
-													</p>
-												</Stack>
+											<Stack gap="sm">
+												<Cluster justify="between" align="center">
+													<span class="meta-chip meta-highlight">{issue.date}</span>
+													{#if issue.status === 'cancelled'}
+														<span class="meta-chip meta-support">Cancelled</span>
+													{:else}
+														<span class="text-muted font-mono zine-num">{issue.venue}</span>
+													{/if}
+												</Cluster>
 
-												<div class="open-zine-cue">
-													Open Zine →
-												</div>
-											</Box>
-										</a>
+												<h4 class="issue-city-title">{issue.city}</h4>
+
+												{#if issue.coverNote}
+													<p class="text-muted issue-note-snippet">"{issue.coverNote}"</p>
+												{/if}
+
+												<span class="text-highlight open-zine-cue">Open Issue Zine →</span>
+											</Stack>
+										</Box>
 									{/each}
 								</Grid>
 							</Stack>
@@ -136,189 +164,243 @@
 				{/if}
 			</Stack>
 
-			<!-- General Wall -->
-			<Box variant="raised" padding="xl" radius="lg" as="section">
-				<Stack gap="md">
-					<Cluster justify="between" align="center">
-						<div>
-							<h2 class="section-title">General Wall</h2>
-							<p class="text-muted subtext-small">Open guestbook for {data.artist.displayName}.</p>
-						</div>
-						<span class="text-muted section-label">Public Notes</span>
-					</Cluster>
+			<!-- GENERAL WALL (SPEC.md §5.3 & §5.5) -->
+			<Stack as="section" gap="md" id="general-wall">
+				<Stack gap="2xs">
+					<h2 class="section-title">General Wall</h2>
+					<p class="text-muted subtext-small">
+						Public guestbook for {data.artist.displayName}. Notes go live immediately—no links, emails, or phone numbers.
+					</p>
+				</Stack>
 
-					<!-- Note Submission Form -->
+				<Box variant="raised" padding="lg" radius="lg" class="wall-card-box">
 					{#if data.session?.user}
-						<form method="POST" action="?/submitNote" use:enhance>
-							<Stack gap="sm">
-								<input type="hidden" name="artistId" value={data.artist.id} />
-								<textarea
-									name="body"
-									bind:value={noteBody}
-									placeholder="Say hello to the band..."
-									rows="3"
-									maxlength="500"
-									class="note-textarea"
-								></textarea>
-								<Cluster justify="between" align="center">
-									<span class="text-muted char-count">{500 - noteBody.length} characters left</span>
-									<button type="submit" class="glass-pill tag-highlight post-note-btn">
-										Post Note
-									</button>
-								</Cluster>
-							</Stack>
+						<form
+							data-stack="gap:sm"
+							method="POST"
+							action="?/submitNote"
+							use:enhance={() => {
+								return async ({ result, update }) => {
+									if (result.type === 'success') {
+										noteBody = '';
+										wallMessage =
+											result.data?.status === 'pending'
+												? 'Note submitted for artist approval!'
+												: 'Your note is live on the General Wall!';
+									} else if (result.type === 'failure') {
+										wallMessage = String(result.data?.error || 'Could not post note.');
+									}
+									await update();
+								};
+							}}
+						>
+							<input type="hidden" name="artistId" value={data.artist.id} />
+							<textarea
+								name="body"
+								bind:value={noteBody}
+								placeholder="Leave a message on {data.artist.displayName}'s General Wall..."
+								rows="2"
+								maxlength="250"
+								required
+								class="wall-textarea"
+							></textarea>
+							<Cluster justify="between" align="center">
+								<span class="text-muted subtext-xs">{250 - noteBody.length} characters left</span>
+								<button type="submit" class="btn-wall-post">
+									Post Note →
+								</button>
+							</Cluster>
 						</form>
 					{:else}
 						<Stack gap="sm">
 							<textarea
 								bind:value={noteBody}
-								placeholder="Type a note..."
-								rows="3"
-								maxlength="500"
-								class="note-textarea"
+								placeholder="Type your note to {data.artist.displayName}..."
+								rows="2"
+								maxlength="250"
+								class="wall-textarea"
 							></textarea>
 							<Cluster justify="between" align="center">
-								<span class="text-muted char-count">Draft saved</span>
-								<a
-									href="/login?redirect=/a/{data.artist.slug}"
-									class="glass-pill tag-highlight auth-cta-link"
+								<span class="text-muted subtext-xs">{250 - noteBody.length} characters left</span>
+								<button
+									type="button"
+									class="btn-wall-post"
+									onclick={() => (authDrawerOpen = true)}
 								>
-									Sign in with Google to Post
-								</a>
+									Sign in with Google to Post →
+								</button>
 							</Cluster>
 						</Stack>
 					{/if}
 
-					<!-- Notes Stream -->
-					<Stack gap="sm" class="notes-stream">
-						{#if data.generalNotes.length === 0}
-							<div class="text-muted empty-wall-text">
-								No notes yet on the General Wall.
-							</div>
-						{:else}
-							{#each data.generalNotes as note}
-								<Box variant="subtle" padding="md" radius="md">
-									<Stack gap="sm">
-										<Cluster justify="between" align="center">
-											<Cluster align="center" gap="xs">
-												<div class="note-avatar">
-													{note.author?.name ? note.author.name[0] : 'F'}
-												</div>
-												<span class="note-author">{note.author?.name || 'Fan'}</span>
-											</Cluster>
+					{#if wallMessage || form?.error}
+						<p class="text-highlight feedback-msg">{wallMessage || form?.error}</p>
+					{/if}
+				</Box>
 
-											<form method="POST" action="?/flagNote" use:enhance>
-												<input type="hidden" name="noteId" value={note.id} />
-												<button type="submit" class="glass-pill text-muted flag-btn">
-													⚑ Flag
-												</button>
-											</form>
-										</Cluster>
+				<Stack gap="sm">
+					{#if data.generalNotes.length === 0}
+						<Box variant="subtle" padding="lg" radius="md">
+							<p class="text-muted">No notes on the General Wall yet. Leave the first one!</p>
+						</Box>
+					{:else}
+						{#each data.generalNotes as note}
+							<Stack as="article" gap="xs" class="note-card">
+								<Cluster justify="between" align="center">
+									<Cluster align="center" gap="xs">
+										<div class="note-avatar">
+											{note.author?.name ? note.author.name[0] : 'F'}
+										</div>
+										<span class="note-author">{note.author?.name || 'Fan'}</span>
+									</Cluster>
 
-										<p class="note-text">
-											{note.body}
-										</p>
+									{#if data.session?.user}
+										<form method="POST" action="?/flagNote" use:enhance>
+											<input type="hidden" name="noteId" value={note.id} />
+											<button type="submit" class="btn-flag-note">
+												Flag
+											</button>
+										</form>
+									{/if}
+								</Cluster>
 
-										{#if note.replies && note.replies.length > 0}
-											<div class="artist-reply">
-												<Stack gap="3xs">
-													<span class="text-highlight reply-header">
-														{data.artist.displayName} (Artist Reply)
-													</span>
-													<p class="reply-text">
-														{note.replies[0].body}
-													</p>
-												</Stack>
-											</div>
-										{/if}
+								<p class="note-body-copy">{note.body}</p>
+
+								{#if note.replies && note.replies.length > 0}
+									<Stack gap="3xs" class="artist-reply">
+										<span class="text-accent reply-label">
+											✓ {data.artist.displayName} (Artist)
+										</span>
+										<p class="reply-copy">{note.replies[0].body}</p>
 									</Stack>
-								</Box>
-							{/each}
-						{/if}
-					</Stack>
+								{/if}
+							</Stack>
+						{/each}
+					{/if}
 				</Stack>
-			</Box>
-
-			<footer class="page-footer">
-				<span>Quire Artist Back Page</span>
-				<a href="/" class="powered-by-link">Powered by Quire</a>
-			</footer>
+			</Stack>
 		</Stack>
-	</Center>
+	</Container>
 </div>
 
-<!-- SLIDE-UP TIP DRAWER -->
-{#if tipDrawerOpen}
-	<div class="glass-drawer tip-drawer">
-		<Stack gap="md">
+<!-- BOTTOM-SHEET AUTH DRAWER -->
+{#if authDrawerOpen}
+	<div class="drawer-backdrop">
+		<Stack gap="md" class="glass-drawer bottom-sheet-modal" role="dialog" aria-modal="true" aria-label="Fan Sign In">
+			<div class="drawer-handle"></div>
 			<Cluster justify="between" align="center">
 				<Stack gap="3xs">
-					<h3 class="drawer-heading">
-						Tip {data.artist.displayName}
-					</h3>
-					<span class="text-muted drawer-subtitle">1-tap general tip. Anonymous.</span>
+					<span class="text-highlight font-mono eyebrow-tag">FAN IDENTITY</span>
+					<h3 class="drawer-title">Sign in with Google</h3>
+				</Stack>
+				<button type="button" class="btn-drawer-close" onclick={() => (authDrawerOpen = false)}>
+					✕ Close
+				</button>
+			</Cluster>
+
+			<p class="text-muted subtext-small">
+				Sign in to post on {data.artist.displayName}’s Wall and access your collected gig stubs.
+			</p>
+
+			<form method="POST" action="?/googleAuth" use:enhance>
+				<button type="submit" class="google-sheet-btn">
+					Continue with Google
+				</button>
+			</form>
+		</Stack>
+	</div>
+{/if}
+
+<!-- GENERAL TIP DRAWER -->
+{#if tipDrawerOpen}
+	<div class="drawer-backdrop">
+		<Stack gap="md" class="glass-drawer bottom-sheet-modal" role="dialog" aria-modal="true" aria-label="Support {data.artist.displayName}">
+			<div class="drawer-handle"></div>
+			<Cluster justify="between" align="center">
+				<Stack gap="3xs">
+					<span class="text-support font-mono eyebrow-tag">GENERAL TIP</span>
+					<h3 class="drawer-title">Support {data.artist.displayName}</h3>
 				</Stack>
 				<button
 					type="button"
-					class="glass-pill close-btn"
-					onclick={() => (tipDrawerOpen = false)}
+					class="btn-drawer-close"
+					onclick={() => {
+						tipDrawerOpen = false;
+						tipMessage = '';
+					}}
 				>
 					✕ Close
 				</button>
 			</Cluster>
 
-			<Cluster align="center" gap="sm">
+			<Cluster distributeEqually gap="xs">
 				{#each data.tipPresets as preset}
 					<button
 						type="button"
-						class="glass-pill preset-btn {selectedTipCents === preset * 100 ? 'preset-active' : ''}"
+						class="preset-btn {selectedTipCents === preset * 100 ? 'preset-active' : ''}"
 						onclick={() => handleTipPreset(preset)}
 					>
 						${preset}
 					</button>
 				{/each}
-
-				<input
-					type="number"
-					placeholder="Custom $"
-					value={customAmountStr}
-					oninput={(e) => handleCustomAmountChange((e.target as HTMLInputElement).value)}
-					min="2"
-					max="500"
-					class="custom-amount-input"
-				/>
 			</Cluster>
 
-			<form method="POST" action="?/tip" use:enhance>
-				<Stack gap="xs">
-					<input type="hidden" name="artistId" value={data.artist.id} />
-					<input type="hidden" name="amountGrossCents" value={selectedTipCents} />
-					<input type="hidden" name="fanCoveredFees" value={String(fanCoveredFees)} />
+			<Stack gap="xs">
+				<label for="bp-custom-tip" class="drawer-label">Custom Amount ($2 – $500 USD)</label>
+				<input
+					id="bp-custom-tip"
+					type="number"
+					min="2"
+					max="500"
+					step="1"
+					placeholder="Enter custom $..."
+					value={customAmountStr}
+					oninput={(e) => handleCustomAmountChange((e.currentTarget as HTMLInputElement).value)}
+					class="drawer-input"
+				/>
+			</Stack>
 
-					<button
-						type="submit"
-						class="floating-tip-btn btn-send-tip"
-					>
-						Send ${(selectedTipCents / 100).toFixed(2)} Tip Now
-					</button>
-				</Stack>
-			</form>
+			<Cluster as="label" align="center" gap="xs" class="fee-optin-label">
+				<input type="checkbox" bind:checked={fanCoveredFees} />
+				<span class="subtext-small">
+					Cover transaction fees so {data.artist.displayName} receives the full ${(selectedTipCents / 100).toFixed(2)}
+				</span>
+			</Cluster>
 
-			{#if form?.success && form?.tipResult}
-				<Box variant="raised" padding="md" radius="md" class="tip-success-box">
-					<div class="text-highlight tip-confirm-title">Tip Confirmed!</div>
-					<p class="text-muted subtext-small">
-						Thank you for supporting {data.artist.displayName}.
-					</p>
+			{#if tipMessage}
+				<Box variant="subtle" padding="sm" radius="md" class="tip-confirm-box">
+					{tipMessage}
 				</Box>
 			{/if}
+
+			<form
+				method="POST"
+				action="?/tip"
+				use:enhance={() => {
+					return async ({ result }) => {
+						if (result.type === 'success') {
+							tipMessage = `✓ General Tip Confirmed! $${(selectedTipCents / 100).toFixed(2)} sent to ${data.artist.displayName}.`;
+						} else {
+							tipMessage = "That didn't go through. Nothing was charged.";
+						}
+					};
+				}}
+			>
+				<input type="hidden" name="artistId" value={data.artist.id} />
+				<input type="hidden" name="amountGrossCents" value={selectedTipCents} />
+				<input type="hidden" name="fanCoveredFees" value={String(fanCoveredFees)} />
+
+				<button type="submit" class="btn-submit-tip">
+					Send ${(selectedTipCents / 100).toFixed(2)} General Tip
+				</button>
+			</form>
 		</Stack>
 	</div>
 {/if}
 
 <style>
 	.artist-page-root {
-		background-color: var(--ink);
+		background-color: var(--bg-void);
 		min-block-size: 100vh;
 	}
 
@@ -326,45 +408,43 @@
 		padding-block: var(--space-xl);
 	}
 
-	:global(.header-card) {
-		position: relative;
-		overflow: hidden;
+	.eyebrow-tag {
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
 	}
 
-	.btn-support-static {
-		position: static;
-		box-shadow: none;
-	}
-
-	:global(.bio-section) {
-		margin-block-start: var(--space-s);
+	:global(.artist-hero-banner) {
+		background-color: var(--bg-surface);
+		background-image: var(--cover-art, none);
+		background-size: cover;
+		background-position: center;
+		border: 1px solid var(--glass-border);
+		border-radius: var(--radius-lg);
+		padding: clamp(1.5rem, 4vw, 2.75rem);
 	}
 
 	.artist-name-title {
-		font-size: clamp(2rem, 5vw, 3.5rem);
-		font-weight: 800;
+		font-size: clamp(2.25rem, 5vw, 3.5rem);
+		font-weight: 900;
+		letter-spacing: -0.03em;
 		color: #ffffff;
 	}
 
 	.artist-bio-text {
-		max-inline-size: 60ch;
-		font-size: 1.1rem;
+		font-size: 1rem;
 		line-height: 1.6;
+		max-inline-size: 62ch;
+		color: #d4d2df;
 	}
 
-	.links-strip {
-		padding-block-start: var(--space-s);
-		border-block-start: 1px solid var(--glass-border);
-	}
-
-	.link-external {
-		text-decoration: none;
-		color: var(--paper);
+	:global(.links-cluster) {
+		padding-block-start: 0.5rem;
 	}
 
 	.section-title {
-		font-size: 1.6rem;
-		font-weight: 700;
+		font-size: 1.5rem;
+		font-weight: 800;
 		color: #ffffff;
 	}
 
@@ -372,62 +452,26 @@
 		font-size: 0.85rem;
 	}
 
-	:global(.empty-issues-box) {
-		text-align: center;
-		color: var(--ink-muted);
+	.subtext-xs {
+		font-size: 0.75rem;
 	}
 
 	.group-month-heading {
-		font-size: 1.1rem;
+		font-size: 0.8rem;
 		font-weight: 700;
+		letter-spacing: 0.08em;
 		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-
-	.issue-card-link {
-		text-decoration: none;
-		color: inherit;
-		display: flex;
-		flex-direction: column;
 	}
 
 	:global(.issue-card-box) {
-		inline-size: 100%;
-		display: flex;
-		flex-direction: column;
-		justify-content: space-between;
-		min-block-size: 100%;
-		transition: transform 0.15s ease;
+		border-color: var(--glass-border);
+		text-decoration: none;
+		transition: border-color 0.15s ease, transform 0.15s ease;
 	}
 
 	:global(.issue-card-box:hover) {
+		border-color: var(--highlight);
 		transform: translateY(-2px);
-	}
-
-	.header-eyebrow {
-		font-size: 0.8rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-	}
-
-	.verified-eyebrow {
-		font-size: 0.8rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-
-	.date-label {
-		font-size: 0.8rem;
-		font-weight: 700;
-	}
-
-	.section-label {
-		font-size: 0.8rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
 	}
 
 	.zine-num {
@@ -435,164 +479,368 @@
 	}
 
 	.issue-city-title {
-		font-size: 1.3rem;
-		font-weight: 700;
+		font-size: 1.35rem;
+		font-weight: 800;
 		color: #ffffff;
-		margin-block-start: var(--space-2xs);
 	}
 
-	.issue-venue-text {
-		font-size: 0.9rem;
+	.issue-note-snippet {
+		font-size: 0.85rem;
+		line-height: 1.45;
 	}
 
 	.open-zine-cue {
-		margin-block-start: var(--space-s);
-		color: var(--highlight);
-		font-size: 0.85rem;
-		font-weight: 600;
+		font-size: 0.78rem;
+		font-weight: 700;
 	}
 
-	.note-textarea {
+	:global(.wall-card-box) {
+		border-color: var(--glass-border);
+	}
+
+	.wall-textarea {
 		inline-size: 100%;
-		background: rgba(0, 0, 0, 0.4);
+		background: rgba(0, 0, 0, 0.45);
 		border: 1px solid var(--glass-border);
 		border-radius: var(--radius-md);
 		color: #ffffff;
 		padding: 0.75rem;
-		font-family: var(--font-sans);
-		font-size: 0.95rem;
-		resize: vertical;
+		font-size: 0.9rem;
+		resize: none;
 	}
 
-	.char-count {
-		font-size: 0.75rem;
+	.feedback-msg {
+		font-size: 0.82rem;
+		margin-block-start: 0.5rem;
 	}
 
-	.post-note-btn {
-		cursor: pointer;
-		padding: 0.5rem 1rem;
-	}
-
-	.auth-cta-link {
-		text-decoration: none;
-		padding: 0.5rem 1rem;
-	}
-
-	:global(.notes-stream) {
-		margin-block-start: var(--space-s);
-	}
-
-	.empty-wall-text {
-		text-align: center;
-		padding: var(--space-l);
-	}
-
-	.note-avatar {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		inline-size: 28px;
-		block-size: 28px;
-		border-radius: var(--radius-full);
-		background: rgba(255, 255, 255, 0.06);
-		font-weight: bold;
-		font-size: 0.75rem;
-		color: var(--highlight);
-	}
-
-	.note-author {
-		font-weight: 600;
-	}
-
-	.flag-btn {
-		background: none;
-		border: none;
-		cursor: pointer;
-		font-size: 0.7rem;
-	}
-
-	.note-text {
-		font-size: 0.95rem;
+	.note-body-copy {
+		font-size: 0.92rem;
 		line-height: 1.5;
-		color: var(--paper);
+		color: #f4f4f0;
 	}
 
-	.reply-header {
-		font-weight: 700;
+	.reply-label {
 		font-size: 0.75rem;
+		font-weight: 700;
 	}
 
-	.reply-text {
-		color: #ffffff;
+	.reply-copy {
 		font-size: 0.85rem;
+		color: #ffffff;
 	}
 
-	.powered-by-link {
-		color: var(--highlight);
-		text-decoration: none;
-	}
-
-	.tip-drawer {
+	/* Bottom Sheet Drawers */
+	.drawer-backdrop {
 		position: fixed;
-		inset-inline: 0;
-		inset-block-end: 0;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.72);
+		backdrop-filter: blur(4px);
 		z-index: 100;
-		padding: var(--space-m);
+		display: flex;
+		align-items: flex-end;
+		justify-content: center;
+	}
+
+	:global(.bottom-sheet-modal) {
+		inline-size: 100%;
+		max-inline-size: 500px;
+		padding: 1.5rem;
 		border-radius: 24px 24px 0 0;
 	}
 
-	.drawer-heading {
+	.drawer-handle {
+		inline-size: 2.5rem;
+		block-size: 0.25rem;
+		background: rgba(255, 255, 255, 0.2);
+		border-radius: 4px;
+		margin-inline: auto;
+	}
+
+	.drawer-title {
 		font-size: 1.25rem;
-		font-weight: 700;
+		font-weight: 800;
 		color: #ffffff;
 	}
 
-	.drawer-subtitle {
-		font-size: 0.8rem;
+	.drawer-label {
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: #d4d2df;
 	}
 
-	.close-btn {
+	.drawer-input {
+		inline-size: 100%;
+		padding-block: 0.7rem;
+		padding-inline: 0.9rem;
+		background: rgba(0, 0, 0, 0.5);
+		border: 1px solid var(--glass-border);
+		border-radius: var(--radius-md);
+		color: #ffffff;
+		font-size: 0.95rem;
+	}
+
+	.google-sheet-btn {
+		inline-size: 100%;
+		block-size: 2.9rem;
+		background: #ffffff;
+		color: #090710;
+		font-weight: 700;
+		font-size: 0.9rem;
+		border: none;
+		border-radius: var(--radius-md);
 		cursor: pointer;
 	}
 
 	.preset-btn {
-		cursor: pointer;
-		padding: 0.6rem 1.2rem;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding-block: 0.75rem;
 		font-size: 1rem;
+		font-weight: 700;
+		border-radius: 8px;
+		background: rgba(255, 255, 255, 0.05);
+		color: #ffffff;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		cursor: pointer;
+		transition: background-color 0.15s ease, border-color 0.15s ease;
+	}
+
+	.preset-btn:hover {
+		background: rgba(255, 255, 255, 0.1);
+		border-color: rgba(255, 255, 255, 0.24);
 	}
 
 	.preset-active {
-		border-color: var(--support);
-		color: var(--support);
-		background: rgba(255, 42, 109, 0.15);
-		font-weight: 700;
-	}
-
-	.custom-amount-input {
-		inline-size: 100px;
-		background: rgba(255, 255, 255, 0.05);
-		border: 1px solid var(--glass-border);
-		border-radius: var(--radius-full);
-		color: #ffffff;
-		padding: 0.5rem 1rem;
-		font-size: 0.9rem;
-	}
-
-	.btn-send-tip {
-		position: static;
-		inline-size: 100%;
-		justify-content: center;
-		padding: 1rem;
-		font-size: 1.1rem;
-		box-shadow: none;
-	}
-
-	:global(.tip-success-box) {
-		text-align: center;
+		background: rgba(1, 255, 195, 0.16);
+		color: var(--highlight);
 		border-color: var(--highlight);
 	}
 
-	.tip-confirm-title {
+	:global(.fee-optin-label) {
+		cursor: pointer;
+	}
+
+	:global(.tip-confirm-box) {
+		color: var(--highlight);
+		border-color: var(--highlight);
+		font-size: 0.85rem;
+	}
+
+	.btn-submit-tip {
+		inline-size: 100%;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding-block: 0.9rem;
+		padding-inline: 1.5rem;
+		border-radius: 8px;
+		background: var(--support);
+		color: #ffffff;
+		border: 1px solid rgba(255, 42, 109, 0.5);
+		font-size: 0.95rem;
 		font-weight: 700;
+		cursor: pointer;
+		box-shadow: 0 0 20px rgba(255, 42, 109, 0.35);
+		transition: transform 0.15s ease, box-shadow 0.15s ease;
+	}
+
+	.btn-submit-tip:hover {
+		transform: translateY(-1px);
+		box-shadow: 0 0 26px rgba(255, 42, 109, 0.6);
+	}
+
+	/* Sleek Rectangular Buttons & Badges (Zero 9999px Pills) */
+	.btn-back-link {
+		display: inline-flex;
+		align-items: center;
+		padding-block: 0.4rem;
+		padding-inline: 0.8rem;
+		border-radius: 6px;
+		background: rgba(255, 255, 255, 0.05);
+		color: #e4e4e7;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		font-size: 0.78rem;
+		font-weight: 600;
+		text-decoration: none;
+		transition: background-color 0.15s ease, color 0.15s ease;
+	}
+
+	.btn-back-link:hover {
+		background: rgba(255, 255, 255, 0.1);
+		color: #ffffff;
+	}
+
+	.btn-nav-ghost {
+		display: inline-flex;
+		align-items: center;
+		padding-block: 0.4rem;
+		padding-inline: 0.75rem;
+		border-radius: 6px;
+		background: rgba(255, 255, 255, 0.04);
+		color: #a1a1aa;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		font-size: 0.78rem;
+		font-weight: 600;
+		text-decoration: none;
+		transition: background-color 0.15s ease, color 0.15s ease;
+	}
+
+	.btn-nav-ghost:hover {
+		background: rgba(255, 255, 255, 0.09);
+		color: #ffffff;
+	}
+
+	.btn-nav-primary {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding-block: 0.4rem;
+		padding-inline: 0.85rem;
+		border-radius: 6px;
+		background: rgba(1, 255, 195, 0.14);
+		color: var(--highlight);
+		border: 1px solid rgba(1, 255, 195, 0.4);
+		font-size: 0.78rem;
+		font-weight: 700;
+		cursor: pointer;
+		transition: background-color 0.15s ease;
+	}
+
+	.btn-nav-primary:hover {
+		background: rgba(1, 255, 195, 0.24);
+	}
+
+	.btn-hero-support {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding-block: 0.65rem;
+		padding-inline: 1.25rem;
+		border-radius: 8px;
+		background: var(--support);
+		color: #ffffff;
+		border: 1px solid rgba(255, 42, 109, 0.5);
+		font-size: 0.88rem;
+		font-weight: 700;
+		cursor: pointer;
+		box-shadow: 0 0 20px rgba(255, 42, 109, 0.35);
+		transition: transform 0.15s ease, box-shadow 0.15s ease;
+	}
+
+	.btn-hero-support:hover {
+		transform: translateY(-1px);
+		box-shadow: 0 0 26px rgba(255, 42, 109, 0.6);
+	}
+
+	.btn-artist-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding-block: 0.35rem;
+		padding-inline: 0.75rem;
+		border-radius: 6px;
+		background: rgba(1, 255, 195, 0.12);
+		color: var(--highlight);
+		border: 1px solid rgba(1, 255, 195, 0.35);
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-decoration: none;
+		transition: background-color 0.15s ease;
+	}
+
+	.btn-artist-link:hover {
+		background: rgba(1, 255, 195, 0.22);
+		color: var(--highlight);
+	}
+
+	.btn-wall-post {
+		display: inline-flex;
+		align-items: center;
+		padding-block: 0.45rem;
+		padding-inline: 0.95rem;
+		border-radius: 6px;
+		background: rgba(1, 255, 195, 0.14);
+		color: var(--highlight);
+		border: 1px solid rgba(1, 255, 195, 0.4);
+		font-size: 0.8rem;
+		font-weight: 700;
+		cursor: pointer;
+		transition: background-color 0.15s ease;
+	}
+
+	.btn-wall-post:hover {
+		background: rgba(1, 255, 195, 0.24);
+	}
+
+	.btn-flag-note {
+		display: inline-flex;
+		align-items: center;
+		padding-block: 0.25rem;
+		padding-inline: 0.55rem;
+		border-radius: 4px;
+		background: rgba(255, 255, 255, 0.04);
+		color: #a1a1aa;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		font-size: 0.7rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: background-color 0.15s ease, color 0.15s ease;
+	}
+
+	.btn-flag-note:hover {
+		background: rgba(255, 42, 109, 0.15);
+		color: #ff6b9b;
+	}
+
+	.btn-drawer-close {
+		display: inline-flex;
+		align-items: center;
+		padding-block: 0.35rem;
+		padding-inline: 0.75rem;
+		border-radius: 6px;
+		background: rgba(255, 255, 255, 0.05);
+		color: #e4e4e7;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		font-size: 0.75rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: background-color 0.15s ease;
+	}
+
+	.btn-drawer-close:hover {
+		background: rgba(255, 255, 255, 0.1);
+	}
+
+	.meta-chip {
+		display: inline-flex;
+		align-items: center;
+		padding-block: 0.2rem;
+		padding-inline: 0.55rem;
+		border-radius: 4px;
+		font-size: 0.72rem;
+		font-weight: 700;
+		font-family: var(--font-mono);
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+
+	.meta-chip.meta-highlight {
+		background: rgba(1, 255, 195, 0.12);
+		border: 1px solid rgba(1, 255, 195, 0.35);
+		color: var(--highlight);
+	}
+
+	.meta-chip.meta-accent {
+		background: rgba(5, 217, 232, 0.12);
+		border: 1px solid rgba(5, 217, 232, 0.35);
+		color: var(--accent);
+	}
+
+	.meta-chip.meta-support {
+		background: rgba(255, 42, 109, 0.14);
+		border: 1px solid rgba(255, 42, 109, 0.4);
+		color: #ff6b9b;
 	}
 </style>

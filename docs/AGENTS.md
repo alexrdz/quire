@@ -8,16 +8,16 @@ All AI agents, subagents, and contributors working on **Quire** must strictly ad
 
 ### 1.1 Inward-Pointing Dependencies
 - **The Dependency Rule:** Dependencies must point exclusively inward toward the domain core.
-  - **Domain Core (`src/lib/domain/`)**: Holds business entities, pure calculations, domain types, and Finite State Machines. It must have **zero imports** from SvelteKit, database drivers, Turso/libSQL, Stripe, S3/R2 SDKs, or network packages.
+  - **Domain Core (`src/lib/domain/`)**: Holds business entities, pure calculations, domain types, and Finite State Machines. It must have **zero imports** from SvelteKit, database drivers, Turso/libSQL, Stripe, Resend, S3/R2 SDKs, or network packages.
   - **Application Services (`src/lib/server/services/`)**: Orchestrates domain workflows, implements ports/interfaces, and consumes adapters.
-  - **Infrastructure & Adapters (`src/lib/server/db/`, `src/lib/server/storage/`, `src/lib/server/payments/`)**: Implements persistence, external APIs, and cloud services.
+  - **Infrastructure & Adapters (`src/lib/server/db/`, `src/lib/server/storage/`, `src/lib/server/payments/`, `src/lib/server/email/`)**: Implements persistence (Turso/Drizzle), media storage (Cloudflare R2), payments (Stripe Connect Express), and transactional email (Resend).
   - **Presentation Layer (`src/routes/`, `src/lib/components/`)**: SvelteKit routes, components, form actions, and page loaders depend inward on domain types and application services. The domain core never depends on or references UI/route state.
 
 ```
 +-------------------------------------------------------+
 |  Presentation: SvelteKit Routes, Components, Actions  |
 |   +-----------------------------------------------+   |
-|   | Infrastructure: Turso / Drizzle, Stripe, R2   |   |
+|   | Infrastructure: Turso/Drizzle, Stripe, Resend |   |
 |   |   +---------------------------------------+   |   |
 |   |   | Services: Use-cases, Orchestration    |   |   |
 |   |   |   +-------------------------------+   |   |   |
@@ -80,7 +80,12 @@ All AI agents, subagents, and contributors working on **Quire** must strictly ad
      - Real-time animations and playback progress (e.g., audio playback progress `style="width: {progress}%;"`, visualizer equalizer height custom properties `style="--h: 40%"`).
      - Dynamic user swatches or avatars.
    - Static styling (font sizes, weights, letter-spacing, text transformations, margins, paddings, flex/grid properties, static colors, static background images) must strictly live in CUBE CSS stylesheet layers or Elemental layout primitives (`<Stack>`, `<Cluster>`, `<Box>`, `<Grid>`, etc.).
-5. **Context Maintenance:**
+5. **Zero Emojis Policy:**
+   - **Never use emojis** anywhere in the UI, templates, components, routes, seed scripts, console logs, tests, or documentation.
+   - Emojis look amateurish and unprofessional. Exclusively use clean inline SVGs or typographic indicators when visual cues are needed.
+6. **Minimal DOM & Polymorphic Layout Primitives:**
+   - Avoid superfluous HTML wrappers combined with layout primitives. Use the `as` prop (`<Stack as="section">`, `<Cluster as="nav">`, `<Box as="article">`) so each semantic element is its own layout primitive without extra wrapper `<div>`s.
+7. **Context Maintenance:**
    - Consult `CONTEXT.md` for ubiquitous language before introducing any new term.
    - Record significant, non-obvious, or hard-to-reverse trade-offs in `docs/adr/`.
    - Keep `docs/project-context.md` synchronized with problems, alternatives, and consequences.

@@ -47,9 +47,13 @@ Always use CSS logical properties instead of directional properties:
   2. **Dynamic Animation & Playback States**: Real-time progress values (e.g., audio playback progress bar `style="width: {progress}%;"`, equalizer height variables `style="--h: 40%"`).
   3. **Runtime User Swatches**: Dynamic user-generated gradients or avatars (e.g., `style="background: {user.color};"`).
 - **Static Styling Forbidden in Markup**:
-  - ❌ `style="font-size: 0.85rem;"` -> Use semantic typography classes.
-  - ❌ `style="font-weight: 700; text-transform: uppercase;"` -> Use utility/component classes.
-  - ❌ `style="color: #FFFFFF;"` or `style="background: ..."` -> Use design token classes or stylesheet rules.
-  - ❌ `style="display: contents;"` or `style="display: flex;"` -> Use `.app-shell` or layout primitives.
-  - ❌ Static background image URLs -> Place in component `<style>` block.
+  - [FORBIDDEN] `style="font-size: 0.85rem;"` -> Use semantic typography classes.
+  - [FORBIDDEN] `style="font-weight: 700; text-transform: uppercase;"` -> Use utility/component classes.
+  - [FORBIDDEN] `style="color: #FFFFFF;"` or `style="background: ..."` -> Use design token classes or stylesheet rules.
+  - [FORBIDDEN] `style="display: contents;"` or `style="display: flex;"` -> Use `.app-shell` or layout primitives.
+  - [FORBIDDEN] Static background image URLs -> Place in component `<style>` block.
 - All static layout, typography, borders, and colors must strictly live in CUBE CSS stylesheet layers (`@layer layouts`, `@layer components`, `@layer utilities`) or Elemental layout primitives (`<Stack>`, `<Cluster>`, `<Box>`, `<Grid>`, etc.).
+
+## 6. Strict Prohibition on Emojis
+- **Never use emojis anywhere** across UI components, routes, templates, logs, or documentation.
+- Emojis are amateurish and unprofessional. Use clean vector SVG icons or typographic treatment instead.

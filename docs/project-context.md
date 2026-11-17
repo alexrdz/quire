@@ -32,10 +32,11 @@ The Leaf PHP prototype (`green-room`) validated the core concept, but required a
 ### Alternatives Considered
 1. **Next.js / React with Tailwind CSS**:
    - *Rejected*: Heavy client hydration, CSS runtime / utility class churn that breaks the bespoke, retro-crafted aesthetic defined in the prototype, and complex multi-context auth configurations.
-2. **SvelteKit with Svelte 5 (Runes), Turso (libSQL) + Drizzle, Better Auth, and CUBE CSS** *(Chosen)*:
+2. **SvelteKit with Svelte 5 (Runes), Turso (libSQL) + Drizzle, Better Auth, Stripe Connect Express, Resend, Cloudflare R2, and CUBE CSS** *(Chosen)*:
    - **Svelte 5 Runes**: Predictable fine-grained reactivity (`$state`, `$derived`, `$props`) allowing the Bookbinder split-screen editor to update an interactive mobile preview iframe without external state libraries.
    - **Turso (libSQL) + Drizzle ORM**: Edge-ready SQLite persistence with type-safe schema definitions and zero-friction local SQLite file development.
-   - **Better Auth**: First-class support for single-table unified users with multi-provider auth (Artist email/password and Fan Google OAuth).
+   - **Better Auth + Resend**: First-class support for single-table unified users with multi-provider auth (Artist email/password with Resend verification & password reset emails, and Fan Google OAuth), plus Resend confirmation emails for shared-account payout changes (`SPEC.md` Section 6.4).
+   - **Stripe Connect Express**: Marketplace connected accounts with Express onboarding, 5% platform `application_fee_amount`, and verified webhook synchronization.
    - **CUBE CSS (`@layer`)**: Native CSS layer hierarchy (`vendor`, `base`, `layouts`, `components`, `sticker`, `bookbinder`, `utilities`) preserving the dark glass aesthetic and CSS scroll-snap horizontal reader without external utility frameworks.
 
 ### Accepted Consequences
@@ -46,7 +47,7 @@ The Leaf PHP prototype (`green-room`) validated the core concept, but required a
 ## 3. Media Asset Storage
 
 ### Problem
-Artists upload high-resolution cover art, gig photography, and bespoke zine graphics. As the platform grows from 15 artists to hundreds with thousands or tens of thousands of images, how do we store and serve these assets reliably, cost-effectively, and without vendor lock-in?
+Artists upload cover art, gig photography, bespoke zine graphics, and audio demos directly from phone or laptop. As the platform grows from 15 artists to hundreds with thousands or tens of thousands of media assets, how do we store and serve these assets reliably, cost-effectively, and without vendor lock-in?
 
 ### Alternatives Considered
 1. **Netlify Blobs**:
@@ -64,22 +65,23 @@ Artists upload high-resolution cover art, gig photography, and bespoke zine grap
 
 ---
 
-## 4. Payments, Tipping & Local Portfolio Simulator
+## 4. Payments, Stripe Connect Express & Transactional Email Confirmation
 
 ### Problem
-Quire is designed as a portfolio piece first, with production capabilities ready for launch. Tips must be anonymous, 1-tap (Apple Pay / Google Pay via Stripe Connect Express with a 5% platform cut), charged immediately, and never retried in the background. However, portfolio reviewers and automated test runners often run the code offline or without live Stripe Connect test credentials.
+Tips must be anonymous, 1-tap (Apple Pay / Google Pay via Stripe Connect Express with a 5% platform application fee), charged immediately, and never retried in the background. Because Artist logins are shared among bandmates, changing the Stripe payout account requires re-entering the password and confirming via email (`SPEC.md` Section 6.4). At the same time, local development and automated test suites must be able to run deterministically even when external API keys are not configured.
 
 ### Alternatives Considered
-1. **Strict Live Stripe Requirement**:
-   - *Rejected*: Without active `STRIPE_SECRET_KEY` configured, tipping breaks or displays an error, preventing evaluators from testing the tipping flow, the Gig Recap cards, and dashboard fee calculations.
-2. **Read-Only / Fake Toast**:
-   - *Rejected*: Clicking tip displays a simulated toast, but writes no database records, leaving the artist dashboard empty.
-3. **Dual Stripe Connect + Local Mock Payment Simulator** *(Chosen)*:
-   - When valid Stripe credentials are provided, Quire uses real Stripe Elements and Stripe Connect application fees.
-   - When Stripe credentials are unset, a 1-tap test checkout simulator activates. It calculates the gross tip, 5% platform fee, and Stripe processing fee, writes the real `tip` record to the database, and immediately updates dashboard metrics.
+1. **Hard Failure Without Live Credentials in Local Dev / CI**:
+   - *Rejected*: Blocking local development or unit/integration test runners when `STRIPE_SECRET_KEY` or `RESEND_API_KEY` are unset slows down local iteration and CI verification of tipping and email confirmation workflows.
+2. **Read-Only / Fake UI Toast**:
+   - *Rejected*: Displaying a client-only toast without executing domain fee math or persisting `tip` records leaves dashboard metrics and financial breakdowns untested.
+3. **Production Stripe Connect Express + Resend with Deterministic Local Dev Fallback** *(Chosen)*:
+   - **Stripe Connect Express**: Uses the official `stripe` SDK for connected Express account creation (`accounts.create({ type: 'express' })`), onboarding links (`accountLinks.create`), one-tap tip PaymentIntents / Checkout Sessions with a 5% platform `application_fee_amount`, and cryptographic webhook verification (`stripe.webhooks.constructEvent`).
+   - **Resend Transactional Email**: Uses the official `resend` SDK for Artist email verification, password resets, and signed payout account change confirmation emails (`SPEC.md` Section 6.4).
+   - **Local Dev Fallback**: Only when `STRIPE_SECRET_KEY` or `RESEND_API_KEY` are unset in local dev/test, the infrastructure adapters fall back to deterministic local execution that computes exact gross/Stripe/platform/net fee breakdowns (`src/lib/domain/tipping.ts`), records the tip in the database, and logs structured email payloads to the console.
 
 ### Accepted Consequences
-- The payment service must maintain strict parity between Stripe webhook payloads and simulated local tip records so business logic remains identical. (See [ADR 0003](file:///Users/alexrodriguez/Sites/quire/docs/adr/0003-local-and-demo-mock-payments.md)).
+- The payment and email adapters maintain strict parity between production Stripe webhooks / Resend deliveries and local development fallbacks so domain invariants remain identical across environments. (See [ADR 0003](file:///Users/alexrodriguez/Sites/quire/docs/adr/0003-local-and-demo-mock-payments.md)).
 
 ---
 
@@ -122,3 +124,24 @@ As web applications grow, business rules often bleed into route handlers, databa
 
 ### Accepted Consequences
 - Requires writing explicit Zod schemas and FSM transition functions upfront rather than quick ad-hoc mutation scripts. (See [ADR 0005](file:///Users/alexrodriguez/Sites/quire/docs/adr/0005-inward-dependencies-and-type-driven-design.md) and [AGENTS.md](file:///Users/alexrodriguez/Sites/quire/AGENTS.md)).
+
+---
+
+## 7. Artist User Journey & Onboarding Decisions (Confirmed & Locked In)
+
+All three open product design questions for the Artist User Journey are **Confirmed & Locked In** with no open ambiguity (see [ARTIST-USER-JOURNEY.md](file:///Users/alexrodriguez/Sites/quire/docs/ARTIST-USER-JOURNEY.md) and `SPEC.md` Sections 3, 4, 6.1, 6.2, 6.4, 6.5, 11):
+
+1. **Editable Clean Artist Slug on Sign-Up (`/login?mode=signup`) — Confirmed & Locked In:**
+   - Landing Page artist CTAs route directly to `/login?mode=signup`.
+   - On sign-up, the Artist sees a live, editable URL slug preview (`/a/band-name`) derived from the band name instead of appending a random 3-digit suffix.
+   - Uniqueness is first-come, first-served with a collision check and suggested alternatives if taken, because the slug is baked into the Permanent Artist QR sticker.
+   - Resend powers email verification and password reset (`/login/reset`).
+
+2. **First-Time Artist 3-Step Studio Launchpad (`/dashboard` when `issues.length === 0`) — Confirmed & Locked In:**
+   - Newly signed-up Artists with `0` issues see a **3-Step Studio Launchpad** above the fold instead of an empty gigs table:
+     - **Step 1: Customize Master Template (`~2 min`)** — cover art upload, WCAG contrast-checked `--accent` against `--bg-void`, type pairing, tip presets, Back Page links, and editable/reorderable recurring pages.
+     - **Step 2: Publish First Issue** — `<60 sec` Quick Issue phone flow or `"New Draft in Bookbinder"` desktop split-screen flow, plus a **Busker Fast-Track** to open/download their Permanent Artist QR immediately and display it in **Full-Screen Case Display** mode (chrome-free, high-contrast QR view).
+     - **Step 3: Connect Stripe Express (`Deferred / On-Demand`)** — real Stripe Connect Express onboarding redirect (`accountLinks.create`) to unhide 1-tap Apple Pay / Google Pay tip buttons, with `SPEC.md` §6.4 password re-entry + Resend email confirmation token verification when changing an existing payout account.
+
+3. **Direct Media Uploads via Cloudflare R2 + Local Dev Fallback (`src/lib/server/storage/`) — Confirmed & Locked In:**
+   - Direct image and audio file uploads from phone or laptop are wired into the Master Template cover art field and into Quick Issue / Bookbinder photo and audio fields (backed by Cloudflare R2 in production with automatic `/static/uploads` local dev fallback), alongside URLs and lightweight embeds (`lite-youtube`, Bandcamp).

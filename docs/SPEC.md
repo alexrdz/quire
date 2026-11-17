@@ -10,7 +10,7 @@ A lightweight platform for touring bands **and buskers** to publish city-specifi
 
 **Positioning:** *"Your Venmo QR collects money. This collects money and people."*
 
-**Project status:** Portfolio piece first, possible launch later. Stripe runs in **test mode** unless launched.
+**Project status:** Production platform powered by Turso (libSQL) + Drizzle ORM, Better Auth, Stripe Connect Express, Resend transactional email, and Cloudflare R2 media storage.
 
 ## 2. Core principles
 
@@ -25,22 +25,25 @@ A lightweight platform for touring bands **and buskers** to publish city-specifi
 
 | Type | Auth | Does |
 |---|---|---|
-| **Artist** (band or busker) | Email + password, **one login per Artist** (shared among bandmates) | Publishes Issues, edits the Master Template, moderates walls, replies to notes, views the dashboard |
+| **Artist** (band or busker) | Email + password, **one login per Artist** (shared among bandmates); Resend verification & password reset | Publishes Issues, edits the Master Template, moderates walls, replies to notes, views the dashboard |
 | **Fan** | Google sign-in (only when needed) | Reads, tips (anonymously), signs walls, saves and stamps Issues |
 
-Both live in one user table with an account-type field (`artist` \| `fan`), managed by Better Auth.
+Both live in one user table with an account-type field (`artist` | `fan`), managed by Better Auth.
+
+- **Artist sign-up & clean permanent slug (`/login?mode=signup`):** Landing Page artist CTAs route directly to `/login?mode=signup`. On sign-up, the Artist enters their Band / Artist Name and sees a live, **editable** URL slug preview (`/a/band-name`) derived from the band name — never silently appending a random 3-digit suffix. Slugs are first-come, first-served with a live collision check and suggested alternatives if taken, because the chosen slug is permanently baked into the Artist QR sticker.
+- **Password reset:** Artists can reset a forgotten shared password via a `/login/reset` flow powered by Resend transactional email.
 
 ## 4. QR codes & entry points
 
-- **Issue QR**: one per Issue. Opens **that Issue's Cover**. Scanning it within the Stamp Window makes the fan eligible to Stamp the Issue.
-- **Artist QR**: one per Artist, permanent. Opens the **Back Page**. A busker who never makes Issues can use the Artist QR alone, replacing their Venmo and Instagram QR codes.
-- Publishing generates a downloadable **SVG QR code** for stickers. It can also be shown full-screen on a phone (propped up next to a busker's case).
+- **Issue QR**: one per Issue. Opens **that Issue's Cover** via `/scan/[slug]?k=[secret]`. Scanning it within the Stamp Window makes the fan eligible to Stamp the Issue.
+- **Artist QR**: one per Artist, permanent (`/a/[slug]`). Opens the **Back Page**. A busker who never makes Issues can use the Artist QR alone, replacing their Venmo and Instagram QR codes.
+- **Sticker SVG & Full-Screen Case Display mode:** Publishing generates a downloadable **SVG QR code** for stickers, and the Artist QR SVG is available immediately upon sign-up. Both Issue QR and Artist QR views include a **Full-Screen Case Display** mode that hides all navigation chrome and maximizes the high-contrast QR badge on a phone screen (built to be propped up next to a busker's guitar case or merch table for scanning from a distance).
 
 ## 5. Fan experience
 
 ### 5.1 Cover (first screen of an Issue)
 - Artist name and cover art, plus city, venue and date
-- A one-line **Cover note** ("Playing till 6 🎸")
+- A one-line **Cover note** ("Playing till 6pm")
 - **One-tap tip buttons**: three presets plus custom. The default presets are $3 / $5 / $10 and the Artist can change them. Payment goes through Apple Pay or Google Pay via Stripe.
 - **"Open tonight's zine →"**
 - A link to the Back Page
@@ -88,7 +91,7 @@ Both live in one user table with an account-type field (`artist` \| `fan`), mana
 - **Stamped:** only available after reaching the Issue **by scanning its QR within the Stamp Window**. Shown as a ticket stub with artist, city, venue, date and "Admit One."
   - **Claim later:** if the scan happened inside the Stamp Window, the fan can sign in and claim the Stamp at any time afterward. Eligibility is recorded at scan time as a signed scan token stored on the device.
   - **The window uses the Issue's time zone**, the venue's local time, not the Artist's or the fan's.
-  - **Known tradeoff:** every fan scans the same QR, so a photo of the sticker shared during the window lets someone stamp remotely. This is accepted for the MVP. The short window limits it, and the case study discusses it openly.
+  - **Known tradeoff:** every fan scans the same QR, so a photo of the sticker shared during the window lets someone stamp remotely. This is an explicitly accepted architectural tradeoff (`docs/adr/0001-issue-qr-scan-verification.md`), bounded by the 48-hour Stamp Window.
 - Both require Google sign-in.
 - **My Stubs** has two sections, Stubs (Stamped, sorted by date) and Saved (a grid). Artist names link to their Back Pages.
 - No follows and no feed (possible later).
@@ -96,20 +99,23 @@ Both live in one user table with an account-type field (`artist` \| `fan`), mana
 ## 6. Artist experience
 
 ### 6.1 Master Template
-Edited occasionally, in the Bookbinder:
-- Cover art, **accent color** (contrast-checked), **type pairing** (2–3 options; Inter is the default)
-- Recurring pages included in every Issue (bio, liner notes, and so on)
-- Back Page links and tip presets
+Edited occasionally, at `/dashboard/template` (or via Bookbinder):
+- **Cover art:** direct image file upload (`src/lib/server/storage/`, stored in Cloudflare R2 in production with automatic local `/static/uploads` fallback in dev) in addition to URL entry, with live thumbnail preview.
+- **Accent color (`--accent`):** WCAG contrast-checked against `--bg-void` (`#090710`) so badges, buttons, and links remain legible; low-contrast colors are flagged and clamped/validated by pure domain helpers.
+- **Type pairing:** 2–3 curated options (`Inter` default, editorial serif, DIY monospace).
+- **Recurring pages:** editable and reorderable pages automatically included in every Issue (bio, liner notes, audio tracks with direct audio upload or Bandcamp/embed URL, `lite-youtube` / Bandcamp video facades, setlists).
+- **Back Page links & tip presets:** link label/URL pairs plus 3 tip preset dollar amounts ($2–$500 USD; default $3 / $5 / $10).
 
 ### 6.2 Creating Issues
-- **Quick Issue (phone, under a minute):**
+Two purpose-built creation flows exist for phone vs. desktop, and **either tool can open an Issue made in the other**:
+- **Quick Issue (phone, `/dashboard/issues/quick`, under 60 seconds):**
   - Required: **city, venue or spot name, and date.** The date sets the Stamp Window.
-  - Optional: Cover note, photo, setlist, and 1–2 bespoke pages
-  - Automatic: Master Template pages, Back Page links, Wall, Endpaper
+  - Optional: Cover note, **direct photo upload** (phone camera/library via `src/lib/server/storage/` R2/local fallback or URL), setlist, and 1–2 bespoke pages.
+  - Automatic: Master Template pages, Back Page links, Wall, Endpaper.
   - **"Duplicate last issue"** copies everything except city and date.
-- **Bookbinder (desktop):** a split-screen editor with a live mobile preview, carried over from the PHP prototype. It's for building and polishing Issues block by block. Either tool can open an Issue made in the other.
-- Publishing generates the Issue QR.
-- **Time zone:** each Issue stores the venue's time zone, set from the city. The Stamp Window and the dashboard's "morning after" both use it.
+- **Bookbinder (desktop, `/dashboard/bookbinder/[id]`):** a split-screen block editor with a live 375x780 mobile preview, carried over from the PHP prototype. It is for building and polishing Issues block by block (`text`, `setlist`, `photo` via direct R2/local upload or URL, `audio` via direct audio upload or Bandcamp/embed URL, and `video` via `lite-youtube` / compact Bandcamp facades).
+- Publishing generates the Issue QR and unlocks **Full-Screen Case Display** mode and downloadable SVG stickers.
+- **Time zone:** each Issue stores the venue's time zone, auto-detected from the browser/city with manual override. The Stamp Window and the dashboard's "morning after" recap both use it.
 - **Multiple Issues on one date** are allowed (early and late sets, two spots in one day).
 
 ### 6.3 Issue lifecycle
@@ -117,17 +123,22 @@ Edited occasionally, in the Bookbinder:
 - **Issues are archived, never deleted.** An archived Issue disappears from the Back Page, but fans' Stubs, tip records and its Wall remain. A fan opening it from My Stubs sees it read-only.
 - **Cancelled:** the Issue stays visible with a "Cancelled" label. Postponing means editing the date, which moves the Stamp Window. Stamps already claimed are kept.
 
-### 6.4 Account safety
-- **Changing the payout account** requires entering the password again and confirming by email, because the login is shared among bandmates.
+### 6.4 Account safety & Stripe Connect Express
+- **Deferred / on-demand Stripe Connect Express onboarding:** Artists can sign up, customize their Master Template, and publish Issues immediately without connecting payouts. When ready to receive tips, clicking **"Connect with Stripe Express"** triggers real Stripe Connect Express onboarding (`accounts.create({ type: 'express' })` + `accountLinks.create`), redirecting to Stripe to verify bank/identity details. Once `payoutsEnabled === true` (synchronized via verified Stripe webhooks), 1-tap Apple Pay / Google Pay tip buttons automatically appear across the Cover, Issue pages, and Back Page.
+- **Changing an existing payout account:** requires entering the band's password again and confirming via a signed token link sent by Resend transactional email (`/dashboard/settings/confirm-payout`), because the login is shared among bandmates.
 - **Verified mark:** granted by hand by the platform after a basic check, to discourage impersonating real bands. Unverified Artists can still publish and receive tips.
 
 ### 6.5 Dashboard
-- **Gig Recap card** for the most recent Issue:
+- **First-Time Artist Studio Launchpad (`issues.length === 0`):** When a newly signed-up Artist visits `/dashboard` with `0` issues, `/dashboard` renders a **3-Step Studio Launchpad** above the fold instead of an empty gigs table:
+  1. **Step 1: Customize Master Template (`~2 min`)** — cover art upload (`src/lib/server/storage/`), contrast-checked `--accent` against `--bg-void`, type pairing, tip presets, Back Page links, and editable/reorderable recurring pages.
+  2. **Step 2: Publish First Issue** — choose between the `<60 sec` **Quick Issue** phone flow (`/dashboard/issues/quick`) or **`"New Draft in Bookbinder"`** desktop split-screen flow, **plus a Busker Fast-Track** to open/download their Permanent Artist QR (`/a/[slug]`) immediately and display it in **Full-Screen Case Display** mode.
+  3. **Step 3: Connect Stripe Express (`Deferred / On-Demand`)** — real Stripe Connect Express onboarding redirect (`accountLinks.create`) to unhide 1-tap Apple Pay / Google Pay tip buttons.
+- **Gig Recap card** for the most recent Issue (once at least one Issue exists):
   - Tips: total and number of tippers
   - Stamped: number of fans
   - Notes: newest first, with flagged notes and notes awaiting approval at the top, and a **Reply** action on unanswered notes
   - Saves: number of bookmarks
-- **A list of all gigs**, one row each (city, date, tips, stamps, notes), plus a **General** row for Back Page activity
+- **A list of all gigs**, one row each (city, date, tips, stamps, notes), plus a **General** row for Back Page activity, and direct **"New Draft in Bookbinder"** and **"+ Publish Quick Issue"** actions
 - Each tip shows **gross amount, fees and net amount**
 - No charts, page views or bounce rates. **No email digest.**
 
@@ -146,12 +157,13 @@ Edited occasionally, in the Bookbinder:
 
 ## 8. Tech stack
 
-- **App:** SvelteKit
-- **Database:** Turso (libSQL), accessed through Drizzle
-- **Auth:** Better Auth, with email/password for Artists and Google OAuth for Fans
-- **Payments:** Stripe Connect (Express). Each Artist has a connected account, and the platform cut is the application fee. Test mode for the portfolio.
+- **App:** SvelteKit (Svelte 5 Runes + TypeScript)
+- **Database:** Turso (libSQL), accessed through Drizzle ORM
+- **Auth:** Better Auth, with email/password for Artists (with email verification and password reset) and Google OAuth for Fans
+- **Payments:** Stripe Connect (Express). Each Artist onboards a connected Express account, tips are processed with a 5% platform `application_fee_amount`, and account/payment state is synchronized via cryptographically verified Stripe webhooks.
+- **Transactional Email:** Resend for Artist email verification, password resets, and payout account change confirmations (Section 6.4).
+- **Storage & Media:** Cloudflare R2 (S3-compatible object storage with zero egress fees) for uploaded cover art and gig photos, plus lightweight embed facades (`lite-youtube`, compact Bandcamp).
 - **Hosting:** Netlify
-- **Media:** lightweight embed facades (`lite-youtube`, compact Bandcamp)
 
 ## 9. Data model (sketch)
 
@@ -176,19 +188,24 @@ collection     fan_user_id, issue_id, kind (saved|stamped), created_at
 scan           id, issue_id, token, created_at                   (proves a QR scan for Stamping)
 ```
 
-## 10. Portfolio & demo layer
+## 10. Seeded showcase & interactive sandbox
 
-- **Seeded demo Artist:** 'The Neon Velvet' on a 3-city tour with rich notes, stubs, tips, and Back Page activity so the app never feels empty.
-- **One-click demo login:** An 'Explore as Demo Artist' quick switch and pre-filled credentials on the login page for portfolio reviewers to test the dashboard, Bookbinder, and moderation immediately.
-- **Case-study page:** Explaining the key decisions: why the sticker is the geofence, why tips are anonymous, why the wall is open, why only artists reply, and why the theming is constrained.
+- **Seeded showcase Artist:** 'The Neon Velvet' on a 3-city tour with rich notes, stubs, tips, and Back Page activity so the platform showcases a live touring workflow out of the box.
+- **One-click demo login:** An 'Explore as Demo Artist' quick switch (`/demo`) and pre-filled sandbox credentials on the login page to test the dashboard, Bookbinder, and moderation immediately.
+- **Architecture Decision Records (`docs/adr/`):** Living engineering documentation explaining key decisions: why the sticker is the geofence, why tips are anonymous, why the wall is open, why only artists reply, and why the theming is constrained.
 
-## 11. Decided items (resolved in grilling session)
+## 11. Decided items (confirmed & locked in)
 
-- **Stripe connection timing:** Deferred / on-demand. Artists can create an account, customize their template, and publish immediately; prompt them to connect Stripe from the dashboard or banner when ready to receive tips (tip buttons remain hidden until payouts are enabled).
+- **Clean editable Artist slug on sign-up:** Landing Page CTAs route directly to `/login?mode=signup`. Sign-up shows a live, editable URL slug preview (`/a/band-name`) derived from the band name (never appending a random 3-digit suffix), validated first-come, first-served with suggested alternatives on collision because it is baked into the Permanent Artist QR sticker.
+- **First-Time Artist 3-Step Studio Launchpad:** When an Artist visits `/dashboard` with `0` issues, render the 3-Step Studio Launchpad above the fold (1: Customize Master Template, 2: Publish First Issue via Quick Issue or `"New Draft in Bookbinder"` + Busker Fast-Track to Permanent Artist QR in **Full-Screen Case Display** mode, 3: Connect Stripe Express) instead of an empty gigs table.
+- **Full-Screen Case Display mode:** Both Issue QR and Permanent Artist QR views support a chrome-free, high-contrast full-screen phone display mode for propping beside a busker's case or merch table.
+- **Direct media uploads (`src/lib/server/storage/`):** Master Template cover art, Quick Issue photo, and Bookbinder photo & audio fields support direct file uploads from phone or laptop (backed by Cloudflare R2 in production with automatic `/static/uploads` local dev fallback), alongside URLs and lightweight embeds (`lite-youtube`, compact Bandcamp).
+- **WCAG contrast-checked `--accent`:** Artist `--accent` color selection is validated for contrast against `--bg-void` (`#090710`).
+- **Stripe connection timing & account safety:** Deferred / on-demand via real Stripe Connect Express onboarding (`accountLinks.create`). Artists can create an account, customize their template, and publish immediately; tip buttons remain hidden until `payoutsEnabled === true`. Changing an existing payout account requires password re-entry plus Resend email confirmation token verification (Section 6.4).
+- **Transactional email:** Resend handles Artist email verification, password reset flows (`/login/reset`), and payout account change confirmation emails (Section 6.4).
 - **Stamp Window:** 48-hour calendar window — from 00:00 on the gig date through 23:59:59 the following day in the venue's local time zone.
 - **QR scan validation:** Dedicated scan endpoint with issue secret (`/scan/[issue_slug]?k=[issue_secret]`), issuing a signed HMAC scan token to the device and redirecting to the Cover.
 - **Wall pending action:** Anonymous fans can type their note upfront; tapping 'Post note' triggers Google OAuth with the draft stored in `sessionStorage` and automatically submits upon return. Endpaper 'Claim Stamp' signs in and immediately stamps.
-- **Page sequence:** Cover → Bespoke pages → Master Template recurring pages → Wall → Endpaper.
-- **Tech stack & styling:** SvelteKit with Svelte 5 (Runes), TypeScript, Turso (libSQL) via Drizzle ORM, Better Auth, and hand-crafted CUBE CSS with native `@layer` (no Tailwind).
-- **Media storage:** Cloudflare R2 (S3-compatible, zero egress fees) for production image uploads with local `/static/uploads` fallback in dev.
-- **Demo tour:** 'The Neon Velvet' 3-city tour with one-click demo login.
+- **Page sequence:** Cover -> Bespoke pages -> Master Template recurring pages -> Wall -> Endpaper.
+- **Tech stack & styling:** SvelteKit with Svelte 5 (Runes), TypeScript, Turso (libSQL) via Drizzle ORM, Better Auth, Stripe Connect Express, Resend, Cloudflare R2, and hand-crafted CUBE CSS with native `@layer` (no Tailwind).
+- **Seeded tour:** 'The Neon Velvet' 3-city tour with one-click sandbox login.

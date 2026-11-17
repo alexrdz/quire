@@ -5,11 +5,11 @@ This rule governs the architectural separation, dependency flow, and state model
 ## 1. Inward-Pointing Dependencies
 - **Domain Core (`src/lib/domain/`)**:
   - Contains pure business entities, calculations, value objects, and Finite State Machines.
-  - **Zero external imports**: No imports from SvelteKit, database drivers, Turso/libSQL, Stripe SDK, S3/R2 client, or external network packages.
+  - **Zero external imports**: No imports from SvelteKit, database drivers, Turso/libSQL, Stripe SDK, Resend SDK, S3/R2 client, or external network packages.
 - **Application Services (`src/lib/server/services/`)**:
   - Coordinates domain workflows, implements ports/interfaces, and consumes infrastructure adapters.
-- **Infrastructure Layer (`src/lib/server/db/`, `src/lib/server/storage/`, `src/lib/server/payments/`)**:
-  - Implements persistence (Drizzle/Turso), cloud storage (Cloudflare R2), and third-party APIs (Stripe Connect).
+- **Infrastructure Layer (`src/lib/server/db/`, `src/lib/server/storage/`, `src/lib/server/payments/`, `src/lib/server/email/`)**:
+  - Implements persistence (Drizzle/Turso), cloud storage (Cloudflare R2), payments (Stripe Connect Express), and transactional email (Resend).
 - **Presentation Layer (`src/routes/`, `src/lib/components/`)**:
   - SvelteKit routes, components, actions, and page loaders depend inward on domain types and services.
   - The domain core never imports or references UI/route state.

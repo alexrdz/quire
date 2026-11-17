@@ -22,11 +22,16 @@ Never begin styling with ad-hoc CSS declarations like `display: flex`, `grid-tem
 
 ### No Inline Styles Across the Application
 Zero inline styles are permitted across the application for layout or visual presentation:
-- ❌ `style="display: flex; gap: 1rem;"` -> Use `<Cluster>` or `<Stack>`
-- ❌ `style="max-width: 65ch; margin-inline: auto;"` -> Use `<Center max="measure">`
-- ❌ `style="grid-template-columns: repeat(3, 1fr);"` -> Use `<Grid>` or `<Switcher>`
-- ❌ `style="--stack-gap: 1.5rem;"` -> Use `gap="md"` / `gap="lg"` props
-- ❌ `style="font-size: ...; font-weight: ...;"` -> Use CUBE CSS classes
+- [FORBIDDEN] `style="display: flex; gap: 1rem;"` -> Use `<Cluster>` or `<Stack>`
+- [FORBIDDEN] `style="max-width: 65ch; margin-inline: auto;"` -> Use `<Center max="measure">`
+- [FORBIDDEN] `style="grid-template-columns: repeat(3, 1fr);"` -> Use `<Grid>` or `<Switcher>`
+- [FORBIDDEN] `style="--stack-gap: 1.5rem;"` -> Use `gap="md"` / `gap="lg"` props
+- [FORBIDDEN] `style="font-size: ...; font-weight: ...;"` -> Use CUBE CSS classes
+
+### No Superfluous Wrapper Tags
+- Never wrap layout primitives in redundant HTML tags or nest multiple primitives that perform the same job (e.g., `<section><Container><Center><Stack>`).
+- Use the polymorphic `as` prop on layout primitives (`<Stack as="section">`, `<Cluster as="nav">`, `<Stack as="header">`, `<Box as="article">`) so the semantic HTML element IS the layout primitive.
+- Never use emojis anywhere in markup or documentation; use SVG icons or clean typography.
 
 The only permitted inline styles are strictly runtime dynamic UI necessities (passing dynamic database values to CSS custom properties like `style="--accent: ...;"` or real-time animations like audio progress bar `style="width: ...%;"`).
 

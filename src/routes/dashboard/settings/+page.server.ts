@@ -1,9 +1,21 @@
+import crypto from 'node:crypto';
 import { fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
+import { and, desc, eq, gt } from 'drizzle-orm';
 import { db, schema } from '$lib/server/db';
-import { eq } from 'drizzle-orm';
-import { auth } from '$lib/server/auth';
+import { auth, verifyUserCredentialPassword } from '$lib/server/auth';
+import { sendPayoutAccountChangeConfirmationEmail } from '$lib/server/email';
+import {
+	inspectConnectedAccountStatus,
+	isStripeConfigured,
+	type StripeExpressAccountSummary
+} from '$lib/server/payments/stripe';
+import {
+	artistSettingsUpdateSchema,
+	payoutAccountChangeRequestSchema,
+	type PayoutChangeAction
+} from '$lib/schemas/payouts';
 
-export const load: ServerLoad = async ({ request }) => {
+export const load: ServerLoad = async ({ request, url }) => {
 	const session = await auth.api.getSession({
 		headers: request.headers
 	});
@@ -20,36 +32,236 @@ export const load: ServerLoad = async ({ request }) => {
 		throw redirect(303, '/login');
 	}
 
+	const stripeParam = url.searchParams.get('stripe');
+	const stripeReturnState =
+		stripeParam === 'return' || stripeParam === 'refresh' ? stripeParam : null;
+	const stripeConfigured = isStripeConfigured();
+	const isSeededDemoAccount = Boolean(artist.stripeAccountId?.startsWith('acct_demo_'));
+
+	let currentArtist = artist;
+	let stripeStatus: StripeExpressAccountSummary | null = null;
+	let stripeSyncError: string | null = null;
+
+	if (currentArtist.stripeAccountId && !isSeededDemoAccount && stripeConfigured) {
+		const statusResult = await inspectConnectedAccountStatus(currentArtist.stripeAccountId);
+		if (statusResult.ok) {
+			stripeStatus = statusResult.value;
+			if (statusResult.value.payoutsEnabled !== Boolean(currentArtist.payoutsEnabled)) {
+				const now = new Date();
+				await db
+					.update(schema.artists)
+					.set({
+						payoutsEnabled: statusResult.value.payoutsEnabled,
+						updatedAt: now
+					})
+					.where(eq(schema.artists.id, currentArtist.id));
+
+				currentArtist = {
+					...currentArtist,
+					payoutsEnabled: statusResult.value.payoutsEnabled,
+					updatedAt: now
+				};
+			}
+		} else {
+			stripeSyncError = statusResult.error.message;
+		}
+	}
+
+	const now = new Date();
+	const pendingToken = await db.query.payoutChangeTokens.findFirst({
+		where: and(
+			eq(schema.payoutChangeTokens.artistId, currentArtist.id),
+			eq(schema.payoutChangeTokens.status, 'pending'),
+			gt(schema.payoutChangeTokens.expiresAt, now)
+		),
+		orderBy: [desc(schema.payoutChangeTokens.createdAt)]
+	});
+
+	const credentialAccount = await db.query.accounts.findFirst({
+		where: and(
+			eq(schema.accounts.userId, session.user.id),
+			eq(schema.accounts.providerId, 'credential')
+		)
+	});
+
 	return {
-		artist
+		artist: currentArtist,
+		userEmail: session.user.email,
+		stripeConfigured,
+		stripeReturnState,
+		stripeStatus,
+		stripeSyncError,
+		isSeededDemoAccount,
+		hasCredentialPassword: Boolean(credentialAccount?.password),
+		pendingPayoutChange: pendingToken
+			? {
+					action: pendingToken.action,
+					expiresAt: pendingToken.expiresAt.toISOString()
+				}
+			: null
 	};
 };
 
+function buildEmailTargetLabel(action: PayoutChangeAction, stripeAccountId: string | null): string {
+	if (action === 'disconnect') {
+		return 'Disconnect Stripe Payout Account';
+	}
+	if (action === 'replace') {
+		return 'Stripe Connect Express (Replace Connected Account)';
+	}
+	const hasLiveAccount = Boolean(stripeAccountId) && !stripeAccountId!.startsWith('acct_demo_');
+	return hasLiveAccount
+		? 'Stripe Connect Express (Resume Onboarding)'
+		: 'Stripe Connect Express (New Onboarding)';
+}
+
 export const actions: Actions = {
-	updateSettings: async ({ request }) => {
+	updateModeration: async ({ request }) => {
 		const session = await auth.api.getSession({
 			headers: request.headers
 		});
-		if (!session?.user) return fail(401, { error: 'Unauthorized' });
+		if (!session?.user) {
+			return fail(401, { moderationError: 'Unauthorized' });
+		}
 
 		const artist = await db.query.artists.findFirst({
 			where: eq(schema.artists.userId, session.user.id)
 		});
-		if (!artist) return fail(401, { error: 'Artist not found' });
+		if (!artist) {
+			return fail(401, { moderationError: 'Artist not found' });
+		}
 
 		const formData = await request.formData();
-		const generalWallApproveFirst = formData.get('generalWallApproveFirst') === 'true';
-		const simulatePayouts = formData.get('simulatePayouts') === 'true';
+		const parsed = artistSettingsUpdateSchema
+			.pick({ generalWallApproveFirst: true })
+			.safeParse({
+				generalWallApproveFirst: formData.get('generalWallApproveFirst') === 'true'
+			});
+
+		if (!parsed.success) {
+			return fail(400, {
+				moderationError: parsed.error.issues[0]?.message || 'Invalid moderation settings.'
+			});
+		}
 
 		await db
 			.update(schema.artists)
 			.set({
-				generalWallApproveFirst,
-				payoutsEnabled: simulatePayouts || artist.payoutsEnabled,
+				generalWallApproveFirst: parsed.data.generalWallApproveFirst,
 				updatedAt: new Date()
 			})
 			.where(eq(schema.artists.id, artist.id));
 
-		return { success: true };
+		return {
+			moderationSaved: true,
+			generalWallApproveFirst: parsed.data.generalWallApproveFirst
+		};
+	},
+
+	requestPayoutChange: async ({ request, url }) => {
+		const session = await auth.api.getSession({
+			headers: request.headers
+		});
+		if (!session?.user) {
+			return fail(401, { payoutError: 'Unauthorized' });
+		}
+
+		const artist = await db.query.artists.findFirst({
+			where: eq(schema.artists.userId, session.user.id)
+		});
+		if (!artist) {
+			return fail(401, { payoutError: 'Artist not found' });
+		}
+
+		const formData = await request.formData();
+		const rawAction = String(formData.get('action') ?? 'connect').trim();
+		const rawPassword = String(formData.get('confirmPassword') ?? '');
+
+		const parsed = payoutAccountChangeRequestSchema.safeParse({
+			confirmPassword: rawPassword,
+			action: rawAction
+		});
+
+		if (!parsed.success) {
+			return fail(400, {
+				payoutError: parsed.error.issues[0]?.message || 'Invalid payout change request.',
+				selectedAction: rawAction
+			});
+		}
+
+		const { confirmPassword, action } = parsed.data;
+
+		if (action === 'disconnect' && !artist.stripeAccountId && !artist.payoutsEnabled) {
+			return fail(400, {
+				payoutError: 'No Stripe payout account is currently connected.',
+				selectedAction: action
+			});
+		}
+
+		const passwordValid = await verifyUserCredentialPassword(session.user.id, confirmPassword);
+		if (!passwordValid) {
+			return fail(403, {
+				payoutError:
+					'Incorrect password. Please re-enter your shared band password to modify payout settings.',
+				selectedAction: action
+			});
+		}
+
+		const now = new Date();
+		const expiresAt = new Date(now.getTime() + 1000 * 60 * 60); // 1 hour
+		const rawToken = crypto.randomBytes(32).toString('hex');
+		const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+		const tokenId = crypto.randomUUID();
+
+		await db
+			.update(schema.payoutChangeTokens)
+			.set({ status: 'cancelled' })
+			.where(
+				and(
+					eq(schema.payoutChangeTokens.artistId, artist.id),
+					eq(schema.payoutChangeTokens.status, 'pending')
+				)
+			);
+
+		await db.insert(schema.payoutChangeTokens).values({
+			id: tokenId,
+			artistId: artist.id,
+			userId: session.user.id,
+			tokenHash,
+			action,
+			targetStripeAccountId: null,
+			status: 'pending',
+			expiresAt,
+			createdAt: now
+		});
+
+		const origin = url.origin.replace(/\/$/, '');
+		const confirmationUrl = `${origin}/dashboard/settings/confirm-payout?token=${encodeURIComponent(rawToken)}`;
+
+		const emailResult = await sendPayoutAccountChangeConfirmationEmail({
+			to: session.user.email,
+			artistName: artist.displayName,
+			confirmationUrl,
+			newStripeAccountId: buildEmailTargetLabel(action, artist.stripeAccountId)
+		});
+
+		if (!emailResult.ok) {
+			await db
+				.update(schema.payoutChangeTokens)
+				.set({ status: 'cancelled' })
+				.where(eq(schema.payoutChangeTokens.id, tokenId));
+
+			return fail(500, {
+				payoutError: emailResult.error.message,
+				selectedAction: action
+			});
+		}
+
+		return {
+			payoutConfirmationSent: true,
+			payoutAction: action,
+			emailMode: emailResult.value.mode,
+			sentToEmail: session.user.email
+		};
 	}
 };

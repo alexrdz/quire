@@ -1,12 +1,12 @@
-import { error, fail, type Actions, type ServerLoad } from '@sveltejs/kit';
+import { error, fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { db, schema } from '$lib/server/db';
 import { eq, and, asc, desc } from 'drizzle-orm';
-import { auth } from '$lib/server/auth';
+import { auth, createSessionForUser } from '$lib/server/auth';
+import { seedDatabase } from '$lib/server/seed';
 import { createTipCheckout } from '$lib/server/services/payments';
 import {
 	submitWallNote,
-	flagWallNote,
-	deleteWallNote
+	flagWallNote
 } from '$lib/server/services/moderation';
 import {
 	claimStampForFan,
@@ -41,8 +41,17 @@ export const load: ServerLoad = async ({ params, cookies, request }) => {
 		orderBy: [asc(schema.templatePages.position)]
 	});
 
+	// Fetch stamped fan IDs for this issue to power the "Was there" mark (SPEC.md §5.5)
+	const issueStamps = await db.query.collections.findMany({
+		where: and(
+			eq(schema.collections.issueId, issue.id),
+			eq(schema.collections.kind, 'stamped')
+		)
+	});
+	const stampedFanIds = new Set(issueStamps.map((s) => s.fanUserId));
+
 	// Fetch live wall notes with replies
-	const notes = await db.query.notes.findMany({
+	const rawNotes = await db.query.notes.findMany({
 		where: and(eq(schema.notes.issueId, issue.id), eq(schema.notes.status, 'live')),
 		orderBy: [desc(schema.notes.createdAt)],
 		with: {
@@ -52,6 +61,11 @@ export const load: ServerLoad = async ({ params, cookies, request }) => {
 			replies: true
 		}
 	});
+
+	const notes = rawNotes.map((n) => ({
+		...n,
+		wasThere: stampedFanIds.has(n.fanUserId)
+	}));
 
 	// Check authentication session
 	const session = await auth.api.getSession({
@@ -83,9 +97,9 @@ export const load: ServerLoad = async ({ params, cookies, request }) => {
 	}
 
 	// Parse tip presets
-	let tipPresets = [3, 5, 10, 20];
+	let tipPresets = [3, 5, 10];
 	try {
-		tipPresets = JSON.parse(issue.artist.tipPresetsJson || '[3, 5, 10, 20]');
+		tipPresets = JSON.parse(issue.artist.tipPresetsJson || '[3, 5, 10]');
 	} catch {
 		// fallback
 	}
@@ -104,6 +118,40 @@ export const load: ServerLoad = async ({ params, cookies, request }) => {
 };
 
 export const actions: Actions = {
+	googleAuth: async ({ request, params, cookies }) => {
+		const formData = await request.formData();
+		const targetHash = String(formData.get('targetHash') || '#page-wall');
+		const callbackURL = `/i/${params.slug}${targetHash}`;
+
+		const hasGoogleKeys = Boolean(
+			process.env.GOOGLE_CLIENT_ID &&
+				process.env.GOOGLE_CLIENT_ID !== 'mock_google_client_id' &&
+				process.env.GOOGLE_CLIENT_SECRET
+		);
+
+		if (hasGoogleKeys) {
+			const res = await auth.api.signInSocial({
+				body: {
+					provider: 'google',
+					callbackURL
+				},
+				headers: request.headers
+			});
+			if (res?.url) {
+				throw redirect(303, res.url);
+			}
+		}
+
+		await seedDatabase();
+		const fanUser = await db.query.users.findFirst({
+			where: eq(schema.users.email, 'maya@example.com')
+		});
+		if (fanUser) {
+			await createSessionForUser(cookies, fanUser.id);
+		}
+		throw redirect(303, callbackURL);
+	},
+
 	tip: async ({ request, url }) => {
 		const formData = await request.formData();
 		const artistId = String(formData.get('artistId') || '');

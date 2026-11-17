@@ -3,6 +3,227 @@ import crypto from 'node:crypto';
 import { db, schema } from '$lib/server/db';
 import { eq, and, asc } from 'drizzle-orm';
 import { auth } from '$lib/server/auth';
+import { generateIssueScanQrSvg } from '$lib/server/services/qr';
+import { uploadFormFile } from '$lib/server/services/storage';
+import { calculateStampWindow } from '$domain/stamping';
+import {
+	archiveIssue,
+	cancelIssue,
+	publishIssue,
+	type Issue
+} from '$domain/issue';
+import { createArtistId, createIssueId } from '$domain/types';
+import { issueStatusSchema, mediaUrlSchema } from '$schemas/issue';
+
+const BOOKBINDER_PAGE_KINDS = new Set(['text', 'setlist', 'photo', 'audio', 'video'] as const);
+type BookbinderPageKind = 'text' | 'setlist' | 'photo' | 'audio' | 'video';
+
+async function requireOwnedIssue(headers: Headers, issueId: string | undefined) {
+	const session = await auth.api.getSession({ headers });
+	if (!session?.user) {
+		return { errorResponse: fail(401, { error: 'Unauthorized' }) } as const;
+	}
+
+	const artist = await db.query.artists.findFirst({
+		where: eq(schema.artists.userId, session.user.id)
+	});
+	if (!artist) {
+		return { errorResponse: fail(401, { error: 'Artist not found' }) } as const;
+	}
+
+	if (!issueId) {
+		return { errorResponse: fail(400, { error: 'Issue ID is required' }) } as const;
+	}
+
+	const issue = await db.query.issues.findFirst({
+		where: and(eq(schema.issues.id, issueId), eq(schema.issues.artistId, artist.id))
+	});
+	if (!issue) {
+		return { errorResponse: fail(403, { error: 'Issue not found or unauthorized' }) } as const;
+	}
+
+	return { session, artist, issue } as const;
+}
+
+function toDomainIssue(
+	existing: typeof schema.issues.$inferSelect,
+	fallbackWindow: { start: Date; end: Date }
+): Issue {
+	const base = {
+		id: createIssueId(existing.id),
+		artistId: createArtistId(existing.artistId),
+		slug: existing.slug,
+		city: existing.city,
+		venue: existing.venue,
+		date: existing.date,
+		timezone: existing.timezone,
+		coverNote: existing.coverNote,
+		approveFirst: existing.approveFirst
+	};
+
+	switch (existing.status) {
+		case 'draft':
+			return { ...base, status: 'draft' };
+		case 'published':
+			return {
+				...base,
+				status: 'published',
+				secretKey: existing.secretKey,
+				stampWindow: {
+					start: existing.stampWindowStart ?? fallbackWindow.start,
+					end: existing.stampWindowEnd ?? fallbackWindow.end
+				},
+				publishedAt: existing.publishedAt ?? existing.createdAt
+			};
+		case 'cancelled':
+			return {
+				...base,
+				status: 'cancelled',
+				cancelledAt: existing.updatedAt
+			};
+		case 'archived':
+			return {
+				...base,
+				status: 'archived',
+				archivedAt: existing.archivedAt ?? existing.updatedAt,
+				previousStatus: 'published'
+			};
+	}
+}
+
+async function resolvePageContentJson(
+	formData: FormData,
+	kind: BookbinderPageKind,
+	isCreate: boolean
+): Promise<{ ok: true; contentJson: string } | { ok: false; error: string }> {
+	const title = String(formData.get('title') || '').trim();
+	const body = String(formData.get('body') || '').trim();
+	const songsRaw = String(formData.get('songs') || '').trim();
+	const duration = String(formData.get('duration') || '03:42').trim();
+
+	if (kind === 'setlist') {
+		const songs = songsRaw
+			? songsRaw
+					.split(/[\n,]+/)
+					.map((s) => s.trim())
+					.filter(Boolean)
+			: isCreate
+				? ['Opening Track', 'New Single', 'Crowd Favorite', 'Encore']
+				: [];
+
+		return {
+			ok: true,
+			contentJson: JSON.stringify({
+				title: title || undefined,
+				songs
+			})
+		};
+	}
+
+	if (kind === 'photo') {
+		const photoFile = formData.get('photoFile');
+		const imageUrlRaw = String(formData.get('imageUrl') || '').trim();
+		let resolvedImageUrl = '';
+
+		if (photoFile instanceof File && photoFile.size > 0) {
+			const uploadRes = await uploadFormFile(photoFile, { kind: 'image' });
+			if (!uploadRes.ok) {
+				return { ok: false, error: uploadRes.error.message };
+			}
+			resolvedImageUrl = uploadRes.value.url;
+		} else if (imageUrlRaw) {
+			const urlCheck = mediaUrlSchema.safeParse(imageUrlRaw);
+			if (!urlCheck.success) {
+				return {
+					ok: false,
+					error:
+						urlCheck.error.issues[0]?.message ||
+						'Photo URL must be a valid http(s) URL or /uploads/ path'
+				};
+			}
+			resolvedImageUrl = urlCheck.data;
+		}
+
+		return {
+			ok: true,
+			contentJson: JSON.stringify({
+				title: title || undefined,
+				body: body || undefined,
+				imageUrl: resolvedImageUrl || undefined
+			})
+		};
+	}
+
+	if (kind === 'audio') {
+		const audioFile = formData.get('audioFile');
+		const audioUrlRaw = String(formData.get('audioUrl') || '').trim();
+		let resolvedAudioUrl = '';
+
+		if (audioFile instanceof File && audioFile.size > 0) {
+			const uploadRes = await uploadFormFile(audioFile, { kind: 'audio' });
+			if (!uploadRes.ok) {
+				return { ok: false, error: uploadRes.error.message };
+			}
+			resolvedAudioUrl = uploadRes.value.url;
+		} else if (audioUrlRaw) {
+			const urlCheck = mediaUrlSchema.safeParse(audioUrlRaw);
+			if (!urlCheck.success) {
+				return {
+					ok: false,
+					error:
+						urlCheck.error.issues[0]?.message ||
+						'Audio URL must be a valid http(s) URL or /uploads/ path'
+				};
+			}
+			resolvedAudioUrl = urlCheck.data;
+		}
+
+		return {
+			ok: true,
+			contentJson: JSON.stringify({
+				title: title || undefined,
+				body: body || undefined,
+				duration: duration || '03:42',
+				audioUrl: resolvedAudioUrl || undefined
+			})
+		};
+	}
+
+	if (kind === 'video') {
+		const videoUrlRaw = String(formData.get('videoUrl') || formData.get('embedUrl') || '').trim();
+		let resolvedVideoUrl = '';
+
+		if (videoUrlRaw) {
+			const urlCheck = mediaUrlSchema.safeParse(videoUrlRaw);
+			if (!urlCheck.success) {
+				return {
+					ok: false,
+					error:
+						urlCheck.error.issues[0]?.message ||
+						'Video URL must be a valid http(s) URL or /uploads/ path'
+				};
+			}
+			resolvedVideoUrl = urlCheck.data;
+		}
+
+		return {
+			ok: true,
+			contentJson: JSON.stringify({
+				title: title || undefined,
+				body: body || undefined,
+				videoUrl: resolvedVideoUrl || undefined
+			})
+		};
+	}
+
+	return {
+		ok: true,
+		contentJson: JSON.stringify({
+			title: title || undefined,
+			body: body || undefined
+		})
+	};
+}
 
 export const load: ServerLoad = async ({ params, request }) => {
 	const session = await auth.api.getSession({
@@ -34,76 +255,232 @@ export const load: ServerLoad = async ({ params, request }) => {
 		throw error(404, 'Issue not found or unauthorized');
 	}
 
+	const origin = new URL(request.url).origin;
+	const issueQrSvg = await generateIssueScanQrSvg(origin, issue.slug, issue.secretKey);
+
 	return {
 		artist,
 		issue,
-		pages: issue.issuePages
+		pages: issue.issuePages,
+		issueQrSvg,
+		issueUrl: `${origin}/i/${issue.slug}`
 	};
 };
 
 export const actions: Actions = {
 	save: async ({ request, params }) => {
-		const session = await auth.api.getSession({
-			headers: request.headers
-		});
-		if (!session?.user) return fail(401, { error: 'Unauthorized' });
+		const owned = await requireOwnedIssue(request.headers, params.id);
+		if ('errorResponse' in owned) return owned.errorResponse;
+		const existing = owned.issue;
 
 		const formData = await request.formData();
 		const coverNote = String(formData.get('coverNote') || '');
-		const city = String(formData.get('city') || '');
-		const venue = String(formData.get('venue') || '');
+		const city = String(formData.get('city') || '').trim();
+		const venue = String(formData.get('venue') || '').trim();
+		const date = String(formData.get('date') || '').trim();
+		const rawStatus = String(formData.get('status') || existing.status).trim();
+		const approveFirst = formData.get('approveFirst') === 'true';
+
+		const nextCity = city || existing.city;
+		const nextVenue = venue || existing.venue;
+		const nextDate = date || existing.date;
+
+		if (!nextCity || !nextVenue) {
+			return fail(400, { error: 'City and venue are required.' });
+		}
+
+		const statusCheck = issueStatusSchema.safeParse(rawStatus);
+		if (!statusCheck.success) {
+			return fail(400, { error: 'Invalid issue status.' });
+		}
+		const requestedStatus = statusCheck.data;
+
+		const windowCalc = calculateStampWindow(nextDate, existing.timezone);
+		if (!windowCalc.ok) {
+			return fail(400, { error: windowCalc.error.message });
+		}
+
+		let nextPublishedAt = existing.publishedAt;
+		let nextArchivedAt = existing.archivedAt;
+
+		if (requestedStatus !== existing.status) {
+			const domainIssue = toDomainIssue(existing, windowCalc.value);
+
+			if (requestedStatus === 'draft') {
+				return fail(400, {
+					error: `Cannot transition an issue with status '${existing.status}' back to 'draft'.`
+				});
+			} else if (requestedStatus === 'published') {
+				const res = publishIssue(domainIssue, {
+					secretKey: existing.secretKey,
+					stampWindow: windowCalc.value
+				});
+				if (!res.ok) {
+					return fail(400, { error: res.error.message });
+				}
+				nextPublishedAt = res.value.publishedAt;
+			} else if (requestedStatus === 'cancelled') {
+				const res = cancelIssue(domainIssue);
+				if (!res.ok) {
+					return fail(400, { error: res.error.message });
+				}
+			} else if (requestedStatus === 'archived') {
+				const res = archiveIssue(domainIssue);
+				if (!res.ok) {
+					return fail(400, { error: res.error.message });
+				}
+				nextArchivedAt = res.value.archivedAt;
+			}
+		}
 
 		await db
 			.update(schema.issues)
 			.set({
 				coverNote,
-				city,
-				venue,
+				city: nextCity,
+				venue: nextVenue,
+				date: nextDate,
+				status: requestedStatus,
+				approveFirst,
+				stampWindowStart: windowCalc.value.start,
+				stampWindowEnd: windowCalc.value.end,
+				publishedAt: nextPublishedAt,
+				archivedAt: nextArchivedAt,
 				updatedAt: new Date()
 			})
-			.where(eq(schema.issues.id, params.id!));
+			.where(and(eq(schema.issues.id, existing.id), eq(schema.issues.artistId, owned.artist.id)));
+
+		return { success: true };
+	},
+
+	updatePage: async ({ request, params }) => {
+		const owned = await requireOwnedIssue(request.headers, params.id);
+		if ('errorResponse' in owned) return owned.errorResponse;
+
+		const formData = await request.formData();
+		const pageId = String(formData.get('pageId') || '').trim();
+		const rawKind = String(formData.get('kind') || 'text').trim();
+
+		if (!pageId) {
+			return fail(400, { error: 'Page ID is required.' });
+		}
+
+		const existingPage = await db.query.issuePages.findFirst({
+			where: and(eq(schema.issuePages.id, pageId), eq(schema.issuePages.issueId, owned.issue.id))
+		});
+		if (!existingPage) {
+			return fail(404, { error: 'Page not found for this issue.' });
+		}
+
+		const kind = BOOKBINDER_PAGE_KINDS.has(rawKind as BookbinderPageKind)
+			? (rawKind as BookbinderPageKind)
+			: (existingPage.kind as BookbinderPageKind);
+
+		const resolved = await resolvePageContentJson(formData, kind, false);
+		if (!resolved.ok) {
+			return fail(400, { error: resolved.error });
+		}
+
+		await db
+			.update(schema.issuePages)
+			.set({ contentJson: resolved.contentJson })
+			.where(and(eq(schema.issuePages.id, pageId), eq(schema.issuePages.issueId, owned.issue.id)));
+
+		return { success: true };
+	},
+
+	movePage: async ({ request, params }) => {
+		const owned = await requireOwnedIssue(request.headers, params.id);
+		if ('errorResponse' in owned) return owned.errorResponse;
+
+		const formData = await request.formData();
+		const pageId = String(formData.get('pageId') || '').trim();
+		const direction = String(formData.get('direction') || 'up');
+
+		const pages = await db.query.issuePages.findMany({
+			where: eq(schema.issuePages.issueId, owned.issue.id),
+			orderBy: [asc(schema.issuePages.position)]
+		});
+
+		const idx = pages.findIndex((p) => p.id === pageId);
+		if (idx === -1) return fail(404, { error: 'Page not found for this issue.' });
+
+		const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+		if (swapIdx < 0 || swapIdx >= pages.length) return { success: true };
+
+		const current = pages[idx];
+		const neighbor = pages[swapIdx];
+
+		await db
+			.update(schema.issuePages)
+			.set({ position: neighbor.position })
+			.where(
+				and(eq(schema.issuePages.id, current.id), eq(schema.issuePages.issueId, owned.issue.id))
+			);
+		await db
+			.update(schema.issuePages)
+			.set({ position: current.position })
+			.where(
+				and(eq(schema.issuePages.id, neighbor.id), eq(schema.issuePages.issueId, owned.issue.id))
+			);
 
 		return { success: true };
 	},
 
 	addPage: async ({ request, params }) => {
-		const session = await auth.api.getSession({
-			headers: request.headers
-		});
-		if (!session?.user) return fail(401, { error: 'Unauthorized' });
+		const owned = await requireOwnedIssue(request.headers, params.id);
+		if ('errorResponse' in owned) return owned.errorResponse;
 
 		const formData = await request.formData();
-		const kind = String(formData.get('kind') || 'text');
-		const body = String(formData.get('body') || '');
+		const rawKind = String(formData.get('kind') || 'text').trim();
+		if (!BOOKBINDER_PAGE_KINDS.has(rawKind as BookbinderPageKind)) {
+			return fail(400, { error: `Unsupported page type '${rawKind}'.` });
+		}
+		const kind = rawKind as BookbinderPageKind;
 
-		// Find highest position
+		const resolved = await resolvePageContentJson(formData, kind, true);
+		if (!resolved.ok) {
+			return fail(400, { error: resolved.error });
+		}
+
 		const pages = await db.query.issuePages.findMany({
-			where: eq(schema.issuePages.issueId, params.id!)
+			where: eq(schema.issuePages.issueId, owned.issue.id),
+			orderBy: [asc(schema.issuePages.position)]
 		});
-		const position = pages.length + 1;
+		const maxPosition = pages.reduce((max, p) => Math.max(max, p.position), 0);
 
 		await db.insert(schema.issuePages).values({
 			id: crypto.randomUUID(),
-			issueId: params.id!,
-			position,
+			issueId: owned.issue.id,
+			position: maxPosition + 1,
 			kind,
-			contentJson: JSON.stringify({ body, songs: ['Song 1', 'Song 2', 'Song 3'] }),
+			contentJson: resolved.contentJson,
 			createdAt: new Date()
 		});
 
 		return { success: true };
 	},
 
-	deletePage: async ({ request }) => {
-		const session = await auth.api.getSession({
-			headers: request.headers
-		});
-		if (!session?.user) return fail(401, { error: 'Unauthorized' });
+	deletePage: async ({ request, params }) => {
+		const owned = await requireOwnedIssue(request.headers, params.id);
+		if ('errorResponse' in owned) return owned.errorResponse;
 
 		const formData = await request.formData();
-		const pageId = String(formData.get('pageId') || '');
+		const pageId = String(formData.get('pageId') || '').trim();
+		if (!pageId) {
+			return fail(400, { error: 'Page ID is required.' });
+		}
 
-		await db.delete(schema.issuePages).where(eq(schema.issuePages.id, pageId));
+		const existingPage = await db.query.issuePages.findFirst({
+			where: and(eq(schema.issuePages.id, pageId), eq(schema.issuePages.issueId, owned.issue.id))
+		});
+		if (!existingPage) {
+			return fail(404, { error: 'Page not found for this issue.' });
+		}
+
+		await db
+			.delete(schema.issuePages)
+			.where(and(eq(schema.issuePages.id, pageId), eq(schema.issuePages.issueId, owned.issue.id)));
 
 		return { success: true };
 	}

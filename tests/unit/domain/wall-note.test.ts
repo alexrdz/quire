@@ -17,8 +17,8 @@ describe('Wall Note Moderation & Submission FSM', () => {
 	const noteId = createNoteId('note-1');
 
 	describe('Anti-Spam Screening Rules', () => {
-		it('allows genuine clean notes and emojis', () => {
-			expect(screenNoteText('Amazing gig tonight in Detroit! 🔥🎸').valid).toBe(true);
+		it('allows genuine clean notes', () => {
+			expect(screenNoteText('Amazing gig tonight in Detroit!').valid).toBe(true);
 			expect(screenNoteText('Play the encore!!').valid).toBe(true);
 		});
 

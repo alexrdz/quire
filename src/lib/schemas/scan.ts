@@ -17,3 +17,12 @@ export const saveIssueSchema = z.object({
 });
 
 export type SaveIssueInput = z.infer<typeof saveIssueSchema>;
+
+export const signedScanTokenSchema = z
+	.string()
+	.regex(
+		/^[a-z0-9-]+\.\d+\.[0-9a-f]{64}$/,
+		'Invalid attendance scan token format'
+	);
+
+export type SignedScanToken = z.infer<typeof signedScanTokenSchema>;
