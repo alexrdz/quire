@@ -12,6 +12,7 @@
 	let artistSlug = $state('');
 	let slugManuallyEdited = $state(false);
 	let emailValue = $state('');
+	let showPetitionForm = $state(false);
 
 	const activeRole = $derived(roleOverride ?? data.defaultRole);
 	const isSignUp = $derived(
@@ -31,6 +32,34 @@
 			? form.slugSuggestions
 			: []
 	);
+
+	const collidedSlug = $derived(
+		form && 'collidedSlug' in form && typeof form.collidedSlug === 'string'
+			? form.collidedSlug
+			: ''
+	);
+
+	const petitionError = $derived(
+		form && 'petitionError' in form && typeof form.petitionError === 'string'
+			? form.petitionError
+			: ''
+	);
+
+	const petitionSubmitted = $derived(
+		Boolean(form && 'petitionSubmitted' in form && form.petitionSubmitted)
+	);
+
+	const petitionedSlug = $derived(
+		form && 'petitionedSlug' in form && typeof form.petitionedSlug === 'string'
+			? form.petitionedSlug
+			: ''
+	);
+
+	$effect(() => {
+		if (petitionError) {
+			showPetitionForm = true;
+		}
+	});
 
 	$effect(() => {
 		if (form?.values) {
@@ -151,9 +180,21 @@
 						</button>
 					</Cluster>
 
+					{#if data.accountClosed && !form?.error}
+						<Box padding="sm" radius="md" class="login-success-box">
+							Your artist account has been closed. Your issues remain archived in read-only mode and fans keep their Stubs.
+						</Box>
+					{/if}
+
 					{#if data.resetSuccess && !form?.error}
 						<Box padding="sm" radius="md" class="login-success-box">
 							Password updated. Sign in below with your new band password.
+						</Box>
+					{/if}
+
+					{#if petitionSubmitted}
+						<Box padding="sm" radius="md" class="login-success-box">
+							Petition received for <span class="font-mono">/a/{petitionedSlug}</span>. We sent a confirmation to <span class="font-mono">{emailValue}</span> and will review your claim. You can also choose an available handle above to start right away.
 						</Box>
 					{/if}
 
@@ -305,6 +346,91 @@
 								{isSignUp ? 'Create Band Account' : 'Sign In to Dashboard'}
 							</button>
 						</form>
+
+						{#if isSignUp && collidedSlug && !petitionSubmitted}
+							<Box variant="subtle" padding="md" radius="md" class="petition-panel">
+								<Stack gap="sm">
+									<Cluster justify="between" align="center" gap="xs">
+										<span class="petition-title">
+											Petition for <span class="text-highlight font-mono">/a/{collidedSlug}</span>
+										</span>
+										<button
+											type="button"
+											class="btn-petition-toggle"
+											onclick={() => (showPetitionForm = !showPetitionForm)}
+										>
+											{showPetitionForm ? 'Hide Form' : 'Request Handle Review'}
+										</button>
+									</Cluster>
+									<p class="slug-hint text-muted">
+										If you are the rightful band and the current owner of <span class="font-mono">/a/{collidedSlug}</span> is inactive or closed, submit a handle-claim petition for review.
+									</p>
+
+									{#if petitionError}
+										<Box padding="sm" radius="md" class="login-error-box">
+											{petitionError}
+										</Box>
+									{/if}
+
+									{#if showPetitionForm}
+										<form data-stack="gap:sm" method="POST" action="?/petitionSlug" use:enhance>
+											<input type="hidden" name="requestedSlug" value={collidedSlug} />
+											<Stack gap="3xs">
+												<label for="petitionerName" class="login-label">Your Band / Artist Name</label>
+												<input
+													id="petitionerName"
+													type="text"
+													name="petitionerName"
+													required
+													value={bandName}
+													placeholder="e.g. The Neon Velvet"
+													class="login-input"
+												/>
+											</Stack>
+											<Stack gap="3xs">
+												<label for="petitionerEmail" class="login-label">Contact Email</label>
+												<input
+													id="petitionerEmail"
+													type="email"
+													name="petitionerEmail"
+													required
+													value={emailValue}
+													placeholder="band@example.com"
+													class="login-input"
+												/>
+											</Stack>
+											<Stack gap="3xs">
+												<label for="evidenceUrl" class="login-label">
+													Official Link (Bandcamp, Spotify, or Website — Optional)
+												</label>
+												<input
+													id="evidenceUrl"
+													type="url"
+													name="evidenceUrl"
+													placeholder="https://yourband.bandcamp.com"
+													class="login-input"
+												/>
+											</Stack>
+											<Stack gap="3xs">
+												<label for="rationale" class="login-label">Why should this handle transfer to you?</label>
+												<textarea
+													id="rationale"
+													name="rationale"
+													required
+													minlength="15"
+													rows="3"
+													placeholder="Explain your band's claim and why the existing account appears inactive..."
+													class="login-input"
+												></textarea>
+											</Stack>
+											<button type="submit" class="btn-petition-submit">
+												Submit Handle Petition
+											</button>
+										</form>
+									{/if}
+								</Stack>
+							</Box>
+						{/if}
 
 						<Cluster justify="center" gap="xs" class="toggle-cluster">
 							<span class="text-muted">
@@ -573,5 +699,44 @@
 		cursor: pointer;
 		font-weight: 600;
 		text-decoration: underline;
+	}
+
+	:global(.petition-panel) {
+		border-color: rgba(5, 217, 232, 0.35);
+	}
+
+	.petition-title {
+		font-size: 0.85rem;
+		font-weight: 700;
+		color: #ffffff;
+	}
+
+	.btn-petition-toggle {
+		padding-block: 0.3rem;
+		padding-inline: 0.65rem;
+		border-radius: 6px;
+		background: rgba(5, 217, 232, 0.12);
+		border: 1px solid rgba(5, 217, 232, 0.35);
+		color: var(--accent);
+		font-size: 0.75rem;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.btn-petition-submit {
+		inline-size: 100%;
+		padding-block: 0.7rem;
+		padding-inline: 1rem;
+		border-radius: 8px;
+		background: rgba(1, 255, 195, 0.14);
+		border: 1px solid rgba(1, 255, 195, 0.45);
+		color: var(--highlight);
+		font-size: 0.85rem;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.btn-petition-submit:hover {
+		background: rgba(1, 255, 195, 0.24);
 	}
 </style>

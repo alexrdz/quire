@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { Container, Box, Stack, Cluster } from '$lib/components/layout';
+	import { Container, Box, Stack, Cluster, Split } from '$lib/components/layout';
 	import ArtistTopNav from '$lib/components/dashboard/ArtistTopNav.svelte';
 
 	type PayoutActionOption = 'connect' | 'replace' | 'disconnect';
@@ -145,6 +145,18 @@
 					Connect your Stripe Express payout account, enforce shared band login security, and configure General Wall moderation rules.
 				</p>
 			</Stack>
+
+			{#if data.verifiedReturn}
+				<Box as="section" variant="subtle" padding="md" radius="md" class="success-box">
+					Band email address verified. Your account is ready for payout security confirmations and password recovery.
+				</Box>
+			{/if}
+
+			{#if data.emailChangedReturn}
+				<Box as="section" variant="subtle" padding="md" radius="md" class="success-box">
+					Band shared email updated and verified.
+				</Box>
+			{/if}
 
 			{#if data.stripeReturnState === 'return'}
 				{#if data.artist.payoutsEnabled}
@@ -372,6 +384,238 @@
 					</form>
 				</Stack>
 			</Box>
+
+			<!-- Band Email Verification & Credentials Section -->
+			<Box as="section" variant="raised" padding="xl" radius="lg" class="settings-card">
+				<Stack gap="lg">
+					<Cluster justify="between" align="center" gap="sm">
+						<Stack gap="2xs">
+							<span class="box-section-title">Account Credentials &amp; Email Verification</span>
+							<p class="text-muted subtext-small">
+								Your shared band email (<span class="font-mono">{data.userEmail}</span>) controls password resets and Stripe payout confirmations.
+							</p>
+						</Stack>
+
+						{#if data.emailVerified}
+							<span class="status-badge status-active">
+								<span class="status-dot" aria-hidden="true"></span>
+								Email Verified
+							</span>
+						{:else}
+							<span class="status-badge status-incomplete">
+								<span class="status-dot" aria-hidden="true"></span>
+								Email Unverified
+							</span>
+						{/if}
+					</Cluster>
+
+					{#if !data.emailVerified}
+						<Box variant="subtle" padding="md" radius="md" class="warning-box">
+							<Cluster justify="between" align="center" gap="md">
+								<p class="subtext-small">
+									Confirm your band email address so you never miss payout security alerts or password reset links.
+								</p>
+								<form method="POST" action="?/resendVerification" use:enhance>
+									<button type="submit" class="btn-secondary">
+										Resend Verification Email
+									</button>
+								</form>
+							</Cluster>
+						</Box>
+					{/if}
+
+					{#if form?.verificationEmailSent}
+						<Box variant="subtle" padding="sm" radius="md" class="success-box">
+							Verification email sent to <strong>{form.sentToEmail}</strong>.
+						</Box>
+					{/if}
+
+					{#if form?.accountError}
+						<Box variant="subtle" padding="sm" radius="md" class="error-box">
+							{form.accountError}
+						</Box>
+					{/if}
+
+					<Split ratio="1-1" gap="lg" collapse="md">
+						<!-- Update Band Email -->
+						<Box variant="subtle" padding="lg" radius="md" class="subsection-box">
+							<Stack gap="md">
+								<Stack gap="3xs">
+									<span class="input-label">Update Band Shared Email</span>
+									<p class="text-muted subtext-small">
+										Requires your current password and sends a verification link to the new email address.
+									</p>
+								</Stack>
+
+								{#if form?.emailChangeRequested}
+									<Box variant="subtle" padding="sm" radius="md" class="success-box">
+										Verification link sent to <strong>{form.targetEmail}</strong>. Open that link to finish switching your band email.
+									</Box>
+								{/if}
+
+								{#if form?.emailError}
+									<Box variant="subtle" padding="sm" radius="md" class="error-box">
+										{form.emailError}
+									</Box>
+								{/if}
+
+								<form data-stack="gap:sm" method="POST" action="?/changeEmail" use:enhance>
+									<Stack gap="3xs">
+										<label for="newEmail" class="input-label">New Band Email</label>
+										<input
+											id="newEmail"
+											type="email"
+											name="newEmail"
+											required
+											placeholder="new-band-email@example.com"
+											class="field-input"
+										/>
+									</Stack>
+									<Stack gap="3xs">
+										<label for="emailCurrentPassword" class="input-label">Current Password</label>
+										<input
+											id="emailCurrentPassword"
+											type="password"
+											name="currentPassword"
+											required
+											autocomplete="current-password"
+											placeholder="Confirm current password"
+											class="field-input"
+										/>
+									</Stack>
+									<button type="submit" class="btn-secondary">
+										Send Email Change Link
+									</button>
+								</form>
+							</Stack>
+						</Box>
+
+						<!-- Change Shared Password -->
+						<Box variant="subtle" padding="lg" radius="md" class="subsection-box">
+							<Stack gap="md">
+								<Stack gap="3xs">
+									<span class="input-label">Change Shared Band Password</span>
+									<p class="text-muted subtext-small">
+										Rotate your band login password anytime band lineup or access changes.
+									</p>
+								</Stack>
+
+								{#if form?.passwordChanged}
+									<Box variant="subtle" padding="sm" radius="md" class="success-box">
+										Shared band password updated.
+									</Box>
+								{/if}
+
+								{#if form?.passwordError}
+									<Box variant="subtle" padding="sm" radius="md" class="error-box">
+										{form.passwordError}
+									</Box>
+								{/if}
+
+								<form data-stack="gap:sm" method="POST" action="?/changePassword" use:enhance>
+									<Stack gap="3xs">
+										<label for="pwCurrent" class="input-label">Current Password</label>
+										<input
+											id="pwCurrent"
+											type="password"
+											name="currentPassword"
+											required
+											autocomplete="current-password"
+											placeholder="Current password"
+											class="field-input"
+										/>
+									</Stack>
+									<Stack gap="3xs">
+										<label for="pwNew" class="input-label">New Password (8+ chars)</label>
+										<input
+											id="pwNew"
+											type="password"
+											name="newPassword"
+											required
+											minlength="8"
+											autocomplete="new-password"
+											placeholder="New password"
+											class="field-input"
+										/>
+									</Stack>
+									<Stack gap="3xs">
+										<label for="pwConfirm" class="input-label">Confirm New Password</label>
+										<input
+											id="pwConfirm"
+											type="password"
+											name="confirmNewPassword"
+											required
+											minlength="8"
+											autocomplete="new-password"
+											placeholder="Repeat new password"
+											class="field-input"
+										/>
+									</Stack>
+									<Cluster as="label" align="center" gap="xs" class="pointer-cursor">
+										<input type="checkbox" name="revokeOtherSessions" value="true" checked />
+										<span class="checkbox-label">Sign out all other band devices</span>
+									</Cluster>
+									<button type="submit" class="btn-secondary">
+										Update Band Password
+									</button>
+								</form>
+							</Stack>
+						</Box>
+					</Split>
+				</Stack>
+			</Box>
+
+			<!-- Close Artist Account Section (EDGE-CASES.md) -->
+			<Box as="section" variant="raised" padding="xl" radius="lg" class="danger-card">
+				<Stack gap="md">
+					<Stack gap="2xs">
+						<span class="text-support eyebrow-small">DANGER ZONE · ACCOUNT CLOSURE</span>
+						<h2 class="box-section-title">Close Artist Account</h2>
+						<p class="text-muted subtext-small">
+							Closing your artist account archives all of your Issues in read-only mode, disables payouts, revokes active sessions, and displays <strong>"This artist has left Quire."</strong> on <span class="font-mono">/a/{data.artist.slug}</span>. Your handle remains reserved to prevent impersonation, and fans keep all of their collected Stubs.
+						</p>
+					</Stack>
+
+					{#if form?.closeError}
+						<Box variant="subtle" padding="sm" radius="md" class="error-box">
+							{form.closeError}
+						</Box>
+					{/if}
+
+					<form data-stack="gap:md" method="POST" action="?/closeAccount" use:enhance>
+						<Split ratio="1-1" gap="md" collapse="sm">
+							<Stack gap="xs">
+								<label for="closePassword" class="input-label">Confirm Shared Band Password</label>
+								<input
+									id="closePassword"
+									type="password"
+									name="confirmPassword"
+									required
+									autocomplete="current-password"
+									placeholder="Enter band password"
+									class="field-input"
+								/>
+							</Stack>
+							<Stack gap="xs">
+								<label for="closePhrase" class="input-label">Type CLOSE to confirm</label>
+								<input
+									id="closePhrase"
+									type="text"
+									name="confirmPhrase"
+									required
+									pattern="CLOSE"
+									placeholder="CLOSE"
+									class="field-input font-mono"
+								/>
+							</Stack>
+						</Split>
+
+						<button type="submit" class="btn-save">
+							Close Artist Account
+						</button>
+					</form>
+				</Stack>
+			</Box>
 		</Stack>
 	</Container>
 </div>
@@ -405,6 +649,10 @@
 	:global(.settings-card),
 	:global(.subsection-box) {
 		border-color: var(--glass-border);
+	}
+
+	:global(.danger-card) {
+		border-color: rgba(255, 42, 109, 0.45);
 	}
 
 	:global(.success-box) {

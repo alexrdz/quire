@@ -253,10 +253,16 @@
 				{#if data.issue.coverNote}
 					<p class="cover-note-text">"{data.issue.coverNote}"</p>
 				{/if}
+
+				{#if data.isArtistClosed}
+					<Box variant="subtle" padding="sm" radius="md" class="closed-artist-notice">
+						This artist has left Quire. This issue is preserved in read-only archive mode.
+					</Box>
+				{/if}
 			</Stack>
 
 			<Cluster justify="between" align="center" gap="sm" class="cover-actions-strip">
-				{#if data.artist.payoutsEnabled}
+				{#if data.artist.payoutsEnabled && !data.isArtistClosed}
 					<button
 						type="button"
 						class="btn-hero-tip"
@@ -587,7 +593,13 @@
 
 			<!-- Note Submission Box -->
 			<Box variant="raised" padding="md" radius="md" class="wall-composer-box">
-				{#if data.session?.user}
+				{#if data.isReadOnly}
+					<p class="text-muted">
+						{data.isArtistClosed
+							? 'This artist has left Quire. The Wall is preserved in read-only archive mode.'
+							: 'This issue is archived and preserved in read-only mode.'}
+					</p>
+				{:else if data.session?.user}
 					<form
 						data-stack="gap:sm"
 						method="POST"
@@ -674,7 +686,7 @@
 									{/if}
 								</Cluster>
 
-								{#if data.session?.user}
+								{#if data.session?.user && !data.isReadOnly}
 									<form method="POST" action="?/flagNote" use:enhance>
 										<input type="hidden" name="noteId" value={note.id} />
 										<button type="submit" class="btn-flag-note">
@@ -840,7 +852,7 @@
 </div>
 
 <!-- Persistent Floating Tip Trigger (Only when payoutsEnabled per SPEC.md §5.4) -->
-{#if data.artist.payoutsEnabled && !tipDrawerOpen && !authDrawerOpen}
+{#if data.artist.payoutsEnabled && !data.isArtistClosed && !tipDrawerOpen && !authDrawerOpen}
 	<button
 		type="button"
 		class="btn-floating-tip"
@@ -1241,6 +1253,12 @@
 
 	:global(.wall-composer-box) {
 		border-color: var(--glass-border);
+	}
+
+	:global(.closed-artist-notice) {
+		border-color: rgba(255, 42, 109, 0.45);
+		color: #ffffff;
+		font-size: 0.85rem;
 	}
 
 	.wall-textarea {

@@ -4,7 +4,8 @@ import { type Result, type DomainError, ok, err } from '$domain/types';
 import {
 	buildEmailVerificationTemplate,
 	buildPasswordResetTemplate,
-	buildPayoutAccountChangeTemplate
+	buildPayoutAccountChangeTemplate,
+	buildSlugPetitionConfirmationTemplate
 } from './templates';
 
 try {
@@ -35,6 +36,13 @@ const payoutChangeInputSchema = z.object({
 	artistName: z.string().min(1).max(120),
 	confirmationUrl: z.string().url('Valid confirmation URL is required'),
 	newStripeAccountId: z.string().min(1).max(128)
+});
+
+const slugPetitionEmailInputSchema = z.object({
+	to: z.string().email('Valid recipient email is required'),
+	petitionerName: z.string().min(1).max(120),
+	requestedSlug: z.string().min(2).max(60),
+	existingArtistClosed: z.boolean()
 });
 
 export interface EmailSendReceipt {
@@ -247,6 +255,32 @@ export async function sendPayoutAccountChangeConfirmationEmail(input: {
 		artistName: parsed.data.artistName,
 		confirmationUrl: parsed.data.confirmationUrl,
 		newStripeAccountId: parsed.data.newStripeAccountId
+	});
+
+	return sendTransactionalEmail({
+		to: parsed.data.to,
+		...template
+	});
+}
+
+export async function sendSlugPetitionConfirmationEmail(input: {
+	to: string;
+	petitionerName: string;
+	requestedSlug: string;
+	existingArtistClosed: boolean;
+}): Promise<Result<EmailSendReceipt, DomainError>> {
+	const parsed = slugPetitionEmailInputSchema.safeParse(input);
+	if (!parsed.success) {
+		return err({
+			code: 'INVALID_EMAIL_INPUT',
+			message: parsed.error.issues[0]?.message || 'Invalid handle petition email input.'
+		});
+	}
+
+	const template = buildSlugPetitionConfirmationTemplate({
+		petitionerName: parsed.data.petitionerName,
+		requestedSlug: parsed.data.requestedSlug,
+		existingArtistClosed: parsed.data.existingArtistClosed
 	});
 
 	return sendTransactionalEmail({

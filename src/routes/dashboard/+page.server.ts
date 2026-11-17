@@ -24,6 +24,7 @@ import {
 	summarizeArtistTips,
 	type TipStatus
 } from '$domain/tipping';
+import { ArtistAccountStatus } from '$domain/account';
 
 const DEFAULT_SIGNUP_BIO = 'Live digital zines and tour archive on Quire.';
 
@@ -55,6 +56,10 @@ export const load: ServerLoad = async ({ request, url }) => {
 
 	if (!artist) {
 		throw redirect(303, '/login');
+	}
+
+	if (artist.accountStatus === ArtistAccountStatus.Closed) {
+		throw redirect(303, '/login?closed=1');
 	}
 
 	// Calculate stats for latest gig recap using pure domain aggregation
@@ -193,6 +198,8 @@ export const load: ServerLoad = async ({ request, url }) => {
 
 	return {
 		artist,
+		emailVerified: Boolean(session.user.emailVerified),
+		userEmail: session.user.email,
 		latestRecap,
 		issues: issuesWithTipSummary,
 		generalRow,
@@ -215,8 +222,8 @@ async function requireArtistContext(request: Request) {
 	const artist = await db.query.artists.findFirst({
 		where: eq(schema.artists.userId, session.user.id)
 	});
-	if (!artist) {
-		return { errorResponse: fail(403, { error: 'Not an artist' }) } as const;
+	if (!artist || artist.accountStatus === ArtistAccountStatus.Closed) {
+		return { errorResponse: fail(403, { error: 'Active artist account required' }) } as const;
 	}
 
 	return { session, artist } as const;

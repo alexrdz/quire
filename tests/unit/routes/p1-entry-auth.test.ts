@@ -116,7 +116,8 @@ describe('P1 /login page & server actions', () => {
 					hasExplicitRedirect: false,
 					defaultRole: 'artist',
 					initialMode: 'signup',
-					resetSuccess: false
+					resetSuccess: false,
+					accountClosed: false
 				},
 				form: null
 			}
@@ -133,7 +134,8 @@ describe('P1 /login page & server actions', () => {
 					hasExplicitRedirect: false,
 					defaultRole: 'artist',
 					initialMode: 'login',
-					resetSuccess: true
+					resetSuccess: true,
+					accountClosed: false
 				},
 				form: null
 			}

@@ -1,14 +1,21 @@
 import crypto from 'node:crypto';
 import { fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { and, desc, eq, gt } from 'drizzle-orm';
+import { ArtistAccountStatus } from '$domain/account';
 import { db, schema } from '$lib/server/db';
-import { auth, verifyUserCredentialPassword } from '$lib/server/auth';
+import { auth, clearSessionCookie, verifyUserCredentialPassword } from '$lib/server/auth';
 import { sendPayoutAccountChangeConfirmationEmail } from '$lib/server/email';
+import { closeArtistAccount } from '$lib/server/services/account';
 import {
 	inspectConnectedAccountStatus,
 	isStripeConfigured,
 	type StripeExpressAccountSummary
 } from '$lib/server/payments/stripe';
+import {
+	changeBandEmailSchema,
+	changePasswordSchema,
+	closeArtistAccountSchema
+} from '$schemas/auth';
 import {
 	artistSettingsUpdateSchema,
 	payoutAccountChangeRequestSchema,
@@ -32,9 +39,15 @@ export const load: ServerLoad = async ({ request, url }) => {
 		throw redirect(303, '/login');
 	}
 
+	if (artist.accountStatus === ArtistAccountStatus.Closed) {
+		throw redirect(303, '/login?closed=1');
+	}
+
 	const stripeParam = url.searchParams.get('stripe');
 	const stripeReturnState =
 		stripeParam === 'return' || stripeParam === 'refresh' ? stripeParam : null;
+	const verifiedReturn = url.searchParams.get('verified') === '1';
+	const emailChangedReturn = url.searchParams.get('emailChanged') === '1';
 	const stripeConfigured = isStripeConfigured();
 	const isSeededDemoAccount = Boolean(artist.stripeAccountId?.startsWith('acct_demo_'));
 
@@ -87,6 +100,9 @@ export const load: ServerLoad = async ({ request, url }) => {
 	return {
 		artist: currentArtist,
 		userEmail: session.user.email,
+		emailVerified: Boolean(session.user.emailVerified),
+		verifiedReturn,
+		emailChangedReturn,
 		stripeConfigured,
 		stripeReturnState,
 		stripeStatus,
@@ -263,5 +279,193 @@ export const actions: Actions = {
 			emailMode: emailResult.value.mode,
 			sentToEmail: session.user.email
 		};
+	},
+
+	resendVerification: async ({ request }) => {
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (!session?.user) {
+			return fail(401, { accountError: 'Unauthorized' });
+		}
+
+		const artist = await db.query.artists.findFirst({
+			where: eq(schema.artists.userId, session.user.id)
+		});
+		if (!artist || artist.accountStatus === ArtistAccountStatus.Closed) {
+			return fail(403, { accountError: 'Active artist account required.' });
+		}
+
+		if (session.user.emailVerified) {
+			return { alreadyVerified: true };
+		}
+
+		try {
+			await auth.api.sendVerificationEmail({
+				body: {
+					email: session.user.email,
+					callbackURL: '/dashboard/settings?verified=1'
+				},
+				headers: request.headers
+			});
+		} catch (err: unknown) {
+			const message =
+				err instanceof Error ? err.message : 'Unable to send verification email right now.';
+			return fail(500, { accountError: message });
+		}
+
+		return {
+			verificationEmailSent: true,
+			sentToEmail: session.user.email
+		};
+	},
+
+	changeEmail: async ({ request }) => {
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (!session?.user) {
+			return fail(401, { emailError: 'Unauthorized' });
+		}
+
+		const artist = await db.query.artists.findFirst({
+			where: eq(schema.artists.userId, session.user.id)
+		});
+		if (!artist || artist.accountStatus === ArtistAccountStatus.Closed) {
+			return fail(403, { emailError: 'Active artist account required.' });
+		}
+
+		const formData = await request.formData();
+		const newEmailRaw = String(formData.get('newEmail') || '');
+		const currentPassword = String(formData.get('currentPassword') || '');
+
+		const parsed = changeBandEmailSchema.safeParse({
+			newEmail: newEmailRaw,
+			currentPassword
+		});
+
+		if (!parsed.success) {
+			return fail(400, {
+				emailError: parsed.error.issues[0]?.message || 'Invalid email update request.'
+			});
+		}
+
+		if (parsed.data.newEmail === session.user.email.toLowerCase()) {
+			return fail(400, {
+				emailError: 'New email matches your current band email.'
+			});
+		}
+
+		const passwordValid = await verifyUserCredentialPassword(
+			session.user.id,
+			parsed.data.currentPassword
+		);
+		if (!passwordValid) {
+			return fail(403, {
+				emailError: 'Incorrect current password. Please re-enter your band password.'
+			});
+		}
+
+		try {
+			await auth.api.changeEmail({
+				body: {
+					newEmail: parsed.data.newEmail,
+					callbackURL: '/dashboard/settings?emailChanged=1'
+				},
+				headers: request.headers
+			});
+		} catch (err: unknown) {
+			const message =
+				err instanceof Error ? err.message : 'Unable to initiate band email update.';
+			return fail(400, { emailError: message });
+		}
+
+		return {
+			emailChangeRequested: true,
+			targetEmail: parsed.data.newEmail
+		};
+	},
+
+	changePassword: async ({ request }) => {
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (!session?.user) {
+			return fail(401, { passwordError: 'Unauthorized' });
+		}
+
+		const artist = await db.query.artists.findFirst({
+			where: eq(schema.artists.userId, session.user.id)
+		});
+		if (!artist || artist.accountStatus === ArtistAccountStatus.Closed) {
+			return fail(403, { passwordError: 'Active artist account required.' });
+		}
+
+		const formData = await request.formData();
+		const parsed = changePasswordSchema.safeParse({
+			currentPassword: String(formData.get('currentPassword') || ''),
+			newPassword: String(formData.get('newPassword') || ''),
+			confirmNewPassword: String(formData.get('confirmNewPassword') || ''),
+			revokeOtherSessions: formData.get('revokeOtherSessions') === 'true'
+		});
+
+		if (!parsed.success) {
+			return fail(400, {
+				passwordError: parsed.error.issues[0]?.message || 'Invalid password update request.'
+			});
+		}
+
+		try {
+			await auth.api.changePassword({
+				body: {
+					currentPassword: parsed.data.currentPassword,
+					newPassword: parsed.data.newPassword,
+					revokeOtherSessions: parsed.data.revokeOtherSessions
+				},
+				headers: request.headers
+			});
+		} catch (err: unknown) {
+			const message =
+				err instanceof Error ? err.message : 'Incorrect current password or invalid new password.';
+			return fail(400, { passwordError: message });
+		}
+
+		return {
+			passwordChanged: true
+		};
+	},
+
+	closeAccount: async ({ request, cookies }) => {
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (!session?.user) {
+			return fail(401, { closeError: 'Unauthorized' });
+		}
+
+		const artist = await db.query.artists.findFirst({
+			where: eq(schema.artists.userId, session.user.id)
+		});
+		if (!artist || artist.accountStatus === ArtistAccountStatus.Closed) {
+			return fail(403, { closeError: 'Artist account not found or already closed.' });
+		}
+
+		const formData = await request.formData();
+		const parsed = closeArtistAccountSchema.safeParse({
+			confirmPassword: String(formData.get('confirmPassword') || ''),
+			confirmPhrase: String(formData.get('confirmPhrase') || '').trim()
+		});
+
+		if (!parsed.success) {
+			return fail(400, {
+				closeError: parsed.error.issues[0]?.message || 'Please confirm password and type CLOSE.'
+			});
+		}
+
+		const closeResult = await closeArtistAccount({
+			artistId: artist.id,
+			userId: session.user.id,
+			confirmPassword: parsed.data.confirmPassword
+		});
+
+		if (!closeResult.ok) {
+			const status = closeResult.error.code === 'INVALID_PASSWORD' ? 403 : 400;
+			return fail(status, { closeError: closeResult.error.message });
+		}
+
+		await clearSessionCookie(cookies);
+		throw redirect(303, '/login?closed=1');
 	}
 };

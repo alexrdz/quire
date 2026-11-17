@@ -76,7 +76,7 @@
 						{/if}
 					</Cluster>
 
-					{#if data.artist.payoutsEnabled}
+					{#if data.artist.payoutsEnabled && !data.isArtistClosed}
 						<button
 							type="button"
 							class="btn-hero-support"
@@ -86,6 +86,17 @@
 						</button>
 					{/if}
 				</Cluster>
+
+				{#if data.isArtistClosed}
+					<Box variant="subtle" padding="md" radius="md" class="closed-artist-banner">
+						<Stack gap="3xs">
+							<span class="meta-chip meta-support">ACCOUNT CLOSED</span>
+							<p class="artist-closed-copy">
+								This artist has left Quire. Past issues remain archived in read-only mode for fans who collected Stubs.
+							</p>
+						</Stack>
+					</Box>
+				{/if}
 
 				<Stack gap="xs">
 					<h1 class="artist-name-title">{data.artist.displayName}</h1>
@@ -117,7 +128,11 @@
 					<span class="text-muted subtext-small">City-specific tour zines</span>
 				</Cluster>
 
-				{#if data.groupedIssues.length === 0}
+				{#if data.isArtistClosed}
+					<Box variant="raised" padding="xl" radius="md" class="empty-issues-box">
+						This artist has left Quire.
+					</Box>
+				{:else if data.groupedIssues.length === 0}
 					<Box variant="raised" padding="xl" radius="md" class="empty-issues-box">
 						No published issues yet.
 					</Box>
@@ -174,7 +189,11 @@
 				</Stack>
 
 				<Box variant="raised" padding="lg" radius="lg" class="wall-card-box">
-					{#if data.session?.user}
+					{#if data.isArtistClosed}
+						<p class="text-muted subtext-small">
+							This artist has left Quire. The General Wall is preserved in read-only mode.
+						</p>
+					{:else if data.session?.user}
 						<form
 							data-stack="gap:sm"
 							method="POST"
@@ -254,7 +273,7 @@
 										<span class="note-author">{note.author?.name || 'Fan'}</span>
 									</Cluster>
 
-									{#if data.session?.user}
+									{#if data.session?.user && !data.isArtistClosed}
 										<form method="POST" action="?/flagNote" use:enhance>
 											<input type="hidden" name="noteId" value={note.id} />
 											<button type="submit" class="btn-flag-note">
@@ -842,5 +861,16 @@
 		background: rgba(255, 42, 109, 0.14);
 		border: 1px solid rgba(255, 42, 109, 0.4);
 		color: #ff6b9b;
+	}
+
+	:global(.closed-artist-banner) {
+		border-color: rgba(255, 42, 109, 0.45);
+	}
+
+	.artist-closed-copy {
+		margin: 0;
+		color: #ffffff;
+		font-size: 0.92rem;
+		line-height: 1.5;
 	}
 </style>

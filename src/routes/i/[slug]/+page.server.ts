@@ -1,4 +1,5 @@
 import { error, fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
+import { ArtistAccountStatus } from '$domain/account';
 import { db, schema } from '$lib/server/db';
 import { eq, and, asc, desc } from 'drizzle-orm';
 import { auth, createSessionForUser } from '$lib/server/auth';
@@ -104,9 +105,14 @@ export const load: ServerLoad = async ({ params, cookies, request }) => {
 		// fallback
 	}
 
+	const isArtistClosed = issue.artist.accountStatus === ArtistAccountStatus.Closed;
+	const isReadOnly = isArtistClosed || issue.status === 'archived';
+
 	return {
 		issue,
 		artist: issue.artist,
+		isArtistClosed,
+		isReadOnly,
 		issuePages: issue.issuePages,
 		templatePages,
 		notes,
@@ -152,7 +158,15 @@ export const actions: Actions = {
 		throw redirect(303, callbackURL);
 	},
 
-	tip: async ({ request, url }) => {
+	tip: async ({ request, url, params }) => {
+		const issueRecord = await db.query.issues.findFirst({
+			where: eq(schema.issues.slug, params.slug!),
+			with: { artist: true }
+		});
+		if (issueRecord?.artist.accountStatus === ArtistAccountStatus.Closed) {
+			return fail(403, { error: 'This artist has left Quire.' });
+		}
+
 		const formData = await request.formData();
 		const artistId = String(formData.get('artistId') || '');
 		const issueId = formData.get('issueId') ? String(formData.get('issueId')) : null;
@@ -185,13 +199,24 @@ export const actions: Actions = {
 		return { success: true, tipResult: tipResult.value };
 	},
 
-	submitNote: async ({ request }) => {
+	submitNote: async ({ request, params }) => {
 		const session = await auth.api.getSession({
 			headers: request.headers
 		});
 
 		if (!session?.user) {
 			return fail(401, { error: 'Please sign in to leave a note on the Wall.' });
+		}
+
+		const issueRecord = await db.query.issues.findFirst({
+			where: eq(schema.issues.slug, params.slug!),
+			with: { artist: true }
+		});
+		if (issueRecord?.artist.accountStatus === ArtistAccountStatus.Closed) {
+			return fail(403, { error: 'This artist has left Quire.' });
+		}
+		if (issueRecord?.status === 'archived') {
+			return fail(403, { error: 'This archived issue is read-only.' });
 		}
 
 		const formData = await request.formData();
@@ -218,13 +243,24 @@ export const actions: Actions = {
 		return { success: true, noteId: noteResult.value.noteId, status: noteResult.value.status };
 	},
 
-	flagNote: async ({ request }) => {
+	flagNote: async ({ request, params }) => {
 		const session = await auth.api.getSession({
 			headers: request.headers
 		});
 
 		if (!session?.user) {
 			return fail(401, { error: 'Sign in to flag a note.' });
+		}
+
+		const issueRecord = await db.query.issues.findFirst({
+			where: eq(schema.issues.slug, params.slug!),
+			with: { artist: true }
+		});
+		if (issueRecord?.artist.accountStatus === ArtistAccountStatus.Closed) {
+			return fail(403, { error: 'This artist has left Quire.' });
+		}
+		if (issueRecord?.status === 'archived') {
+			return fail(403, { error: 'This archived issue is read-only.' });
 		}
 
 		const formData = await request.formData();

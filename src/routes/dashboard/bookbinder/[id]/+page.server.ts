@@ -5,6 +5,7 @@ import { eq, and, asc } from 'drizzle-orm';
 import { auth } from '$lib/server/auth';
 import { generateIssueScanQrSvg } from '$lib/server/services/qr';
 import { uploadFormFile } from '$lib/server/services/storage';
+import { ArtistAccountStatus } from '$domain/account';
 import { calculateStampWindow } from '$domain/stamping';
 import {
 	archiveIssue,
@@ -29,6 +30,9 @@ async function requireOwnedIssue(headers: Headers, issueId: string | undefined) 
 	});
 	if (!artist) {
 		return { errorResponse: fail(401, { error: 'Artist not found' }) } as const;
+	}
+	if (artist.accountStatus === ArtistAccountStatus.Closed) {
+		return { errorResponse: fail(403, { error: 'This artist account has been closed.' }) } as const;
 	}
 
 	if (!issueId) {
@@ -240,6 +244,10 @@ export const load: ServerLoad = async ({ params, request }) => {
 
 	if (!artist) {
 		throw redirect(303, '/login');
+	}
+
+	if (artist.accountStatus === ArtistAccountStatus.Closed) {
+		throw redirect(303, '/login?closed=1');
 	}
 
 	const issue = await db.query.issues.findFirst({
