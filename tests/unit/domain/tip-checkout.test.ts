@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
 	calculateTipBreakdown,
+	calculateTipReversalCents,
+	formatUsdCents,
+	isTipReversed,
+	summarizeArtistTips,
 	tipCheckoutTransition,
+	TipReversalStatus,
+	TipStatus,
 	type TipState,
 	MIN_TIP_CENTS,
 	MAX_TIP_CENTS
@@ -132,6 +138,74 @@ describe('Tip Calculation & Checkout FSM', () => {
 			expect(resetResult.ok).toBe(true);
 			if (!resetResult.ok) return;
 			expect(resetResult.value.status).toBe('idle');
+		});
+	});
+
+	describe('Reversal Accounting, Tip Summaries & USD Formatting', () => {
+		it('distinguishes succeeded vs reversed tip statuses', () => {
+			expect(isTipReversed(TipStatus.Succeeded)).toBe(false);
+			expect(isTipReversed(TipReversalStatus.Refunded)).toBe(true);
+			expect(isTipReversed(TipReversalStatus.Disputed)).toBe(true);
+		});
+
+		it('summarizes mixed succeeded, refunded, and disputed tips with absorbed fees', () => {
+			const summary = summarizeArtistTips([
+				// $10 succeeded (fan did not cover fees): net = 1000 - 50 - 59 = 891
+				{
+					amountGross: 1000,
+					feePlatform: 50,
+					feeStripe: 59,
+					amountNet: 891,
+					fanCoveredFees: false,
+					status: TipStatus.Succeeded
+				},
+				// $10 refunded (artist absorbed fees: baseNet 891 - 1000 refund = -109 net; reversal = 1000)
+				{
+					amountGross: 1000,
+					feePlatform: 50,
+					feeStripe: 59,
+					amountNet: -109,
+					fanCoveredFees: false,
+					status: TipReversalStatus.Refunded
+				},
+				// $20 disputed (fan covered Stripe fee: baseNet 1900 - 2000 dispute = -100 net; reversal = 2000)
+				{
+					amountGross: 2000,
+					feePlatform: 100,
+					feeStripe: 88,
+					amountNet: -100,
+					fanCoveredFees: true,
+					status: TipReversalStatus.Disputed
+				}
+			]);
+
+			expect(summary.tipCount).toBe(3);
+			expect(summary.succeededCount).toBe(1);
+			expect(summary.refundCount).toBe(1);
+			expect(summary.disputeCount).toBe(1);
+			expect(summary.grossCents).toBe(4000);
+			expect(summary.feesCents).toBe(50 + 59 + 50 + 59 + 100 + 88);
+			expect(summary.reversalsCents).toBe(3000);
+			expect(summary.netCents).toBe(891 - 109 - 100);
+		});
+
+		it('returns 0 reversal cents for succeeded tips', () => {
+			expect(
+				calculateTipReversalCents({
+					amountGross: 500,
+					feePlatform: 25,
+					feeStripe: 45,
+					amountNet: 430,
+					fanCoveredFees: false,
+					status: TipStatus.Succeeded
+				})
+			).toBe(0);
+		});
+
+		it('formats positive, zero, and negative cent values cleanly', () => {
+			expect(formatUsdCents(891)).toBe('$8.91');
+			expect(formatUsdCents(0)).toBe('$0.00');
+			expect(formatUsdCents(-109)).toBe('-$1.09');
 		});
 	});
 });

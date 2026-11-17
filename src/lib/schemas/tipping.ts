@@ -1,6 +1,9 @@
 import { z } from 'zod';
+import { TIP_REVERSAL_STATUSES, TIP_STATUSES } from '$domain/tipping';
 
 export const tipCurrencySchema = z.literal('usd');
+export const tipStatusSchema = z.enum(TIP_STATUSES);
+export const tipReversalStatusSchema = z.enum(TIP_REVERSAL_STATUSES);
 
 export const initiateTipSchema = z.object({
 	artistId: z.string().min(1, 'Artist ID is required'),

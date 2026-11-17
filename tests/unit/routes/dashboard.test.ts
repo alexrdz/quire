@@ -2,6 +2,7 @@ import { afterEach, describe, it, expect } from 'vitest';
 import { actions, load } from '../../../src/routes/dashboard/+page.server';
 import { db, schema } from '$lib/server/db';
 import { authSecret } from '$lib/server/auth';
+import { TipReversalStatus, TipStatus } from '$domain/tipping';
 import { eq } from 'drizzle-orm';
 import { seedDatabase } from '$lib/server/seed';
 import crypto from 'node:crypto';
@@ -208,5 +209,100 @@ describe('Dashboard +page.server', () => {
 			expect(redirectErr.status).toBe(303);
 			expect(redirectErr.location).toBe('/login?redirect=/dashboard');
 		}
+	});
+
+	it('breaks out refunds, chargebacks, and per-tip ledger rows in load', async () => {
+		await seedDatabase();
+		const fixture = await createFreshArtistSession(crypto.randomBytes(3).toString('hex'));
+		const issueId = crypto.randomUUID();
+		const now = new Date();
+
+		await db.insert(schema.issues).values({
+			id: issueId,
+			artistId: fixture.artistId,
+			slug: `${fixture.slug}-bk-2026-11-17`,
+			city: 'Brooklyn',
+			venue: 'Union Pool',
+			date: '2026-11-17',
+			timezone: 'America/New_York',
+			coverNote: 'Late set',
+			secretKey: crypto.randomBytes(16).toString('hex'),
+			status: 'published',
+			approveFirst: false,
+			createdAt: now,
+			updatedAt: now
+		});
+
+		await db.insert(schema.tips).values([
+			{
+				id: crypto.randomUUID(),
+				artistId: fixture.artistId,
+				issueId,
+				amountGross: 1000,
+				feeStripe: 59,
+				feePlatform: 50,
+				amountNet: 891,
+				fanCoveredFees: false,
+				stripePaymentId: `pi_test_succ_${crypto.randomBytes(6).toString('hex')}`,
+				status: TipStatus.Succeeded,
+				createdAt: new Date(now.getTime() - 2000)
+			},
+			{
+				id: crypto.randomUUID(),
+				artistId: fixture.artistId,
+				issueId,
+				amountGross: 1000,
+				feeStripe: 59,
+				feePlatform: 50,
+				amountNet: -109,
+				fanCoveredFees: false,
+				stripePaymentId: `pi_test_ref_${crypto.randomBytes(6).toString('hex')}`,
+				status: TipReversalStatus.Refunded,
+				refundedAt: now,
+				createdAt: new Date(now.getTime() - 1000)
+			},
+			{
+				id: crypto.randomUUID(),
+				artistId: fixture.artistId,
+				issueId: null,
+				amountGross: 2000,
+				feeStripe: 88,
+				feePlatform: 100,
+				amountNet: -100,
+				fanCoveredFees: true,
+				stripePaymentId: `pi_test_disp_${crypto.randomBytes(6).toString('hex')}`,
+				status: TipReversalStatus.Disputed,
+				refundedAt: now,
+				createdAt: now
+			}
+		]);
+
+		const req = new Request('http://localhost:4173/dashboard', {
+			headers: { cookie: fixture.cookie }
+		});
+		const data = (await (load as any)({ request: req, url: new URL(req.url) })) as any;
+
+		expect(data.latestRecap.totalGrossCents).toBe(2000);
+		expect(data.latestRecap.totalFeesCents).toBe(218);
+		expect(data.latestRecap.reversalsCents).toBe(1000);
+		expect(data.latestRecap.totalNetCents).toBe(782);
+		expect(data.latestRecap.refundCount).toBe(1);
+		expect(data.latestRecap.disputeCount).toBe(0);
+
+		expect(data.generalRow.grossCents).toBe(2000);
+		expect(data.generalRow.reversalsCents).toBe(2000);
+		expect(data.generalRow.netCents).toBe(-100);
+		expect(data.generalRow.disputeCount).toBe(1);
+
+		expect(data.issues[0].tipSummary.reversalsCents).toBe(1000);
+		expect(data.tipLedger).toHaveLength(3);
+		expect(data.tipLedger[0].sourceLabel).toBe('General (Back Page)');
+		expect(data.tipLedger[0].status).toBe(TipReversalStatus.Disputed);
+		expect(data.tipLedger[0].reversalCents).toBe(2000);
+		expect(data.tipLedger[1].sourceLabel).toBe('Brooklyn @ Union Pool');
+		expect(data.tipLedger[1].status).toBe(TipReversalStatus.Refunded);
+		expect(data.tipLedger[1].reversalCents).toBe(1000);
+		expect(data.tipLedger[2].status).toBe(TipStatus.Succeeded);
+		expect(data.tipLedger[2].reversalCents).toBe(0);
 	});
 });
