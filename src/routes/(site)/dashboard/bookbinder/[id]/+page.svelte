@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { Box, Stack, Cluster, Split, Frame } from '$lib/components/layout';
+	import { Box, Stack, Cluster, Split } from '$lib/components/layout';
 	import QrCaseDisplay from '$lib/components/dashboard/QrCaseDisplay.svelte';
-	import { optimizeFileInputOnChange } from '$lib/utils/image-optimize';
+	import { optimizeFileInputFilesOnChange } from '$lib/utils/image-optimize';
+	import PhotoPileEditor from '$lib/components/dashboard/PhotoPileEditor.svelte';
+	import { MAX_PHOTOS_PER_PAGE, resolvePhotoEntries } from '$domain/photo-pile';
 
 	let { data, form } = $props();
 
@@ -29,6 +31,7 @@
 		body?: string;
 		songs?: string[];
 		imageUrl?: string;
+		photos?: unknown;
 		audioUrl?: string;
 		videoUrl?: string;
 		embedUrl?: string;
@@ -314,35 +317,9 @@
 										class="bookbinder-input"
 									/>
 								</Stack>
-								{#if parsed.imageUrl}
-									<Frame ratio="4-3" class="editor-photo-preview">
-										<img src={parsed.imageUrl} alt={parsed.title || 'Photo preview'} />
-									</Frame>
-								{/if}
-								<Split ratio="1-1" gap="sm" collapse="sm">
-									<Stack gap="xs">
-										<label for="photo-file-{page.id}" class="input-label-sm">Upload Replacement Photo</label>
-										<input
-											id="photo-file-{page.id}"
-											type="file"
-											name="photoFile"
-											accept="image/jpeg,image/png,image/webp,image/avif,image/svg+xml"
-											onchange={optimizeFileInputOnChange}
-											class="bookbinder-input"
-										/>
-									</Stack>
-									<Stack gap="xs">
-										<label for="img-{page.id}" class="input-label-sm">Photo URL</label>
-										<input
-											id="img-{page.id}"
-											type="text"
-											name="imageUrl"
-											value={parsed.imageUrl || ''}
-											placeholder="https://... or /uploads/..."
-											class="bookbinder-input"
-										/>
-									</Stack>
-								</Split>
+								{#key page.contentJson}
+									<PhotoPileEditor pageId={page.id} initial={resolvePhotoEntries(parsed)} />
+								{/key}
 								<Stack gap="xs">
 									<label for="body-{page.id}" class="input-label-sm">Caption / Story</label>
 									<textarea
@@ -528,13 +505,16 @@
 						{:else if newKind === 'photo'}
 							<Split ratio="1-1" gap="sm" collapse="sm" class="w-full">
 								<Stack gap="xs">
-									<label for="new-photo-file" class="input-label-sm">Upload Photo</label>
+									<label for="new-photo-file" class="input-label-sm">
+										Upload Photos (select several, up to {MAX_PHOTOS_PER_PAGE})
+									</label>
 									<input
 										id="new-photo-file"
 										type="file"
 										name="photoFile"
+										multiple
 										accept="image/jpeg,image/png,image/webp,image/avif,image/svg+xml"
-										onchange={optimizeFileInputOnChange}
+										onchange={optimizeFileInputFilesOnChange}
 										class="bookbinder-input"
 									/>
 								</Stack>
@@ -733,11 +713,6 @@
 		font-family: inherit;
 	}
 
-	:global(.editor-photo-preview) {
-		max-inline-size: 260px;
-		border-radius: var(--radius-md);
-		border: 1px solid var(--glass-border);
-	}
 
 	.editor-audio-preview {
 		inline-size: 100%;

@@ -14,7 +14,8 @@ import {
 	type Issue
 } from '$domain/issue';
 import { createArtistId, createIssueId } from '$domain/types';
-import { issueStatusSchema, mediaUrlSchema } from '$schemas/issue';
+import { issueStatusSchema, mediaUrlSchema, photoEntriesSchema } from '$schemas/issue';
+import { MAX_PHOTOS_PER_PAGE } from '$domain/photo-pile';
 
 const BOOKBINDER_PAGE_KINDS = new Set(['text', 'setlist', 'photo', 'audio', 'video'] as const);
 type BookbinderPageKind = 'text' | 'setlist' | 'photo' | 'audio' | 'video';
@@ -125,35 +126,64 @@ async function resolvePageContentJson(
 	}
 
 	if (kind === 'photo') {
-		const photoFile = formData.get('photoFile');
+		// Photos already on the page, in the order the artist arranged them.
+		const keptUrls = formData.getAll('keepPhotoUrl').map((v) => String(v).trim());
+		const keptCaptions = formData.getAll('keepPhotoCaption').map((v) => String(v));
+		const keptRaw = keptUrls.flatMap((url, i) =>
+			url ? [{ url, caption: keptCaptions[i] || undefined }] : []
+		);
+		const newFiles = formData
+			.getAll('photoFile')
+			.filter((f): f is File => f instanceof File && f.size > 0);
 		const imageUrlRaw = String(formData.get('imageUrl') || '').trim();
-		let resolvedImageUrl = '';
+		const addedRaw = imageUrlRaw ? [{ url: imageUrlRaw }] : [];
 
-		if (photoFile instanceof File && photoFile.size > 0) {
-			const uploadRes = await uploadFormFile(photoFile, { kind: 'image' });
-			if (!uploadRes.ok) {
-				return { ok: false, error: uploadRes.error.message };
-			}
-			resolvedImageUrl = uploadRes.value.url;
-		} else if (imageUrlRaw) {
-			const urlCheck = mediaUrlSchema.safeParse(imageUrlRaw);
-			if (!urlCheck.success) {
+		const totalPhotos = keptRaw.length + newFiles.length + addedRaw.length;
+		if (totalPhotos > MAX_PHOTOS_PER_PAGE) {
+			return {
+				ok: false,
+				error: `A photo page holds at most ${MAX_PHOTOS_PER_PAGE} photos.`
+			};
+		}
+
+		// Validate everything the artist typed before spending any upload.
+		const keptCheck = photoEntriesSchema.safeParse(keptRaw);
+		const addedCheck = photoEntriesSchema.safeParse(addedRaw);
+		for (const check of [keptCheck, addedCheck]) {
+			if (!check.success) {
 				return {
 					ok: false,
 					error:
-						urlCheck.error.issues[0]?.message ||
+						check.error.issues[0]?.message ||
 						'Photo URL must be a valid http(s) URL or /uploads/ path'
 				};
 			}
-			resolvedImageUrl = urlCheck.data;
 		}
+		if (!keptCheck.success || !addedCheck.success) {
+			return { ok: false, error: 'Invalid photo data.' };
+		}
+
+		const uploaded: { url: string }[] = [];
+		for (const file of newFiles) {
+			const uploadRes = await uploadFormFile(file, { kind: 'image' });
+			if (!uploadRes.ok) {
+				return { ok: false, error: uploadRes.error.message };
+			}
+			uploaded.push({ url: uploadRes.value.url });
+		}
+
+		const photos = [...keptCheck.data, ...uploaded, ...addedCheck.data].map((p) =>
+			'caption' in p && p.caption ? { url: p.url, caption: p.caption } : { url: p.url }
+		);
 
 		return {
 			ok: true,
 			contentJson: JSON.stringify({
 				title: title || undefined,
 				body: body || undefined,
-				imageUrl: resolvedImageUrl || undefined
+				photos: photos.length > 0 ? photos : undefined,
+				// First photo mirrored as `imageUrl` so single-photo readers keep working.
+				imageUrl: photos[0]?.url
 			})
 		};
 	}

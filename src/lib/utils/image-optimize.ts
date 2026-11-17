@@ -95,6 +95,28 @@ export async function optimizeImageFile(
 }
 
 /**
+ * Same as optimizeFileInputOnChange, but optimizes every file selected on a
+ * `multiple` file input and keeps their order.
+ */
+export async function optimizeFileInputFilesOnChange(
+	event: Event,
+	options?: OptimizeImageOptions
+): Promise<File[]> {
+	const input = event.currentTarget as HTMLInputElement | null;
+	const originals = input?.files ? Array.from(input.files) : [];
+	if (!input || originals.length === 0) {
+		return [];
+	}
+	const optimized = await Promise.all(originals.map((file) => optimizeImageFile(file, options)));
+	if (optimized.some((file, i) => file !== originals[i]) && typeof DataTransfer !== 'undefined') {
+		const dt = new DataTransfer();
+		for (const file of optimized) dt.items.add(file);
+		input.files = dt.files;
+	}
+	return optimized;
+}
+
+/**
  * Optimizes the selected image file on an <input type="file"> element in place
  * using DataTransfer so standard HTML multipart form submissions send WebP bytes.
  */

@@ -112,6 +112,9 @@ afterEach(async () => {
 				try {
 					const parsed = JSON.parse(page.contentJson);
 					trackUploadUrl(parsed.imageUrl);
+					if (Array.isArray(parsed.photos)) {
+						for (const photo of parsed.photos) trackUploadUrl(photo?.url);
+					}
 					trackUploadUrl(parsed.audioUrl);
 					trackUploadUrl(parsed.videoUrl);
 				} catch {}
@@ -482,5 +485,173 @@ describe('P4 Quick Issue + Bookbinder + Reader', () => {
 		expect(JSON.parse(pVideo.contentJson).videoUrl).toBe(
 			'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
 		);
+	});
+});
+
+describe('Bookbinder photo pile pages', () => {
+	async function createPublishedIssue(label: string) {
+		const fixture = await createTestArtistFixture(label);
+		const now = new Date();
+		const issueId = crypto.randomUUID();
+		const slug = `pile-show-${issueId.slice(0, 6)}`;
+		await db.insert(schema.issues).values({
+			id: issueId,
+			artistId: fixture.artistId,
+			slug,
+			city: 'Portland',
+			venue: 'Doug Fir',
+			date: '2026-12-02',
+			timezone: 'America/Los_Angeles',
+			coverNote: '',
+			secretKey: 'pilekey',
+			status: 'published',
+			publishedAt: now,
+			createdAt: now,
+			updatedAt: now
+		});
+		return {
+			fixture,
+			issueId,
+			baseUrl: `http://localhost:4173/dashboard/bookbinder/${issueId}`
+		};
+	}
+
+	function jpeg(name: string): File {
+		return new File([new Uint8Array([255, 216, 255, 224])], name, { type: 'image/jpeg' });
+	}
+
+	async function readPage(issueId: string) {
+		const pages = await db.query.issuePages.findMany({
+			where: eq(schema.issuePages.issueId, issueId),
+			orderBy: [asc(schema.issuePages.position)]
+		});
+		return pages.map((p) => ({ id: p.id, content: JSON.parse(p.contentJson) }));
+	}
+
+	it('stores several uploaded photos plus a URL on one photo page, in order', async () => {
+		const { fixture, issueId, baseUrl } = await createPublishedIssue('pile-add');
+		const form = new FormData();
+		form.set('kind', 'photo');
+		form.set('title', 'Load-in');
+		form.append('photoFile', jpeg('one.jpg'));
+		form.append('photoFile', jpeg('two.jpg'));
+		form.append('photoFile', jpeg('three.jpg'));
+		form.set('imageUrl', 'https://images.example.com/four.jpg');
+
+		const res = (await (bookbinderActions.addPage as any)({
+			request: buildPostRequest(`${baseUrl}?/addPage`, fixture.cookie, form),
+			params: { id: issueId }
+		})) as any;
+		expect(res.success).toBe(true);
+
+		const [page] = await readPage(issueId);
+		expect(page.content.photos).toHaveLength(4);
+		for (const photo of page.content.photos.slice(0, 3)) {
+			expect(photo.url).toMatch(/^\/uploads\/.+\.jpg$/);
+		}
+		expect(page.content.photos[3].url).toBe('https://images.example.com/four.jpg');
+		expect(page.content.imageUrl).toBe(page.content.photos[0].url);
+	});
+
+	it('reorders, captions and removes photos when the page is updated', async () => {
+		const { fixture, issueId, baseUrl } = await createPublishedIssue('pile-edit');
+		const addForm = new FormData();
+		addForm.set('kind', 'photo');
+		addForm.append('photoFile', jpeg('a.jpg'));
+		addForm.append('photoFile', jpeg('b.jpg'));
+		addForm.append('photoFile', jpeg('c.jpg'));
+		await (bookbinderActions.addPage as any)({
+			request: buildPostRequest(`${baseUrl}?/addPage`, fixture.cookie, addForm),
+			params: { id: issueId }
+		});
+		const [created] = await readPage(issueId);
+		const [a, b, c] = created.content.photos.map((p: { url: string }) => p.url);
+
+		// Keep c then a (b removed), with captions.
+		const editForm = new FormData();
+		editForm.set('pageId', created.id);
+		editForm.set('kind', 'photo');
+		editForm.append('keepPhotoUrl', c);
+		editForm.append('keepPhotoCaption', '  Merch table  ');
+		editForm.append('keepPhotoUrl', a);
+		editForm.append('keepPhotoCaption', '');
+		const res = (await (bookbinderActions.updatePage as any)({
+			request: buildPostRequest(`${baseUrl}?/updatePage`, fixture.cookie, editForm),
+			params: { id: issueId }
+		})) as any;
+		expect(res.success).toBe(true);
+
+		const [updated] = await readPage(issueId);
+		expect(updated.content.photos).toEqual([{ url: c, caption: 'Merch table' }, { url: a }]);
+		expect(updated.content.imageUrl).toBe(c);
+		expect(JSON.stringify(updated.content)).not.toContain(b);
+		trackUploadUrl(b);
+	});
+
+	it('upgrades a legacy single-image page to a photos array on save', async () => {
+		const { fixture, issueId, baseUrl } = await createPublishedIssue('pile-legacy');
+		const pageId = crypto.randomUUID();
+		await db.insert(schema.issuePages).values({
+			id: pageId,
+			issueId,
+			position: 1,
+			kind: 'photo',
+			contentJson: JSON.stringify({ title: 'Old', imageUrl: 'https://images.example.com/old.jpg' }),
+			createdAt: new Date()
+		});
+
+		const form = new FormData();
+		form.set('pageId', pageId);
+		form.set('kind', 'photo');
+		form.set('title', 'Old');
+		form.append('keepPhotoUrl', 'https://images.example.com/old.jpg');
+		form.append('keepPhotoCaption', '');
+		form.set('imageUrl', 'https://images.example.com/new.jpg');
+		const res = (await (bookbinderActions.updatePage as any)({
+			request: buildPostRequest(`${baseUrl}?/updatePage`, fixture.cookie, form),
+			params: { id: issueId }
+		})) as any;
+		expect(res.success).toBe(true);
+
+		const [page] = await readPage(issueId);
+		expect(page.content.photos).toEqual([
+			{ url: 'https://images.example.com/old.jpg' },
+			{ url: 'https://images.example.com/new.jpg' }
+		]);
+	});
+
+	it('rejects more than 12 photos, long captions and bad URLs', async () => {
+		const { fixture, issueId, baseUrl } = await createPublishedIssue('pile-limits');
+		const post = async (form: FormData) =>
+			(await (bookbinderActions.addPage as any)({
+				request: buildPostRequest(`${baseUrl}?/addPage`, fixture.cookie, form),
+				params: { id: issueId }
+			})) as any;
+
+		const tooMany = new FormData();
+		tooMany.set('kind', 'photo');
+		for (let i = 0; i < 13; i++) {
+			tooMany.append('keepPhotoUrl', `https://images.example.com/${i}.jpg`);
+			tooMany.append('keepPhotoCaption', '');
+		}
+		const tooManyRes = await post(tooMany);
+		expect(tooManyRes.status).toBe(400);
+		expect(tooManyRes.data.error).toMatch(/at most 12/);
+
+		const longCaption = new FormData();
+		longCaption.set('kind', 'photo');
+		longCaption.append('keepPhotoUrl', 'https://images.example.com/a.jpg');
+		longCaption.append('keepPhotoCaption', 'x'.repeat(141));
+		const longRes = await post(longCaption);
+		expect(longRes.status).toBe(400);
+		expect(longRes.data.error).toMatch(/140 characters/);
+
+		const badUrl = new FormData();
+		badUrl.set('kind', 'photo');
+		badUrl.set('imageUrl', 'javascript:alert(1)');
+		const badRes = await post(badUrl);
+		expect(badRes.status).toBe(400);
+
+		expect(await readPage(issueId)).toHaveLength(0);
 	});
 });

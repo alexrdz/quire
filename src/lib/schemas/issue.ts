@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_PHOTOS_PER_PAGE, MAX_PHOTO_CAPTION_LENGTH } from '../domain/photo-pile';
 
 export const pageKindSchema = z.enum([
 	'text',
@@ -37,6 +38,19 @@ export const mediaUrlSchema = z
 	);
 
 export type MediaUrlInput = z.infer<typeof mediaUrlSchema>;
+
+export const photoEntrySchema = z.object({
+	url: mediaUrlSchema,
+	caption: z
+		.string()
+		.trim()
+		.max(MAX_PHOTO_CAPTION_LENGTH, `Photo captions are limited to ${MAX_PHOTO_CAPTION_LENGTH} characters`)
+		.optional()
+});
+
+export const photoEntriesSchema = z
+	.array(photoEntrySchema)
+	.max(MAX_PHOTOS_PER_PAGE, `A photo page holds at most ${MAX_PHOTOS_PER_PAGE} photos`);
 
 export const typePairingSchema = z.enum(['sans-serif', 'serif', 'mono']);
 export type TypePairing = z.infer<typeof typePairingSchema>;

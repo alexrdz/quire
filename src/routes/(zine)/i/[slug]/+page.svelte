@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { Stack, Box, Cluster, Frame } from '$lib/components/layout';
+	import PhotoPile from '$lib/components/zine/PhotoPile.svelte';
+	import { resolvePhotoEntries } from '$domain/photo-pile';
 
 	let { data, form } = $props();
 
@@ -68,6 +70,7 @@
 		body?: string;
 		songs?: string[];
 		imageUrl?: string;
+		photos?: unknown;
 		audioUrl?: string;
 		videoUrl?: string;
 		embedUrl?: string;
@@ -295,8 +298,9 @@
 			idx + 1 < contentPages.length ? `page-content-${idx + 1}` : 'page-wall'}
 		{@const prevTarget = idx === 0 ? 'page-cover' : `page-content-${idx - 1}`}
 
-		{@const isPhotoPage = (page.kind === 'photo' || page.kind === 'image') && Boolean(parsed.imageUrl)}
-		{@const safePhotoCssUrl = parsed.imageUrl ? parsed.imageUrl.replace(/'/g, '%27') : ''}
+		{@const photos = page.kind === 'photo' || page.kind === 'image' ? resolvePhotoEntries(parsed) : []}
+		{@const isPhotoPage = photos.length > 0}
+		{@const safePhotoCssUrl = photos[0] ? photos[0].url.replace(/'/g, '%27') : ''}
 
 		<section
 			id="page-content-{idx}"
@@ -342,11 +346,16 @@
 						</Box>
 					{:else if page.kind === 'photo' || page.kind === 'image'}
 						<Stack gap="md">
-							{#if parsed.imageUrl}
+							{#if photos.length > 1}
+								<PhotoPile
+									{photos}
+									label={parsed.title || `${data.issue.city} photo pile`}
+								/>
+							{:else if photos.length === 1}
 								<Frame ratio="4-3" class="photo-page-frame">
 									<img
-										src={parsed.imageUrl}
-										alt={parsed.title || `${data.issue.city} gig photo`}
+										src={photos[0].url}
+										alt={photos[0].caption || parsed.title || `${data.issue.city} gig photo`}
 										loading="lazy"
 									/>
 								</Frame>
@@ -356,6 +365,9 @@
 							</h2>
 							{#if parsed.body}
 								<p class="bespoke-body-text">{parsed.body}</p>
+							{/if}
+							{#if photos.length === 1 && photos[0].caption}
+								<p class="bespoke-body-text">{photos[0].caption}</p>
 							{/if}
 						</Stack>
 					{:else if page.kind === 'audio'}
