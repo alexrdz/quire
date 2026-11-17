@@ -4,6 +4,7 @@
 	import { Container, Box, Stack, Cluster, Split, Grid, Frame } from '$lib/components/layout';
 	import ArtistTopNav from '$lib/components/dashboard/ArtistTopNav.svelte';
 	import { checkAccentContrast } from '$domain/theme';
+	import { optimizeFileInputOnChange } from '$lib/utils/image-optimize';
 
 	let { data, form } = $props();
 
@@ -45,9 +46,8 @@
 		};
 	});
 
-	function handleCoverFileChange(event: Event) {
-		const input = event.currentTarget as HTMLInputElement;
-		const file = input.files?.[0];
+	async function handleCoverFileChange(event: Event) {
+		const file = await optimizeFileInputOnChange(event);
 		if (coverFilePreviewUrl) {
 			URL.revokeObjectURL(coverFilePreviewUrl);
 			coverFilePreviewUrl = null;
@@ -518,6 +518,7 @@
 																type="file"
 																name="photoFile"
 																accept="image/*"
+																onchange={optimizeFileInputOnChange}
 																class="form-field-input file-field-input"
 															/>
 														</Stack>
@@ -686,6 +687,7 @@
 										type="file"
 										name="photoFile"
 										accept="image/*"
+										onchange={optimizeFileInputOnChange}
 										class="form-field-input file-field-input"
 									/>
 								</Stack>

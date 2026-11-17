@@ -136,3 +136,54 @@ export function archiveIssue(
 		previousStatus: issue.status
 	});
 }
+
+export interface IssueMonthGroup<T extends { date: string }> {
+	key: string;
+	month: string;
+	issues: T[];
+}
+
+const MONTH_FORMATTER = new Intl.DateTimeFormat('en-US', {
+	month: 'long',
+	year: 'numeric',
+	timeZone: 'UTC'
+});
+
+function parseYearMonth(dateStr: string): { key: string; month: string } {
+	const match = /^(\d{4})-(\d{2})/.exec(dateStr.trim());
+	if (!match) {
+		return { key: '0000-00', month: dateStr || 'Undated' };
+	}
+
+	const year = Number(match[1]);
+	const monthNum = Number(match[2]);
+	if (!Number.isInteger(year) || !Number.isInteger(monthNum) || monthNum < 1 || monthNum > 12) {
+		return { key: '0000-00', month: dateStr || 'Undated' };
+	}
+
+	const key = `${match[1]}-${match[2]}`;
+	const label = MONTH_FORMATTER.format(new Date(Date.UTC(year, monthNum - 1, 1)));
+	return { key, month: label };
+}
+
+/**
+ * Pure domain helper that groups issues into YYYY-MM buckets ordered newest-first.
+ * Uses UTC month formatting to prevent local timezone drift on YYYY-MM-DD dates.
+ */
+export function groupIssuesByMonth<T extends { date: string }>(
+	issues: readonly T[]
+): IssueMonthGroup<T>[] {
+	const buckets = new Map<string, IssueMonthGroup<T>>();
+
+	for (const issue of issues) {
+		const { key, month } = parseYearMonth(issue.date);
+		let bucket = buckets.get(key);
+		if (!bucket) {
+			bucket = { key, month, issues: [] };
+			buckets.set(key, bucket);
+		}
+		bucket.issues.push(issue);
+	}
+
+	return Array.from(buckets.values()).sort((a, b) => b.key.localeCompare(a.key));
+}

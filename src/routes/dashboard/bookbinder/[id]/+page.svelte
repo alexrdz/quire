@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { Box, Stack, Cluster, Split, Frame } from '$lib/components/layout';
 	import QrCaseDisplay from '$lib/components/dashboard/QrCaseDisplay.svelte';
+	import { optimizeFileInputOnChange } from '$lib/utils/image-optimize';
 
 	let { data, form } = $props();
 
@@ -326,6 +327,7 @@
 											type="file"
 											name="photoFile"
 											accept="image/jpeg,image/png,image/webp,image/avif,image/svg+xml"
+											onchange={optimizeFileInputOnChange}
 											class="bookbinder-input"
 										/>
 									</Stack>
@@ -532,6 +534,7 @@
 										type="file"
 										name="photoFile"
 										accept="image/jpeg,image/png,image/webp,image/avif,image/svg+xml"
+										onchange={optimizeFileInputOnChange}
 										class="bookbinder-input"
 									/>
 								</Stack>

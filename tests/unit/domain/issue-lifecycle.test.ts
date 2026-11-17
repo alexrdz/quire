@@ -3,6 +3,7 @@ import {
 	publishIssue,
 	cancelIssue,
 	archiveIssue,
+	groupIssuesByMonth,
 	type DraftIssue,
 	type PublishedIssue
 } from '$domain/issue';
@@ -123,5 +124,37 @@ describe('Issue Lifecycle FSM', () => {
 		if (!rePubResult.ok) {
 			expect(rePubResult.error.code).toBe('ILLEGAL_TRANSITION');
 		}
+	});
+});
+
+describe('groupIssuesByMonth', () => {
+	it('groups issues into UTC YYYY-MM buckets ordered newest-first without timezone drift', () => {
+		const input = [
+			{ id: '1', date: '2026-09-01', city: 'Chicago' },
+			{ id: '2', date: '2026-10-31', city: 'Brooklyn' },
+			{ id: '3', date: '2026-10-01', city: 'Boston' },
+			{ id: '4', date: '2025-12-15', city: 'Austin' }
+		];
+
+		const groups = groupIssuesByMonth(input);
+
+		expect(groups.map((g) => g.key)).toEqual(['2026-10', '2026-09', '2025-12']);
+		expect(groups.map((g) => g.month)).toEqual([
+			'October 2026',
+			'September 2026',
+			'December 2025'
+		]);
+		expect(groups[0]?.issues.map((i) => i.city)).toEqual(['Brooklyn', 'Boston']);
+		expect(groups[1]?.issues.map((i) => i.city)).toEqual(['Chicago']);
+		expect(groups[2]?.issues.map((i) => i.city)).toEqual(['Austin']);
+	});
+
+	it('returns an empty array for empty input and handles malformed dates gracefully', () => {
+		expect(groupIssuesByMonth([])).toEqual([]);
+
+		const weird = groupIssuesByMonth([{ id: 'x', date: 'TBD' }]);
+		expect(weird).toHaveLength(1);
+		expect(weird[0]?.key).toBe('0000-00');
+		expect(weird[0]?.month).toBe('TBD');
 	});
 });

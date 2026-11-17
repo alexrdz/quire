@@ -1,5 +1,6 @@
 import { error, fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { ArtistAccountStatus } from '$domain/account';
+import { groupIssuesByMonth } from '$domain/issue';
 import { db, schema } from '$lib/server/db';
 import { eq, and, desc, isNull, inArray } from 'drizzle-orm';
 import { auth, createSessionForUser } from '$lib/server/auth';
@@ -62,24 +63,7 @@ export const load: ServerLoad = async ({ params, request }) => {
 	// Closed accounts archive all issues and hide them from the Back Page.
 	const isArtistClosed = artist.accountStatus === ArtistAccountStatus.Closed;
 	const issues = isArtistClosed ? [] : artist.issues || [];
-	type IssueType = (typeof issues)[number];
-	const issuesByMonth = new Map<string, IssueType[]>();
-	for (const issue of issues) {
-		const [year, month] = issue.date.split('-');
-		const monthName = new Date(Number(year), Number(month) - 1, 1).toLocaleString('default', {
-			month: 'long',
-			year: 'numeric'
-		});
-		if (!issuesByMonth.has(monthName)) {
-			issuesByMonth.set(monthName, []);
-		}
-		issuesByMonth.get(monthName)!.push(issue);
-	}
-
-	const groupedIssues = Array.from(issuesByMonth.entries()).map(([month, list]) => ({
-		month,
-		issues: list
-	}));
+	const groupedIssues = groupIssuesByMonth(issues);
 
 	return {
 		artist,

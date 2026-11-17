@@ -138,42 +138,49 @@
 					</Box>
 				{:else}
 					<Stack gap="lg">
-						{#each data.groupedIssues as group}
-							<Stack gap="sm">
-								<h3 class="text-highlight group-month-heading">{group.month}</h3>
+						{#each data.groupedIssues as group, idx (group.key)}
+							<details open={idx === 0} class="month-accordion">
+								<summary class="month-accordion-summary">
+									<span class="text-highlight group-month-heading">{group.month}</span>
+									<span class="month-count-badge">
+										{group.issues.length} {group.issues.length === 1 ? 'show' : 'shows'}
+									</span>
+								</summary>
 
-								<Grid min="sm" gap="md">
-									{#each group.issues as issue}
-										<Box
-											as="a"
-											href="/i/{issue.slug}"
-											variant="raised"
-											padding="lg"
-											radius="lg"
-											class="issue-card-box"
-										>
-											<Stack gap="sm">
-												<Cluster justify="between" align="center">
-													<span class="meta-chip meta-highlight">{issue.date}</span>
-													{#if issue.status === 'cancelled'}
-														<span class="meta-chip meta-support">Cancelled</span>
-													{:else}
-														<span class="text-muted font-mono zine-num">{issue.venue}</span>
+								<div class="month-accordion-body">
+									<Grid min="sm" gap="md">
+										{#each group.issues as issue (issue.id)}
+											<Box
+												as="a"
+												href="/i/{issue.slug}"
+												variant="raised"
+												padding="lg"
+												radius="lg"
+												class="issue-card-box"
+											>
+												<Stack gap="sm">
+													<Cluster justify="between" align="center">
+														<span class="meta-chip meta-highlight">{issue.date}</span>
+														{#if issue.status === 'cancelled'}
+															<span class="meta-chip meta-support">Cancelled</span>
+														{:else}
+															<span class="text-muted font-mono zine-num">{issue.venue}</span>
+														{/if}
+													</Cluster>
+
+													<h4 class="issue-city-title">{issue.city}</h4>
+
+													{#if issue.coverNote}
+														<p class="text-muted issue-note-snippet">"{issue.coverNote}"</p>
 													{/if}
-												</Cluster>
 
-												<h4 class="issue-city-title">{issue.city}</h4>
-
-												{#if issue.coverNote}
-													<p class="text-muted issue-note-snippet">"{issue.coverNote}"</p>
-												{/if}
-
-												<span class="text-highlight open-zine-cue">Open Issue Zine →</span>
-											</Stack>
-										</Box>
-									{/each}
-								</Grid>
-							</Stack>
+													<span class="text-highlight open-zine-cue">Open Issue Zine →</span>
+												</Stack>
+											</Box>
+										{/each}
+									</Grid>
+								</div>
+							</details>
 						{/each}
 					</Stack>
 				{/if}
@@ -473,6 +480,48 @@
 
 	.subtext-xs {
 		font-size: 0.75rem;
+	}
+
+	.month-accordion {
+		border-block-end: 1px solid var(--glass-border);
+		padding-block-end: var(--s-md);
+	}
+
+	.month-accordion-summary {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--s-sm);
+		padding-block: var(--s-2xs);
+		cursor: pointer;
+		list-style: none;
+	}
+
+	.month-accordion-summary::-webkit-details-marker {
+		display: none;
+	}
+
+	.month-accordion-summary::after {
+		content: '+';
+		font-family: var(--font-mono);
+		font-size: 0.9rem;
+		color: var(--text-muted);
+	}
+
+	.month-accordion[open] > .month-accordion-summary::after {
+		content: '-';
+		color: var(--highlight);
+	}
+
+	.month-count-badge {
+		margin-inline-start: auto;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--text-muted);
+	}
+
+	.month-accordion-body {
+		padding-block-start: var(--s-sm);
 	}
 
 	.group-month-heading {
