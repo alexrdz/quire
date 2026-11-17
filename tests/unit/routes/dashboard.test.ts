@@ -3,6 +3,7 @@ import { actions, load } from '../../../src/routes/dashboard/+page.server';
 import { db, schema } from '$lib/server/db';
 import { authSecret } from '$lib/server/auth';
 import { TipReversalStatus, TipStatus } from '$domain/tipping';
+import { NoteStatus } from '$domain/wall';
 import { eq } from 'drizzle-orm';
 import { seedDatabase } from '$lib/server/seed';
 import crypto from 'node:crypto';
@@ -304,5 +305,98 @@ describe('Dashboard +page.server', () => {
 		expect(data.tipLedger[1].reversalCents).toBe(1000);
 		expect(data.tipLedger[2].status).toBe(TipStatus.Succeeded);
 		expect(data.tipLedger[2].reversalCents).toBe(0);
+	});
+
+	it('supports hide, restore, reply, deleteReply, blockFan, and unblockFan moderation actions', async () => {
+		await seedDatabase();
+		const fixture = await createFreshArtistSession(crypto.randomBytes(3).toString('hex'));
+
+		const fanUser = await db.query.users.findFirst({
+			where: eq(schema.users.email, 'maya@example.com')
+		});
+		expect(fanUser).toBeDefined();
+		if (!fanUser) return;
+
+		const noteId = crypto.randomUUID();
+		await db.insert(schema.notes).values({
+			id: noteId,
+			artistId: fixture.artistId,
+			issueId: null,
+			fanUserId: fanUser.id,
+			body: 'Loved the acoustic encore!',
+			status: NoteStatus.Live,
+			flagCount: 0,
+			flagImmune: false,
+			createdAt: new Date()
+		});
+
+		const postAction = async (
+			actionFn: (arg: any) => unknown,
+			fields: Record<string, string>
+		) => {
+			const formData = new FormData();
+			for (const [k, v] of Object.entries(fields)) {
+				formData.set(k, v);
+			}
+			const req = new Request('http://localhost:4173/dashboard', {
+				method: 'POST',
+				headers: { cookie: fixture.cookie },
+				body: formData
+			});
+			return actionFn({ request: req } as any);
+		};
+
+		// 1. Reply & deleteReply
+		const replyRes = await postAction(actions.reply, {
+			noteId,
+			body: 'Thank you for coming out!'
+		});
+		expect(replyRes).toEqual({ success: true });
+
+		const delReplyRes = await postAction(actions.deleteReply, { noteId });
+		expect(delReplyRes).toEqual({ success: true });
+		const replyRow = await db.query.noteReplies.findFirst({
+			where: eq(schema.noteReplies.noteId, noteId)
+		});
+		expect(replyRow).toBeUndefined();
+
+		// 2. Non-destructive hide & restore
+		const hideRes = await postAction(actions.hide, { noteId });
+		expect(hideRes).toEqual({ success: true });
+		const hiddenRow = await db.query.notes.findFirst({
+			where: eq(schema.notes.id, noteId)
+		});
+		expect(hiddenRow?.status).toBe(NoteStatus.Hidden);
+
+		const restoreRes = await postAction(actions.restore, { noteId });
+		expect(restoreRes).toEqual({ success: true });
+		const restoredRow = await db.query.notes.findFirst({
+			where: eq(schema.notes.id, noteId)
+		});
+		expect(restoredRow?.status).toBe(NoteStatus.Live);
+		expect(restoredRow?.flagImmune).toBe(true);
+
+		// 3. Block fan -> appears in load.blockedFans -> unblockFan removes block
+		const blockRes = await postAction(actions.blockFan, { fanUserId: fanUser.id });
+		expect(blockRes).toEqual({ success: true });
+
+		const dashReq = new Request('http://localhost:4173/dashboard', {
+			headers: { cookie: fixture.cookie }
+		});
+		const loadedBlocked = (await (load as any)({
+			request: dashReq,
+			url: new URL(dashReq.url)
+		})) as any;
+		expect(loadedBlocked.blockedFans).toHaveLength(1);
+		expect(loadedBlocked.blockedFans[0].fanUserId).toBe(fanUser.id);
+
+		const unblockRes = await postAction(actions.unblockFan, { fanUserId: fanUser.id });
+		expect(unblockRes).toEqual({ success: true });
+
+		const loadedUnblocked = (await (load as any)({
+			request: dashReq,
+			url: new URL(dashReq.url)
+		})) as any;
+		expect(loadedUnblocked.blockedFans).toEqual([]);
 	});
 });

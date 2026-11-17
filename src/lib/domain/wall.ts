@@ -13,6 +13,40 @@ export const FLAG_AUTO_HIDE_THRESHOLD = 3;
 export const MAX_NOTE_LENGTH = 500;
 
 /**
+ * Canonical Wall note lifecycle statuses and moderation actions shared across
+ * domain logic, Zod boundary schemas, Drizzle persistence, and UI.
+ */
+export const NoteStatus = {
+	Live: 'live',
+	Pending: 'pending',
+	Hidden: 'hidden'
+} as const;
+
+export type NoteStatus = (typeof NoteStatus)[keyof typeof NoteStatus];
+
+export const NOTE_STATUSES = [
+	NoteStatus.Live,
+	NoteStatus.Pending,
+	NoteStatus.Hidden
+] as const;
+
+export const ModerationAction = {
+	Approve: 'approve',
+	Hide: 'hide',
+	Restore: 'restore',
+	Delete: 'delete'
+} as const;
+
+export type ModerationAction = (typeof ModerationAction)[keyof typeof ModerationAction];
+
+export const MODERATION_ACTIONS = [
+	ModerationAction.Approve,
+	ModerationAction.Hide,
+	ModerationAction.Restore,
+	ModerationAction.Delete
+] as const;
+
+/**
  * Moderation screening checks:
  * Decision 23: No links, emails, or phone numbers in notes.
  */
@@ -51,7 +85,7 @@ export interface NoteEntity {
 	issueId: IssueId | null; // null = General Wall
 	fanUserId: FanUserId;
 	body: string;
-	status: 'live' | 'pending' | 'hidden';
+	status: NoteStatus;
 	flagCount: number;
 	flagImmune: boolean;
 	createdAt: Date;
@@ -72,7 +106,7 @@ export interface NoteReplyEntity {
 export function flagNote(
 	note: NoteEntity
 ): Result<{ note: NoteEntity; wasAutoHidden: boolean }, DomainError> {
-	if (note.status === 'hidden') {
+	if (note.status === NoteStatus.Hidden) {
 		return err({
 			code: 'ALREADY_HIDDEN',
 			message: 'Note is already hidden.'
@@ -85,12 +119,29 @@ export function flagNote(
 	const updatedNote: NoteEntity = {
 		...note,
 		flagCount: newFlagCount,
-		status: shouldAutoHide ? 'hidden' : note.status
+		status: shouldAutoHide ? NoteStatus.Hidden : note.status
 	};
 
 	return ok({
 		note: updatedNote,
 		wasAutoHidden: shouldAutoHide
+	});
+}
+
+/**
+ * Artist hides a live or pending note without deleting it (SPEC 5.5).
+ */
+export function hideNote(note: NoteEntity): Result<NoteEntity, DomainError> {
+	if (note.status === NoteStatus.Hidden) {
+		return err({
+			code: 'ALREADY_HIDDEN',
+			message: 'Note is already hidden.'
+		});
+	}
+
+	return ok({
+		...note,
+		status: NoteStatus.Hidden
 	});
 }
 
@@ -101,7 +152,7 @@ export function flagNote(
 export function restoreNote(note: NoteEntity): Result<NoteEntity, DomainError> {
 	return ok({
 		...note,
-		status: 'live',
+		status: NoteStatus.Live,
 		flagImmune: true
 	});
 }
@@ -213,7 +264,7 @@ export function wallNoteTransition(
 					issueId: event.issueId,
 					fanUserId: currentState.fanUserId,
 					body: currentState.draft,
-					status: event.approveFirst ? 'pending' : 'live',
+					status: event.approveFirst ? NoteStatus.Pending : NoteStatus.Live,
 					flagCount: 0,
 					flagImmune: false,
 					createdAt: new Date()

@@ -4,7 +4,9 @@ import { eq, and } from 'drizzle-orm';
 import {
 	screenNoteText,
 	flagNote,
+	hideNote,
 	restoreNote,
+	NoteStatus,
 	type NoteEntity
 } from '$domain/wall';
 import {
@@ -32,7 +34,7 @@ export interface SubmitNoteParams {
  */
 export async function submitWallNote(
 	params: SubmitNoteParams
-): Promise<Result<{ noteId: string; status: 'live' | 'pending' }, DomainError>> {
+): Promise<Result<{ noteId: string; status: typeof NoteStatus.Live | typeof NoteStatus.Pending }, DomainError>> {
 	const existingBlock = await db.query.blocks.findFirst({
 		where: and(
 			eq(schema.blocks.artistId, params.artistId),
@@ -74,7 +76,7 @@ export async function submitWallNote(
 	}
 
 	const noteId = crypto.randomUUID();
-	const status = approveFirst ? 'pending' : 'live';
+	const status = approveFirst ? NoteStatus.Pending : NoteStatus.Live;
 
 	await db.insert(schema.notes).values({
 		id: noteId,
@@ -91,13 +93,27 @@ export async function submitWallNote(
 	return ok({ noteId, status });
 }
 
+function toDomainNote(note: typeof schema.notes.$inferSelect): NoteEntity {
+	return {
+		id: createNoteId(note.id),
+		artistId: createArtistId(note.artistId),
+		issueId: note.issueId ? createIssueId(note.issueId) : null,
+		fanUserId: createFanUserId(note.fanUserId),
+		body: note.body,
+		status: note.status,
+		flagCount: note.flagCount,
+		flagImmune: note.flagImmune,
+		createdAt: note.createdAt
+	};
+}
+
 /**
  * Flags a note. Enforces 1 flag per fan and auto-hides at 3 flags (unless flagImmune).
  */
 export async function flagWallNote(
 	noteId: string,
 	fanUserId: string
-): Promise<Result<{ flagCount: number; status: 'live' | 'pending' | 'hidden' }, DomainError>> {
+): Promise<Result<{ flagCount: number; status: NoteStatus }, DomainError>> {
 	const existingFlag = await db.query.noteFlags.findFirst({
 		where: and(
 			eq(schema.noteFlags.noteId, noteId),
@@ -124,19 +140,7 @@ export async function flagWallNote(
 		createdAt: new Date()
 	});
 
-	const domainNote: NoteEntity = {
-		id: createNoteId(note.id),
-		artistId: createArtistId(note.artistId),
-		issueId: note.issueId ? createIssueId(note.issueId) : null,
-		fanUserId: createFanUserId(note.fanUserId),
-		body: note.body,
-		status: note.status,
-		flagCount: note.flagCount,
-		flagImmune: note.flagImmune,
-		createdAt: note.createdAt
-	};
-
-	const flagResult = flagNote(domainNote);
+	const flagResult = flagNote(toDomainNote(note));
 	if (!flagResult.ok) {
 		return err(flagResult.error);
 	}
@@ -158,6 +162,34 @@ export async function flagWallNote(
 }
 
 /**
+ * Non-destructively hides a note from public Walls while preserving it for review/restoration.
+ */
+export async function hideWallNote(
+	noteId: string,
+	artistId: string
+): Promise<Result<void, DomainError>> {
+	const note = await db.query.notes.findFirst({
+		where: and(eq(schema.notes.id, noteId), eq(schema.notes.artistId, artistId))
+	});
+
+	if (!note) {
+		return err({ code: 'NOTE_NOT_FOUND', message: 'Note not found or unauthorized.' });
+	}
+
+	const hidden = hideNote(toDomainNote(note));
+	if (!hidden.ok) return err(hidden.error);
+
+	await db
+		.update(schema.notes)
+		.set({
+			status: hidden.value.status
+		})
+		.where(eq(schema.notes.id, noteId));
+
+	return ok(undefined);
+}
+
+/**
  * Restores a hidden/pending note by the Artist.
  * Decision 22: Restored notes become flag-immune.
  */
@@ -173,26 +205,14 @@ export async function restoreWallNote(
 		return err({ code: 'NOTE_NOT_FOUND', message: 'Note not found or unauthorized.' });
 	}
 
-	const domainNote: NoteEntity = {
-		id: createNoteId(note.id),
-		artistId: createArtistId(note.artistId),
-		issueId: note.issueId ? createIssueId(note.issueId) : null,
-		fanUserId: createFanUserId(note.fanUserId),
-		body: note.body,
-		status: note.status,
-		flagCount: note.flagCount,
-		flagImmune: note.flagImmune,
-		createdAt: note.createdAt
-	};
-
-	const restored = restoreNote(domainNote);
+	const restored = restoreNote(toDomainNote(note));
 	if (!restored.ok) return err(restored.error);
 
 	await db
 		.update(schema.notes)
 		.set({
-			status: 'live',
-			flagImmune: true
+			status: restored.value.status,
+			flagImmune: restored.value.flagImmune
 		})
 		.where(eq(schema.notes.id, noteId));
 
@@ -242,6 +262,36 @@ export async function replyToWallNote(
 	});
 
 	return ok({ replyId });
+}
+
+/**
+ * Deletes an Artist's own reply to a note, returning the note to an unanswered state (EDGE-CASES.md).
+ */
+export async function deleteWallReply(
+	noteId: string,
+	artistId: string
+): Promise<Result<void, DomainError>> {
+	const existingReply = await db.query.noteReplies.findFirst({
+		where: and(
+			eq(schema.noteReplies.noteId, noteId),
+			eq(schema.noteReplies.artistId, artistId)
+		)
+	});
+
+	if (!existingReply) {
+		return err({ code: 'REPLY_NOT_FOUND', message: 'Reply not found or unauthorized.' });
+	}
+
+	await db
+		.delete(schema.noteReplies)
+		.where(
+			and(
+				eq(schema.noteReplies.id, existingReply.id),
+				eq(schema.noteReplies.artistId, artistId)
+			)
+		);
+
+	return ok(undefined);
 }
 
 /**
@@ -302,8 +352,27 @@ export async function blockFanFromWalls(
 
 	await db
 		.update(schema.notes)
-		.set({ status: 'hidden' })
+		.set({ status: NoteStatus.Hidden })
 		.where(and(eq(schema.notes.artistId, artistId), eq(schema.notes.fanUserId, fanUserId)));
+
+	return ok(undefined);
+}
+
+/**
+ * Unblocks a previously blocked fan so they can post again.
+ * Previously hidden notes remain hidden unless individually restored by the Artist.
+ */
+export async function unblockFanFromWalls(
+	artistId: string,
+	fanUserId: string
+): Promise<Result<void, DomainError>> {
+	if (!artistId || !fanUserId) {
+		return err({ code: 'INVALID_INPUT', message: 'Artist ID and Fan ID are required.' });
+	}
+
+	await db
+		.delete(schema.blocks)
+		.where(and(eq(schema.blocks.artistId, artistId), eq(schema.blocks.fanUserId, fanUserId)));
 
 	return ok(undefined);
 }

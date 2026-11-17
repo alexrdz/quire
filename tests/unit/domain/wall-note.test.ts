@@ -2,8 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
 	screenNoteText,
 	flagNote,
+	hideNote,
 	restoreNote,
 	wallNoteTransition,
+	NoteStatus,
+	ModerationAction,
 	type WallNoteState,
 	type NoteEntity,
 	FLAG_AUTO_HIDE_THRESHOLD
@@ -109,6 +112,22 @@ describe('Wall Note Moderation & Submission FSM', () => {
 			if (!flagAgain.ok) return;
 			expect(flagAgain.value.note.status).toBe('live');
 			expect(flagAgain.value.wasAutoHidden).toBe(false);
+		});
+
+		it('hides a live note non-destructively and rejects hiding an already hidden note', () => {
+			expect(NoteStatus.Hidden).toBe('hidden');
+			expect(ModerationAction.Hide).toBe('hide');
+
+			const hiddenRes = hideNote(baseNote);
+			expect(hiddenRes.ok).toBe(true);
+			if (!hiddenRes.ok) return;
+			expect(hiddenRes.value.status).toBe(NoteStatus.Hidden);
+
+			const doubleHide = hideNote(hiddenRes.value);
+			expect(doubleHide.ok).toBe(false);
+			if (!doubleHide.ok) {
+				expect(doubleHide.error.code).toBe('ALREADY_HIDDEN');
+			}
 		});
 	});
 
