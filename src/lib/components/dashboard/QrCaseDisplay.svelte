@@ -140,23 +140,23 @@
 	}
 
 	.qr-case-eyebrow {
-		font-size: 0.72rem;
-		font-weight: 700;
-		letter-spacing: 0.12em;
+		font-size: var(--text-meta);
+		font-weight: var(--weight-bold);
+		letter-spacing: var(--tracking-wide);
 		text-transform: uppercase;
 		color: var(--accent, #05d9e8);
 	}
 
 	.qr-case-close {
 		cursor: pointer;
-		padding-block: 0.55rem;
-		padding-inline: 1rem;
+		padding-block: var(--space-2xs);
+		padding-inline: var(--space-s);
 		border-radius: 9999px;
 		background: rgba(255, 255, 255, 0.08);
 		border: 1px solid rgba(255, 255, 255, 0.24);
 		color: #ffffff;
-		font-size: 0.85rem;
-		font-weight: 700;
+		font-size: var(--text-small);
+		font-weight: var(--weight-bold);
 		transition: background-color 0.15s ease, border-color 0.15s ease;
 	}
 
@@ -187,18 +187,18 @@
 		color: #090710;
 		border: 4px solid var(--accent, #05d9e8);
 		border-radius: 1.5rem;
-		padding-block: 1.5rem;
-		padding-inline: 1.5rem;
+		padding-block: var(--space-m);
+		padding-inline: var(--space-m);
 		box-shadow: 0 0 48px rgba(5, 217, 232, 0.22);
 	}
 
 	.qr-case-card-label {
-		font-size: 0.78rem;
-		font-weight: 800;
-		letter-spacing: 0.14em;
+		font-size: var(--text-meta);
+		font-weight: var(--weight-heavy);
+		letter-spacing: var(--tracking-display);
 		text-transform: uppercase;
 		color: #090710;
-		margin-block-end: 0.75rem;
+		margin-block-end: var(--space-xs);
 	}
 
 	.qr-case-svg {
@@ -214,31 +214,31 @@
 	}
 
 	.qr-case-card-brand {
-		font-size: 0.72rem;
-		font-weight: 800;
-		letter-spacing: 0.18em;
+		font-size: var(--text-meta);
+		font-weight: var(--weight-heavy);
+		letter-spacing: var(--tracking-display);
 		text-transform: uppercase;
 		color: #3a364a;
-		margin-block-start: 0.75rem;
+		margin-block-start: var(--space-xs);
 	}
 
 	.qr-case-title {
-		font-size: clamp(1.35rem, 3.5vw, 2rem);
-		font-weight: 800;
-		line-height: 1.15;
+		font-size: var(--text-heading-sm);
+		font-weight: var(--weight-heavy);
+		line-height: var(--leading-tight);
 		color: #ffffff;
-		letter-spacing: -0.02em;
+		letter-spacing: var(--tracking-snug);
 	}
 
 	.qr-case-subtitle {
-		font-size: 0.98rem;
+		font-size: var(--text-body);
 		color: #d4d2df;
 		max-inline-size: 42ch;
 	}
 
 	.qr-case-url {
-		font-size: 0.85rem;
-		font-weight: 600;
+		font-size: var(--text-small);
+		font-weight: var(--weight-semibold);
 		color: var(--accent, #05d9e8);
 		word-break: break-all;
 	}
@@ -248,8 +248,8 @@
 		z-index: 1;
 		margin-block-end: 0;
 		text-align: center;
-		font-size: 0.7rem;
-		letter-spacing: 0.1em;
+		font-size: var(--text-meta);
+		letter-spacing: var(--tracking-wide);
 		color: var(--ink-muted, #9e9bae);
 	}
 </style>

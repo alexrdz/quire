@@ -6,12 +6,12 @@ import { asc, eq } from 'drizzle-orm';
 import { hashPassword, makeSignature } from 'better-auth/crypto';
 import { db, schema } from '$lib/server/db';
 import { authSecret } from '$lib/server/auth';
-import { actions as quickActions } from '../../../src/routes/dashboard/issues/quick/+page.server';
+import { actions as quickActions } from '../../../src/routes/(site)/dashboard/issues/quick/+page.server';
 import {
 	actions as bookbinderActions,
 	load as bookbinderLoad
-} from '../../../src/routes/dashboard/bookbinder/[id]/+page.server';
-import { load as readerLoad } from '../../../src/routes/i/[slug]/+page.server';
+} from '../../../src/routes/(site)/dashboard/bookbinder/[id]/+page.server';
+import { load as readerLoad } from '../../../src/routes/(zine)/i/[slug]/+page.server';
 
 interface TestArtistFixture {
 	userId: string;

@@ -4,7 +4,7 @@
 
 	interface Props extends HTMLAttributes<HTMLElement> {
 		as?: string;
-		gap?: 'none' | '3xs' | '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+		gap?: 'none' | '4xs' | '3xs' | 'compact' | '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 		justify?: 'start' | 'center' | 'end' | 'between' | 'around' | 'evenly';
 		align?: 'start' | 'center' | 'end' | 'stretch' | 'baseline';
 		nowrap?: boolean;

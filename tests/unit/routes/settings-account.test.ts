@@ -18,10 +18,10 @@ import {
 import { authSecret, verifyUserCredentialPassword } from '$lib/server/auth';
 import { db, schema } from '$lib/server/db';
 import { seedDatabase } from '$lib/server/seed';
-import { actions as settingsActions, load as settingsLoad } from '../../../src/routes/dashboard/settings/+page.server';
-import { actions as loginActions, load as loginLoad } from '../../../src/routes/login/+page.server';
-import { actions as backPageActions, load as backPageLoad } from '../../../src/routes/a/[slug]/+page.server';
-import { actions as issueActions, load as issueLoad } from '../../../src/routes/i/[slug]/+page.server';
+import { actions as settingsActions, load as settingsLoad } from '../../../src/routes/(site)/dashboard/settings/+page.server';
+import { actions as loginActions, load as loginLoad } from '../../../src/routes/(site)/login/+page.server';
+import { actions as backPageActions, load as backPageLoad } from '../../../src/routes/(site)/a/[slug]/+page.server';
+import { actions as issueActions, load as issueLoad } from '../../../src/routes/(zine)/i/[slug]/+page.server';
 
 const createdUserIds: string[] = [];
 const createdSessionTokens: string[] = [];

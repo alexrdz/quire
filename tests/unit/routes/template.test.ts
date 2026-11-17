@@ -7,7 +7,7 @@ import { hashPassword, makeSignature } from 'better-auth/crypto';
 import { db, schema } from '$lib/server/db';
 import { authSecret } from '$lib/server/auth';
 import { checkAccentContrast } from '$domain/theme';
-import { actions, load } from '../../../src/routes/dashboard/template/+page.server';
+import { actions, load } from '../../../src/routes/(site)/dashboard/template/+page.server';
 
 interface TestArtistFixture {
 	userId: string;

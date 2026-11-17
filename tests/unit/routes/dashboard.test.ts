@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect } from 'vitest';
-import { actions, load } from '../../../src/routes/dashboard/+page.server';
+import { actions, load } from '../../../src/routes/(site)/dashboard/+page.server';
 import { db, schema } from '$lib/server/db';
 import { authSecret } from '$lib/server/auth';
 import { TipReversalStatus, TipStatus } from '$domain/tipping';

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { render } from 'svelte/server';
 import { db, schema } from '$lib/server/db';
-import { load as backPageLoad } from '../../../src/routes/a/[slug]/+page.server';
+import { load as backPageLoad } from '../../../src/routes/(site)/a/[slug]/+page.server';
 
 vi.mock('$app/forms', () => ({
 	enhance: () => ({ destroy() {} })
@@ -89,7 +89,7 @@ describe('Artist Back Page Monthly Collapsing (/a/[slug])', () => {
 		]);
 		expect(data.groupedIssues[0]?.issues).toHaveLength(2);
 
-		const { default: BackPageComponent } = await import('../../../src/routes/a/[slug]/+page.svelte');
+		const { default: BackPageComponent } = await import('../../../src/routes/(site)/a/[slug]/+page.svelte');
 		const rendered = render(BackPageComponent, {
 			props: {
 				data: data as never,

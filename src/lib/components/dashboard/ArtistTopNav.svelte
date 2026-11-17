@@ -68,9 +68,9 @@
 
 	.brand-code {
 		color: var(--highlight);
-		font-weight: 800;
-		font-size: 0.85rem;
-		letter-spacing: 0.12em;
+		font-weight: var(--weight-heavy);
+		font-size: var(--text-small);
+		letter-spacing: var(--tracking-wide);
 	}
 
 	.brand-sep {
@@ -80,28 +80,29 @@
 	}
 
 	.artist-nav-name {
-		font-size: 1rem;
-		font-weight: 800;
+		font-size: var(--text-body);
+		font-weight: var(--weight-heavy);
 		color: #ffffff;
-		letter-spacing: -0.01em;
+		letter-spacing: var(--tracking-snug);
 	}
 
 	:global(.app-nav-group) {
 		background: rgba(255, 255, 255, 0.04);
 		border: 1px solid var(--glass-border);
 		border-radius: 8px;
-		padding: 0.25rem;
+		padding-block: var(--space-3xs);
+		padding-inline: var(--space-3xs);
 	}
 
 	.app-nav-tab {
 		display: inline-flex;
 		align-items: center;
-		gap: 0.375rem;
-		padding-block: 0.4rem;
-		padding-inline: 0.875rem;
+		gap: var(--space-compact);
+		padding-block: var(--space-compact);
+		padding-inline: var(--space-xs);
 		border-radius: 6px;
-		font-size: 0.8rem;
-		font-weight: 600;
+		font-size: var(--text-meta);
+		font-weight: var(--weight-semibold);
 		color: #D4D2DF;
 		text-decoration: none;
 		transition: background-color 0.15s ease, color 0.15s ease;
@@ -126,14 +127,14 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		gap: 0.375rem;
-		padding-block: 0.45rem;
-		padding-inline: 0.95rem;
+		gap: var(--space-compact);
+		padding-block: var(--space-2xs);
+		padding-inline: var(--space-s);
 		border-radius: 8px;
 		background: var(--support);
 		color: #ffffff;
-		font-size: 0.78rem;
-		font-weight: 700;
+		font-size: var(--text-meta);
+		font-weight: var(--weight-bold);
 		text-decoration: none;
 		border: 1px solid rgba(255, 42, 109, 0.5);
 		box-shadow: 0 0 16px rgba(255, 42, 109, 0.3);
@@ -150,13 +151,13 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		padding-block: 0.45rem;
-		padding-inline: 0.75rem;
+		padding-block: var(--space-2xs);
+		padding-inline: var(--space-xs);
 		border-radius: 6px;
 		background: rgba(255, 255, 255, 0.04);
 		color: #a1a1aa;
-		font-size: 0.78rem;
-		font-weight: 600;
+		font-size: var(--text-meta);
+		font-weight: var(--weight-semibold);
 		text-decoration: none;
 		border: 1px solid rgba(255, 255, 255, 0.08);
 		transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;

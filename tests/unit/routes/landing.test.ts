@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render } from 'svelte/server';
-import Page from '../../../src/routes/+page.svelte';
+import Page from '../../../src/routes/(site)/+page.svelte';
 
 describe('Landing +page.svelte', () => {
 	it('renders landing page via SSR without errors', () => {

@@ -24,30 +24,82 @@
 	--font-serif: Georgia, "Times New Roman", Times, serif;
 	--font-mono: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
-	/* Dynamic Page Spacing */
-	--page-padding: clamp(1.25rem, 3.5vh, 2.75rem) clamp(1rem, 3vw, 2.5rem);
+	/* utopia: 320–1240px, 16–18px base, 1.2–1.25 type ratios
+	   https://utopia.fyi/type/calculator/?c=320,16,1.2,1240,18,1.25,7,1
+	   https://utopia.fyi/space/calculator/?c=320,16,1.2,1240,18,1.25,7,1&s=0.75|0.5|0.375|0.25|0.125,1.5|2|3|4|6,s-l
+	   unrounded spacing endpoints keep even the smallest steps genuinely fluid. */
+	--step--1: clamp(0.833333rem, 0.810145rem + 0.115942vw, 0.9rem);
+	--step-0: clamp(1rem, 0.956522rem + 0.217391vw, 1.125rem);
+	--step-1: clamp(1.2rem, 1.128261rem + 0.358696vw, 1.40625rem);
+	--step-2: clamp(1.44rem, 1.329457rem + 0.552717vw, 1.757813rem);
+	--step-3: clamp(1.728rem, 1.564777rem + 0.816114vw, 2.197266rem);
+	--step-4: clamp(2.0736rem, 1.839519rem + 1.170404vw, 2.746582rem);
+	--step-5: clamp(2.48832rem, 2.159657rem + 1.643317vw, 3.433228rem);
+	--step-6: clamp(2.985984rem, 2.53188rem + 2.270522vw, 4.291534rem);
+	--step-7: clamp(3.583181rem, 2.96362rem + 3.097804vw, 5.364418rem);
+	--text-meta: clamp(0.75rem, 0.728261rem + 0.108696vw, 0.8125rem);
+	--text-small: var(--step--1);
+	--text-ui: clamp(0.875rem, 0.831522rem + 0.217391vw, 1rem);
+	--text-body: var(--step-0);
+	--text-lead: var(--step-1);
+	--text-heading-sm: var(--step-2);
+	--text-heading: var(--step-3);
+	--text-title: var(--step-4);
+	--text-display: var(--step-5);
+	--text-hero: var(--step-6);
+	--text-cover: var(--step-7);
+	--control-size: clamp(2.75rem, 2.663043rem + 0.434783vw, 3rem);
+	--preview-inline-size: clamp(22.5rem, 21.847826rem + 3.26087vw, 24.375rem);
+	--preview-block-size: clamp(43.125rem, 41.168478rem + 9.782609vw, 48.75rem);
 
-	/* Fluid Utopia Spacing Scale */
-	--space-3xs: clamp(0.25rem, 0.25rem + 0vw, 0.25rem);          /* 4px */
-	--space-2xs: clamp(0.5rem, 0.5rem + 0vw, 0.5rem);             /* 8px */
-	--space-xs:  clamp(0.75rem, 0.7283rem + 0.1087vw, 0.8125rem);  /* 12px -> 13px */
-	--space-s:   clamp(1rem, 0.9565rem + 0.2174vw, 1.125rem);      /* 16px -> 18px */
-	--space-m:   clamp(1.5rem, 1.4348rem + 0.3261vw, 1.6875rem);   /* 24px -> 27px */
-	--space-l:   clamp(2rem, 1.913rem + 0.4348vw, 2.25rem);        /* 32px -> 36px */
-	--space-xl:  clamp(3rem, 2.8696rem + 0.6522vw, 3.375rem);      /* 48px -> 54px */
-	--space-2xl: clamp(4rem, 3.8261rem + 0.8696vw, 4.5rem);        /* 64px -> 72px */
-	--space-3xl: clamp(6rem, 5.7391rem + 1.3043vw, 6.75rem);       /* 96px -> 108px */
+	--leading-solid: 1;
+	--leading-tight: 1.1;
+	--leading-heading: 1.2;
+	--leading-snug: 1.4;
+	--leading-body: 1.6;
+	--weight-regular: 400;
+	--weight-medium: 500;
+	--weight-semibold: 600;
+	--weight-bold: 700;
+	--weight-heavy: 800;
+	--weight-black: 900;
+	--tracking-tight: -0.03em;
+	--tracking-snug: -0.02em;
+	--tracking-normal: 0;
+	--tracking-label: 0.05em;
+	--tracking-wide: 0.1em;
+	--tracking-display: 0.15em;
 
-	/* Token Aliases */
+	/* fluid spacing and selected utopia pairs */
+	--space-4xs: clamp(0.125rem, 0.119565rem + 0.027174vw, 0.140625rem);
+	--space-3xs: clamp(0.25rem, 0.23913rem + 0.054348vw, 0.28125rem);
+	--space-compact: clamp(0.375rem, 0.358696rem + 0.081522vw, 0.421875rem);
+	--space-2xs: clamp(0.5rem, 0.478261rem + 0.108696vw, 0.5625rem);
+	--space-xs: clamp(0.75rem, 0.717391rem + 0.163043vw, 0.84375rem);
+	--space-s: clamp(1rem, 0.956522rem + 0.217391vw, 1.125rem);
+	--space-m: clamp(1.5rem, 1.434783rem + 0.326087vw, 1.6875rem);
+	--space-l: clamp(2rem, 1.913043rem + 0.434783vw, 2.25rem);
+	--space-xl: clamp(3rem, 2.869565rem + 0.652174vw, 3.375rem);
+	--space-2xl: clamp(4rem, 3.826087rem + 0.869565vw, 4.5rem);
+	--space-3xl: clamp(6rem, 5.73913rem + 1.304348vw, 6.75rem);
+	--space-3xs-2xs: clamp(0.25rem, 0.141304rem + 0.543478vw, 0.5625rem);
+	--space-xs-s: clamp(0.75rem, 0.619565rem + 0.652174vw, 1.125rem);
+	--space-s-m: clamp(1rem, 0.76087rem + 1.195652vw, 1.6875rem);
+	--space-s-l: clamp(1rem, 0.565217rem + 2.173913vw, 2.25rem);
+	--space-m-xl: clamp(1.5rem, 0.847826rem + 3.26087vw, 3.375rem);
+	--space-l-xl: clamp(2rem, 1.521739rem + 2.391304vw, 3.375rem);
+	--space-xl-2xl: clamp(3rem, 2.478261rem + 2.608696vw, 4.5rem);
 	--space-sm: var(--space-s);
 	--space-md: var(--space-m);
 	--space-lg: var(--space-l);
+	--page-padding-block: var(--space-s-l);
+	--page-padding-inline: var(--space-s-m);
 
 	/* Corner Radii */
 	--radius-none: 0px;
-	--radius-sm: 0.375rem;
-	--radius-md: 0.625rem;
-	--radius-lg: 1rem;
+	--radius-sm: clamp(0.375rem, 0.353261rem + 0.108696vw, 0.4375rem);
+	--radius-md: clamp(0.625rem, 0.581522rem + 0.217391vw, 0.75rem);
+	--radius-lg: clamp(1rem, 0.913043rem + 0.434783vw, 1.25rem);
 	--radius-full: 9999px;
 
 	/* Reading Measure Bounds */
@@ -56,15 +108,16 @@
 	--measure-wide:   clamp(65ch, 80ch + 2vw, 90ch);
 
 	/* Container Sizes */
+	--container-size-xs: clamp(20rem, 17.913043rem + 10.434783vw, 26rem);
 	--container-size-sm:   clamp(36rem, 85vw, 65rem);
 	--container-size-md:   clamp(48rem, 90vw, 75rem);
 	--container-size-lg:   clamp(64rem, 95vw, 84.375rem);
-	--container-size-main: 88rem;
+	--container-size-main: clamp(64rem, 55.652174rem + 41.73913vw, 88rem);
 
 	/* Fluid Container Padding */
-	--layout-container-padding-sm: clamp(1rem, 2vw + 0.5rem, 1.75rem);
-	--layout-container-padding-md: clamp(1.5rem, 3.5vw + 0.5rem, 3rem);
-	--layout-container-padding-lg: clamp(2rem, 5vw + 0.5rem, 4.5rem);
+	--layout-container-padding-sm: var(--space-s-m);
+	--layout-container-padding-md: var(--space-s-l);
+	--layout-container-padding-lg: var(--space-m-xl);
 }
 
 *,
@@ -86,6 +139,29 @@ body {
 	-webkit-font-smoothing: antialiased;
 }
 
+body {
+	font-size: var(--text-body);
+	line-height: var(--leading-body);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+	overflow-wrap: anywhere;
+}
+
+h1 { font-size: var(--text-title); }
+h2 { font-size: var(--text-heading); }
+h3 { font-size: var(--text-heading-sm); }
+h4 { font-size: var(--text-lead); }
+h5 { font-size: var(--text-body); }
+h6 { font-size: var(--text-small); }
+small { font-size: var(--text-meta); }
+
 /* Reset links & interactive elements so browser default blue/purple never leaks onto dark surfaces */
 a,
 a:visited {
@@ -105,16 +181,16 @@ textarea {
 .skip-link {
 	position: fixed;
 	inset-block-start: -100px;
-	inset-inline-start: 1rem;
+	inset-inline-start: var(--space-s);
 	background-color: var(--bg-void);
 	color: var(--highlight);
-	padding-block: 0.75rem;
-	padding-inline: 1.25rem;
+	padding-block: var(--space-xs);
+	padding-inline: var(--space-s);
 	font-family: var(--font-mono);
-	font-size: 0.85rem;
-	font-weight: 700;
+	font-size: var(--text-small);
+	font-weight: var(--weight-bold);
 	text-transform: uppercase;
-	letter-spacing: 0.05em;
+	letter-spacing: var(--tracking-label);
 	text-decoration: none;
 	border: 2px solid var(--highlight);
 	border-radius: 4px;
@@ -124,7 +200,7 @@ textarea {
 
 .skip-link:focus,
 .skip-link:focus-visible {
-	inset-block-start: 1rem;
+	inset-block-start: var(--space-s);
 	outline: 3px solid var(--highlight);
 	outline-offset: 2px;
 }

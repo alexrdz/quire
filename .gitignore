@@ -12,3 +12,5 @@ local.db-shm
 local.db-wal
 static/uploads/*
 !static/uploads/.gitkeep
+test-results/
+playwright-report/

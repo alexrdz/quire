@@ -4,17 +4,17 @@ import { eq, like } from 'drizzle-orm';
 import { render } from 'svelte/server';
 import { db, schema } from '$lib/server/db';
 import { auth } from '$lib/server/auth';
-import LandingPage from '../../../src/routes/+page.svelte';
-import LoginPage from '../../../src/routes/login/+page.svelte';
-import ResetPage from '../../../src/routes/login/reset/+page.svelte';
+import LandingPage from '../../../src/routes/(site)/+page.svelte';
+import LoginPage from '../../../src/routes/(site)/login/+page.svelte';
+import ResetPage from '../../../src/routes/(site)/login/reset/+page.svelte';
 import {
 	actions as loginActions,
 	load as loginLoad
-} from '../../../src/routes/login/+page.server';
+} from '../../../src/routes/(site)/login/+page.server';
 import {
 	actions as resetActions,
 	load as resetLoad
-} from '../../../src/routes/login/reset/+page.server';
+} from '../../../src/routes/(site)/login/reset/+page.server';
 
 const createdUserIds: string[] = [];
 const createdVerificationIds: string[] = [];

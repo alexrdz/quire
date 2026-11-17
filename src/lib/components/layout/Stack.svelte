@@ -4,7 +4,7 @@
 
 	interface Props extends HTMLAttributes<HTMLElement> {
 		as?: string;
-		gap?: 'none' | '3xs' | '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
+		gap?: 'none' | '4xs' | '3xs' | 'compact' | '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
 		align?: 'start' | 'center' | 'end' | 'stretch';
 		onlyChild?: boolean;
 		class?: string;

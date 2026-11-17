@@ -4,7 +4,7 @@
 
 	interface Props extends HTMLAttributes<HTMLElement> {
 		as?: string;
-		padding?: 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+		padding?: 'none' | '4xs' | '3xs' | 'compact' | '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 		variant?: 'raised' | 'subtle' | 'muted' | 'invert';
 		border?: 'none';
 		radius?: 'none' | 'sm' | 'md' | 'lg';

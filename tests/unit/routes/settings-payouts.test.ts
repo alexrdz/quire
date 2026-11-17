@@ -8,8 +8,8 @@ import * as stripeAdapter from '$lib/server/payments/stripe';
 import {
 	actions as settingsActions,
 	load as settingsLoad
-} from '../../../src/routes/dashboard/settings/+page.server';
-import { load as confirmPayoutLoad } from '../../../src/routes/dashboard/settings/confirm-payout/+page.server';
+} from '../../../src/routes/(site)/dashboard/settings/+page.server';
+import { load as confirmPayoutLoad } from '../../../src/routes/(site)/dashboard/settings/confirm-payout/+page.server';
 
 const ORIGINAL_ENV = { ...process.env };
 
