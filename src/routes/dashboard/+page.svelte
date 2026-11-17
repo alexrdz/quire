@@ -4,6 +4,7 @@
 	import ArtistTopNav from '$lib/components/dashboard/ArtistTopNav.svelte';
 	import QrCaseDisplay from '$lib/components/dashboard/QrCaseDisplay.svelte';
 	import { formatUsdCents, isTipReversed, TipStatus } from '$domain/tipping';
+	import { NoteStatus } from '$domain/wall';
 
 	let { data } = $props();
 
@@ -12,12 +13,34 @@
 	let showArtistQrModal = $state(false);
 	let showCaseDisplay = $state(false);
 	let tipFilter = $state<'all' | 'issues' | 'general' | 'reversals'>('all');
+	let noteFilter = $state<'all' | 'review' | 'live' | 'hidden'>('all');
 
 	const filteredTipLedger = $derived(
 		(data.tipLedger ?? []).filter((tip) => {
 			if (tipFilter === 'issues') return tip.issueId !== null;
 			if (tipFilter === 'general') return tip.issueId === null;
 			if (tipFilter === 'reversals') return isTipReversed(tip.status);
+			return true;
+		})
+	);
+
+	const blockedFanIds = $derived(
+		new Set((data.blockedFans ?? []).map((b) => b.fanUserId))
+	);
+
+	const needsReviewCount = $derived(
+		(data.pendingNotes ?? []).filter(
+			(n) => n.status === NoteStatus.Pending || n.flagCount > 0 || n.status === NoteStatus.Hidden
+		).length
+	);
+
+	const filteredNotes = $derived(
+		(data.pendingNotes ?? []).filter((note) => {
+			if (noteFilter === 'review') {
+				return note.status === NoteStatus.Pending || note.flagCount > 0;
+			}
+			if (noteFilter === 'live') return note.status === NoteStatus.Live;
+			if (noteFilter === 'hidden') return note.status === NoteStatus.Hidden;
 			return true;
 		})
 	);
@@ -583,21 +606,56 @@
 			{/if}
 
 			<!-- MODERATION & GUESTBOOK QUEUE -->
-			{#if data.issues.length > 0 || data.pendingNotes.length > 0}
+			{#if data.issues.length > 0 || data.pendingNotes.length > 0 || (data.blockedFans && data.blockedFans.length > 0)}
 			<Box as="section" variant="raised" padding="lg" radius="lg" class="moderation-box">
 				<Stack gap="md">
-					<Cluster justify="between" align="center">
+					<Cluster justify="between" align="center" gap="md">
 						<Stack gap="3xs">
-							<h2 class="section-heading">Wall Guestbook & Moderation</h2>
+							<h2 class="section-heading">Wall Guestbook &amp; Moderation</h2>
 							<p class="text-muted subtext-small">
-								Reply to fans (one level deep), restore flagged notes (making them flag-immune), hide notes, or block spammers across all Walls.
+								Reply to fans (one level deep), restore flagged notes (making them flag-immune), hide notes non-destructively, or block/unblock fans across all Walls.
 							</p>
 						</Stack>
-						<span class="meta-chip">{data.pendingNotes.length} notes</span>
+						<Cluster gap="xs" role="tablist" aria-label="Filter wall notes">
+							<button
+								type="button"
+								class="btn-filter-tab {noteFilter === 'all' ? 'is-active' : ''}"
+								onclick={() => (noteFilter = 'all')}
+							>
+								All ({data.pendingNotes.length})
+							</button>
+							<button
+								type="button"
+								class="btn-filter-tab {noteFilter === 'review' ? 'is-active' : ''}"
+								onclick={() => (noteFilter = 'review')}
+							>
+								Needs Review ({needsReviewCount})
+							</button>
+							<button
+								type="button"
+								class="btn-filter-tab {noteFilter === 'live' ? 'is-active' : ''}"
+								onclick={() => (noteFilter = 'live')}
+							>
+								Live
+							</button>
+							<button
+								type="button"
+								class="btn-filter-tab {noteFilter === 'hidden' ? 'is-active' : ''}"
+								onclick={() => (noteFilter = 'hidden')}
+							>
+								Hidden
+							</button>
+						</Cluster>
 					</Cluster>
 
+					{#if filteredNotes.length === 0}
+						<Box variant="subtle" padding="md" radius="md">
+							<p class="text-muted subtext-small">No notes match this moderation filter.</p>
+						</Box>
+					{:else}
 					<Stack gap="sm">
-						{#each data.pendingNotes as note}
+						{#each filteredNotes as note (note.id)}
+							{@const isFanBlocked = blockedFanIds.has(note.fanUserId)}
 							<Box as="article" variant="subtle" padding="md" radius="md" class="note-card-box">
 								<Stack gap="sm" align="start">
 									<Cluster justify="between" align="center" gap="sm" class="w-full">
@@ -609,7 +667,7 @@
 											<span class="meta-chip">
 												{note.issue ? `${note.issue.city} (${note.issue.venue})` : 'General Wall'}
 											</span>
-											{#if note.status !== 'live'}
+											{#if note.status !== NoteStatus.Live}
 												<span class="meta-chip meta-support">{note.status.toUpperCase()}</span>
 											{/if}
 											{#if note.flagCount > 0}
@@ -618,14 +676,26 @@
 											{#if note.flagImmune}
 												<span class="meta-chip meta-highlight">✓ Flag-Immune</span>
 											{/if}
+											{#if isFanBlocked}
+												<span class="meta-chip meta-support">Blocked</span>
+											{/if}
 										</Cluster>
 
 										<Cluster gap="xs">
-											{#if note.status === 'hidden' || note.status === 'pending'}
+											{#if note.status === NoteStatus.Hidden || note.status === NoteStatus.Pending}
 												<form method="POST" action="?/restore" use:enhance>
 													<input type="hidden" name="noteId" value={note.id} />
 													<button type="submit" class="btn-mod-approve">
 														✓ Approve / Restore
+													</button>
+												</form>
+											{/if}
+
+											{#if note.status !== NoteStatus.Hidden}
+												<form method="POST" action="?/hide" use:enhance>
+													<input type="hidden" name="noteId" value={note.id} />
+													<button type="submit" class="btn-mod-hide">
+														Hide Note
 													</button>
 												</form>
 											{/if}
@@ -637,12 +707,21 @@
 												</button>
 											</form>
 
-											<form method="POST" action="?/blockFan" use:enhance>
-												<input type="hidden" name="fanUserId" value={note.fanUserId} />
-												<button type="submit" class="btn-mod-block">
-													Block Fan
-												</button>
-											</form>
+											{#if isFanBlocked}
+												<form method="POST" action="?/unblockFan" use:enhance>
+													<input type="hidden" name="fanUserId" value={note.fanUserId} />
+													<button type="submit" class="btn-mod-unblock">
+														Unblock Fan
+													</button>
+												</form>
+											{:else}
+												<form method="POST" action="?/blockFan" use:enhance>
+													<input type="hidden" name="fanUserId" value={note.fanUserId} />
+													<button type="submit" class="btn-mod-block">
+														Block Fan
+													</button>
+												</form>
+											{/if}
 										</Cluster>
 									</Cluster>
 
@@ -650,7 +729,15 @@
 
 									{#if note.replies && note.replies.length > 0}
 										<Stack gap="3xs" class="artist-reply w-full">
-											<span class="text-accent reply-label">Your Reply:</span>
+											<Cluster justify="between" align="center" gap="xs">
+												<span class="text-accent reply-label">Your Reply:</span>
+												<form method="POST" action="?/deleteReply" use:enhance>
+													<input type="hidden" name="noteId" value={note.id} />
+													<button type="submit" class="btn-mod-delete">
+														✕ Delete Reply
+													</button>
+												</form>
+											</Cluster>
 											<p class="reply-text">{note.replies[0].body}</p>
 										</Stack>
 									{:else if replyingToNoteId === note.id}
@@ -705,6 +792,41 @@
 							</Box>
 						{/each}
 					</Stack>
+					{/if}
+
+					{#if data.blockedFans && data.blockedFans.length > 0}
+						<Box variant="subtle" padding="md" radius="md" class="blocked-fans-panel">
+							<Stack gap="sm">
+								<Cluster justify="between" align="center">
+									<span class="text-support eyebrow-small">
+										BLOCKED FANS ({data.blockedFans.length})
+									</span>
+									<span class="text-muted cell-subtext">
+										Blocked fans cannot post on your Walls. Unblocking preserves existing hidden notes until restored.
+									</span>
+								</Cluster>
+
+								<Stack gap="xs">
+									{#each data.blockedFans as blocked (blocked.id)}
+										<Cluster justify="between" align="center" gap="sm" class="blocked-fan-row">
+											<Cluster align="center" gap="xs">
+												<span class="note-author-name">{blocked.name}</span>
+												{#if blocked.email}
+													<span class="text-muted font-mono cell-subtext">{blocked.email}</span>
+												{/if}
+											</Cluster>
+											<form method="POST" action="?/unblockFan" use:enhance>
+												<input type="hidden" name="fanUserId" value={blocked.fanUserId} />
+												<button type="submit" class="btn-mod-unblock">
+													Unblock
+												</button>
+											</form>
+										</Cluster>
+									{/each}
+								</Stack>
+							</Stack>
+						</Box>
+					{/if}
 				</Stack>
 			</Box>
 			{/if}
@@ -1247,5 +1369,53 @@
 		background: rgba(5, 217, 232, 0.14);
 		border-color: rgba(5, 217, 232, 0.45);
 		color: var(--accent);
+	}
+
+	.btn-mod-hide {
+		display: inline-flex;
+		align-items: center;
+		padding-block: 0.35rem;
+		padding-inline: 0.75rem;
+		border-radius: 6px;
+		background: rgba(255, 255, 255, 0.06);
+		border: 1px solid rgba(255, 255, 255, 0.16);
+		color: #e4e4e7;
+		font-size: 0.75rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: background-color 0.15s ease, color 0.15s ease;
+	}
+
+	.btn-mod-hide:hover {
+		background: rgba(255, 255, 255, 0.12);
+		color: #ffffff;
+	}
+
+	.btn-mod-unblock {
+		display: inline-flex;
+		align-items: center;
+		padding-block: 0.35rem;
+		padding-inline: 0.75rem;
+		border-radius: 6px;
+		background: rgba(5, 217, 232, 0.12);
+		border: 1px solid rgba(5, 217, 232, 0.35);
+		color: var(--accent);
+		font-size: 0.75rem;
+		font-weight: 700;
+		cursor: pointer;
+		transition: background-color 0.15s ease;
+	}
+
+	.btn-mod-unblock:hover {
+		background: rgba(5, 217, 232, 0.22);
+	}
+
+	:global(.blocked-fans-panel) {
+		border-color: rgba(255, 42, 109, 0.28);
+	}
+
+	:global(.blocked-fan-row) {
+		padding-block: 0.4rem;
+		border-block-start: 1px solid rgba(255, 255, 255, 0.06);
 	}
 </style>

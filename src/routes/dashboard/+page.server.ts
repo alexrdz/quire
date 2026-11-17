@@ -4,13 +4,21 @@ import { db, schema } from '$lib/server/db';
 import { eq, and, desc, isNull } from 'drizzle-orm';
 import { auth } from '$lib/server/auth';
 import {
+	blockFanFromWalls,
+	deleteWallNote,
+	deleteWallReply,
+	hideWallNote,
 	replyToWallNote,
 	restoreWallNote,
-	deleteWallNote,
-	blockFanFromWalls
+	unblockFanFromWalls
 } from '$lib/server/services/moderation';
 import { generateArtistQrSvg } from '$lib/server/services/qr';
-import { replyNoteSchema } from '$schemas/wall';
+import {
+	blockFanSchema,
+	noteIdSchema,
+	replyNoteSchema,
+	unblockFanSchema
+} from '$schemas/wall';
 import {
 	calculateTipReversalCents,
 	summarizeArtistTips,
@@ -165,6 +173,24 @@ export const load: ServerLoad = async ({ request, url }) => {
 			(artist.tipPresetsJson && artist.tipPresetsJson.replace(/\s+/g, '') !== '[3,5,10]')
 	);
 
+	const blocks = await db.query.blocks.findMany({
+		where: eq(schema.blocks.artistId, artist.id),
+		orderBy: [desc(schema.blocks.createdAt)],
+		with: {
+			fanUser: {
+				columns: { id: true, name: true, email: true }
+			}
+		}
+	});
+
+	const blockedFans = blocks.map((b) => ({
+		id: b.id,
+		fanUserId: b.fanUserId,
+		name: b.fanUser?.name || 'Fan',
+		email: b.fanUser?.email || '',
+		createdAt: b.createdAt
+	}));
+
 	return {
 		artist,
 		latestRecap,
@@ -172,6 +198,7 @@ export const load: ServerLoad = async ({ request, url }) => {
 		generalRow,
 		tipLedger,
 		pendingNotes: allNotes,
+		blockedFans,
 		artistQrSvg,
 		artistBackPageUrl,
 		hasCustomizedTemplate,
@@ -179,15 +206,27 @@ export const load: ServerLoad = async ({ request, url }) => {
 	};
 };
 
+async function requireArtistContext(request: Request) {
+	const session = await auth.api.getSession({ headers: request.headers });
+	if (!session?.user) {
+		return { errorResponse: fail(401, { error: 'Unauthorized' }) } as const;
+	}
+
+	const artist = await db.query.artists.findFirst({
+		where: eq(schema.artists.userId, session.user.id)
+	});
+	if (!artist) {
+		return { errorResponse: fail(403, { error: 'Not an artist' }) } as const;
+	}
+
+	return { session, artist } as const;
+}
+
 export const actions: Actions = {
 	createDraft: async ({ request }) => {
-		const session = await auth.api.getSession({ headers: request.headers });
-		if (!session?.user) return fail(401, { error: 'Unauthorized' });
-
-		const artist = await db.query.artists.findFirst({
-			where: eq(schema.artists.userId, session.user.id)
-		});
-		if (!artist) return fail(403, { error: 'Not an artist' });
+		const ctx = await requireArtistContext(request);
+		if ('errorResponse' in ctx) return ctx.errorResponse;
+		const { artist } = ctx;
 
 		const today = new Date().toISOString().slice(0, 10);
 		const shortId = crypto.randomBytes(3).toString('hex');
@@ -224,42 +263,77 @@ export const actions: Actions = {
 	},
 
 	reply: async ({ request }) => {
-		const session = await auth.api.getSession({ headers: request.headers });
-		if (!session?.user) return fail(401, { error: 'Unauthorized' });
-
-		const artist = await db.query.artists.findFirst({
-			where: eq(schema.artists.userId, session.user.id)
-		});
-		if (!artist) return fail(403, { error: 'Not an artist' });
+		const ctx = await requireArtistContext(request);
+		if ('errorResponse' in ctx) return ctx.errorResponse;
 
 		const formData = await request.formData();
-		const noteId = String(formData.get('noteId') || '');
-		const body = String(formData.get('body') || '');
-
-		const parseResult = replyNoteSchema.safeParse({ noteId, body });
+		const parseResult = replyNoteSchema.safeParse({
+			noteId: String(formData.get('noteId') || ''),
+			body: String(formData.get('body') || '')
+		});
 		if (!parseResult.success) {
 			return fail(400, { error: parseResult.error.issues[0]?.message || 'Validation error' });
 		}
 
-		const res = await replyToWallNote(noteId, artist.id, parseResult.data.body);
+		const res = await replyToWallNote(
+			parseResult.data.noteId,
+			ctx.artist.id,
+			parseResult.data.body
+		);
+		if (!res.ok) return fail(400, { error: res.error.message });
+
+		return { success: true };
+	},
+
+	deleteReply: async ({ request }) => {
+		const ctx = await requireArtistContext(request);
+		if ('errorResponse' in ctx) return ctx.errorResponse;
+
+		const formData = await request.formData();
+		const parseResult = noteIdSchema.safeParse({
+			noteId: String(formData.get('noteId') || '')
+		});
+		if (!parseResult.success) {
+			return fail(400, { error: parseResult.error.issues[0]?.message || 'Validation error' });
+		}
+
+		const res = await deleteWallReply(parseResult.data.noteId, ctx.artist.id);
+		if (!res.ok) return fail(400, { error: res.error.message });
+
+		return { success: true };
+	},
+
+	hide: async ({ request }) => {
+		const ctx = await requireArtistContext(request);
+		if ('errorResponse' in ctx) return ctx.errorResponse;
+
+		const formData = await request.formData();
+		const parseResult = noteIdSchema.safeParse({
+			noteId: String(formData.get('noteId') || '')
+		});
+		if (!parseResult.success) {
+			return fail(400, { error: parseResult.error.issues[0]?.message || 'Validation error' });
+		}
+
+		const res = await hideWallNote(parseResult.data.noteId, ctx.artist.id);
 		if (!res.ok) return fail(400, { error: res.error.message });
 
 		return { success: true };
 	},
 
 	restore: async ({ request }) => {
-		const session = await auth.api.getSession({ headers: request.headers });
-		if (!session?.user) return fail(401, { error: 'Unauthorized' });
-
-		const artist = await db.query.artists.findFirst({
-			where: eq(schema.artists.userId, session.user.id)
-		});
-		if (!artist) return fail(403, { error: 'Not an artist' });
+		const ctx = await requireArtistContext(request);
+		if ('errorResponse' in ctx) return ctx.errorResponse;
 
 		const formData = await request.formData();
-		const noteId = String(formData.get('noteId') || '');
+		const parseResult = noteIdSchema.safeParse({
+			noteId: String(formData.get('noteId') || '')
+		});
+		if (!parseResult.success) {
+			return fail(400, { error: parseResult.error.issues[0]?.message || 'Validation error' });
+		}
 
-		const res = await restoreWallNote(noteId, artist.id);
+		const res = await restoreWallNote(parseResult.data.noteId, ctx.artist.id);
 		if (!res.ok) return fail(400, { error: res.error.message });
 
 		return { success: true };
@@ -270,28 +344,50 @@ export const actions: Actions = {
 		if (!session?.user) return fail(401, { error: 'Unauthorized' });
 
 		const formData = await request.formData();
-		const noteId = String(formData.get('noteId') || '');
+		const parseResult = noteIdSchema.safeParse({
+			noteId: String(formData.get('noteId') || '')
+		});
+		if (!parseResult.success) {
+			return fail(400, { error: parseResult.error.issues[0]?.message || 'Validation error' });
+		}
 
-		const res = await deleteWallNote(noteId, session.user.id);
+		const res = await deleteWallNote(parseResult.data.noteId, session.user.id);
 		if (!res.ok) return fail(400, { error: res.error.message });
 
 		return { success: true };
 	},
 
 	blockFan: async ({ request }) => {
-		const session = await auth.api.getSession({ headers: request.headers });
-		if (!session?.user) return fail(401, { error: 'Unauthorized' });
-
-		const artist = await db.query.artists.findFirst({
-			where: eq(schema.artists.userId, session.user.id)
-		});
-		if (!artist) return fail(403, { error: 'Not an artist' });
+		const ctx = await requireArtistContext(request);
+		if ('errorResponse' in ctx) return ctx.errorResponse;
 
 		const formData = await request.formData();
-		const fanUserId = String(formData.get('fanUserId') || '');
-		if (!fanUserId) return fail(400, { error: 'Fan ID required' });
+		const parseResult = blockFanSchema.safeParse({
+			fanUserId: String(formData.get('fanUserId') || '')
+		});
+		if (!parseResult.success) {
+			return fail(400, { error: parseResult.error.issues[0]?.message || 'Fan ID required' });
+		}
 
-		const res = await blockFanFromWalls(artist.id, fanUserId);
+		const res = await blockFanFromWalls(ctx.artist.id, parseResult.data.fanUserId);
+		if (!res.ok) return fail(400, { error: res.error.message });
+
+		return { success: true };
+	},
+
+	unblockFan: async ({ request }) => {
+		const ctx = await requireArtistContext(request);
+		if ('errorResponse' in ctx) return ctx.errorResponse;
+
+		const formData = await request.formData();
+		const parseResult = unblockFanSchema.safeParse({
+			fanUserId: String(formData.get('fanUserId') || '')
+		});
+		if (!parseResult.success) {
+			return fail(400, { error: parseResult.error.issues[0]?.message || 'Fan ID required' });
+		}
+
+		const res = await unblockFanFromWalls(ctx.artist.id, parseResult.data.fanUserId);
 		if (!res.ok) return fail(400, { error: res.error.message });
 
 		return { success: true };

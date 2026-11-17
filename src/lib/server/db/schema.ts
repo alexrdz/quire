@@ -1,6 +1,7 @@
 import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { relations } from 'drizzle-orm';
 import { TIP_STATUSES, TipStatus } from '../../domain/tipping';
+import { NOTE_STATUSES, NoteStatus } from '../../domain/wall';
 
 /**
  * Better Auth Tables (Extended with accountType)
@@ -257,8 +258,8 @@ export const notes = sqliteTable(
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
 		body: text('body').notNull(),
-		status: text('status', { enum: ['live', 'pending', 'hidden'] })
-			.default('live')
+		status: text('status', { enum: NOTE_STATUSES })
+			.default(NoteStatus.Live)
 			.notNull(),
 		flagCount: integer('flag_count').default(0).notNull(),
 		flagImmune: integer('flag_immune', { mode: 'boolean' }).default(false).notNull(),
