@@ -3,6 +3,7 @@ import { fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { db, schema } from '$lib/server/db';
 import { eq, asc, and } from 'drizzle-orm';
 import { auth } from '$lib/server/auth';
+import { ArtistAccountStatus } from '$domain/account';
 import { checkAccentContrast } from '$domain/theme';
 import { artistTemplateSchema, mediaUrlSchema } from '$schemas/issue';
 import { uploadFormFile, type MediaKindFilter } from '$lib/server/services/storage';
@@ -47,6 +48,10 @@ async function requireArtist(headers: Headers) {
 	});
 	if (!artist) {
 		return { ok: false as const, status: 401 as const, error: 'Artist not found' };
+	}
+
+	if (artist.accountStatus === ArtistAccountStatus.Closed) {
+		return { ok: false as const, status: 403 as const, error: 'This artist account has been closed.' };
 	}
 
 	return { ok: true as const, artist };
@@ -140,6 +145,10 @@ export const load: ServerLoad = async ({ request }) => {
 
 	if (!artist) {
 		throw redirect(303, '/login');
+	}
+
+	if (artist.accountStatus === ArtistAccountStatus.Closed) {
+		throw redirect(303, '/login?closed=1');
 	}
 
 	const templatePages = await db.query.templatePages.findMany({

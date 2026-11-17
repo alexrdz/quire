@@ -146,3 +146,37 @@ export function buildPayoutAccountChangeTemplate(params: {
 
 	return { subject, html, text };
 }
+
+export function buildSlugPetitionConfirmationTemplate(params: {
+	petitionerName: string;
+	requestedSlug: string;
+	existingArtistClosed: boolean;
+}): EmailTemplate {
+	const safeName = escapeHtml(params.petitionerName);
+	const safeSlug = escapeHtml(params.requestedSlug);
+	const ownerStateNote = params.existingArtistClosed
+		? 'The original owner of this handle has closed their Quire account.'
+		: 'This handle is currently registered to another artist on Quire.';
+
+	const subject = `Handle claim petition received for /a/${params.requestedSlug}`;
+	const html = wrapEmailLayout(
+		`Petition received for /a/${safeSlug}`,
+		`<p style="margin:0 0 16px 0;">Hello ${safeName},</p>
+<p style="margin:0 0 16px 0;">We received your request to acquire the Quire artist handle <strong style="color:#01FFC3;">/a/${safeSlug}</strong>.</p>
+<p style="margin:0 0 16px 0;">${escapeHtml(ownerStateNote)} Our team reviews handle transfer petitions manually to protect artists from impersonation while ensuring legitimate bands can claim inactive handles.</p>
+<p style="margin:0;font-size:13px;color:#a1a1aa;">In the meantime, you can register another handle right away and begin publishing gig zines.</p>`,
+		'No action is needed right now. We will follow up at this email address once your petition is reviewed.'
+	);
+
+	const text = [
+		`Hello ${params.petitionerName},`,
+		'',
+		`We received your request to acquire the Quire artist handle /a/${params.requestedSlug}.`,
+		ownerStateNote,
+		'Our team reviews handle transfer petitions manually to protect artists from impersonation while ensuring legitimate bands can claim inactive handles.',
+		'',
+		'We will follow up at this email address once your petition is reviewed.'
+	].join('\n');
+
+	return { subject, html, text };
+}

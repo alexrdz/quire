@@ -82,3 +82,60 @@ export const emailVerificationQuerySchema = z.object({
 });
 
 export type EmailVerificationQueryInput = z.infer<typeof emailVerificationQuerySchema>;
+
+export const changePasswordSchema = z
+	.object({
+		currentPassword: z.string().min(1, 'Current password is required').max(256),
+		newPassword: z
+			.string()
+			.min(8, 'New password must be at least 8 characters')
+			.max(256, 'Password cannot exceed 256 characters'),
+		confirmNewPassword: z.string().min(1, 'Please confirm your new password').max(256),
+		revokeOtherSessions: z.boolean().default(true)
+	})
+	.refine((data) => data.newPassword === data.confirmNewPassword, {
+		message: 'New password and confirmation do not match',
+		path: ['confirmNewPassword']
+	});
+
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+export const changeBandEmailSchema = z.object({
+	newEmail: emailSchema,
+	currentPassword: z.string().min(1, 'Current password is required to update band email').max(256)
+});
+
+export type ChangeBandEmailInput = z.infer<typeof changeBandEmailSchema>;
+
+export const closeArtistAccountSchema = z.object({
+	confirmPassword: z.string().min(1, 'Password is required to close your account').max(256),
+	confirmPhrase: z.literal('CLOSE', {
+		message: 'Type CLOSE in all caps to confirm closing this artist account'
+	})
+});
+
+export type CloseArtistAccountInput = z.infer<typeof closeArtistAccountSchema>;
+
+export const slugPetitionSchema = z.object({
+	requestedSlug: artistSlugSchema,
+	petitionerName: z
+		.string()
+		.trim()
+		.min(1, 'Your band or artist name is required')
+		.max(100, 'Band name cannot exceed 100 characters'),
+	petitionerEmail: emailSchema,
+	evidenceUrl: z
+		.string()
+		.trim()
+		.url('Please enter a valid URL (e.g. Bandcamp, Spotify, or official site)')
+		.max(500)
+		.optional()
+		.or(z.literal('')),
+	rationale: z
+		.string()
+		.trim()
+		.min(15, 'Please briefly explain your claim to this handle (at least 15 characters)')
+		.max(1000, 'Rationale cannot exceed 1000 characters')
+});
+
+export type SlugPetitionInput = z.infer<typeof slugPetitionSchema>;

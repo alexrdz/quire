@@ -96,6 +96,22 @@
 				</Cluster>
 			</Cluster>
 
+			{#if data.emailVerified === false}
+				<Box as="section" variant="subtle" padding="md" radius="lg" class="email-verify-callout">
+					<Cluster justify="between" align="center" gap="md">
+						<Stack gap="3xs">
+							<span class="text-accent eyebrow-small">VERIFY BAND EMAIL</span>
+							<p class="text-muted subtext-small">
+								Confirm <span class="font-mono">{data.userEmail}</span> to ensure password resets and payout security notifications reach your band.
+							</p>
+						</Stack>
+						<a href="/dashboard/settings" class="btn-action-accent">
+							Verify in Settings →
+						</a>
+					</Cluster>
+				</Box>
+			{/if}
+
 			<!-- Permanent Artist QR Card (SPEC.md §4) -->
 			{#if showArtistQrModal && data.artistQrSvg}
 				<Box as="section" variant="raised" padding="xl" radius="lg" class="qr-showcase-box">
@@ -871,6 +887,10 @@
 
 	:global(.qr-showcase-box) {
 		border-color: var(--accent);
+	}
+
+	:global(.email-verify-callout) {
+		border-color: rgba(5, 217, 232, 0.35);
 	}
 
 	:global(.launchpad-box) {

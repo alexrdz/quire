@@ -1,4 +1,5 @@
 import { error, fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
+import { ArtistAccountStatus } from '$domain/account';
 import { db, schema } from '$lib/server/db';
 import { eq, and, desc, isNull, inArray } from 'drizzle-orm';
 import { auth, createSessionForUser } from '$lib/server/auth';
@@ -58,7 +59,9 @@ export const load: ServerLoad = async ({ params, request }) => {
 	} catch {}
 
 	// Group issues by month: 'October 2026', 'September 2026', etc.
-	const issues = artist.issues || [];
+	// Closed accounts archive all issues and hide them from the Back Page.
+	const isArtistClosed = artist.accountStatus === ArtistAccountStatus.Closed;
+	const issues = isArtistClosed ? [] : artist.issues || [];
 	type IssueType = (typeof issues)[number];
 	const issuesByMonth = new Map<string, IssueType[]>();
 	for (const issue of issues) {
@@ -80,6 +83,7 @@ export const load: ServerLoad = async ({ params, request }) => {
 
 	return {
 		artist,
+		isArtistClosed,
 		groupedIssues,
 		generalNotes,
 		tipPresets,
@@ -120,7 +124,14 @@ export const actions: Actions = {
 		throw redirect(303, callbackURL);
 	},
 
-	tip: async ({ request, url }) => {
+	tip: async ({ request, url, params }) => {
+		const artistRecord = await db.query.artists.findFirst({
+			where: eq(schema.artists.slug, params.slug!)
+		});
+		if (artistRecord?.accountStatus === ArtistAccountStatus.Closed) {
+			return fail(403, { error: 'This artist has left Quire.' });
+		}
+
 		const formData = await request.formData();
 		const artistId = String(formData.get('artistId') || '');
 		const amountGrossCents = Number(formData.get('amountGrossCents') || 0);
@@ -151,13 +162,20 @@ export const actions: Actions = {
 		return { success: true, tipResult: tipResult.value };
 	},
 
-	submitNote: async ({ request }) => {
+	submitNote: async ({ request, params }) => {
 		const session = await auth.api.getSession({
 			headers: request.headers
 		});
 
 		if (!session?.user) {
 			return fail(401, { error: 'Please sign in to leave a note on the General Wall.' });
+		}
+
+		const artistRecord = await db.query.artists.findFirst({
+			where: eq(schema.artists.slug, params.slug!)
+		});
+		if (artistRecord?.accountStatus === ArtistAccountStatus.Closed) {
+			return fail(403, { error: 'This artist has left Quire.' });
 		}
 
 		const formData = await request.formData();
@@ -183,13 +201,20 @@ export const actions: Actions = {
 		return { success: true, noteId: noteResult.value.noteId, status: noteResult.value.status };
 	},
 
-	flagNote: async ({ request }) => {
+	flagNote: async ({ request, params }) => {
 		const session = await auth.api.getSession({
 			headers: request.headers
 		});
 
 		if (!session?.user) {
 			return fail(401, { error: 'Sign in to flag a note.' });
+		}
+
+		const artistRecord = await db.query.artists.findFirst({
+			where: eq(schema.artists.slug, params.slug!)
+		});
+		if (artistRecord?.accountStatus === ArtistAccountStatus.Closed) {
+			return fail(403, { error: 'This artist has left Quire.' });
 		}
 
 		const formData = await request.formData();

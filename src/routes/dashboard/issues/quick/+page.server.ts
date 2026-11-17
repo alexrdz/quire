@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { db, schema } from '$lib/server/db';
 import { eq, desc, asc } from 'drizzle-orm';
 import { auth } from '$lib/server/auth';
+import { ArtistAccountStatus } from '$domain/account';
 import { calculateStampWindow } from '$domain/stamping';
 import { generateIssueScanQrSvg } from '$lib/server/services/qr';
 import { uploadFormFile } from '$lib/server/services/storage';
@@ -23,6 +24,10 @@ export const load: ServerLoad = async ({ request }) => {
 
 	if (!artist) {
 		throw redirect(303, '/login');
+	}
+
+	if (artist.accountStatus === ArtistAccountStatus.Closed) {
+		throw redirect(303, '/login?closed=1');
 	}
 
 	const lastIssue = await db.query.issues.findFirst({
@@ -74,6 +79,9 @@ export const actions: Actions = {
 			where: eq(schema.artists.userId, session.user.id)
 		});
 		if (!artist) return fail(401, { error: 'Artist not found' });
+		if (artist.accountStatus === ArtistAccountStatus.Closed) {
+			return fail(403, { error: 'This artist account has been closed.' });
+		}
 
 		const formData = await request.formData();
 		const city = String(formData.get('city') || '');

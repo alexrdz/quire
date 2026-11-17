@@ -2,10 +2,12 @@ import crypto from 'node:crypto';
 import { fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { eq, inArray } from 'drizzle-orm';
 import { normalizeArtistSlug, suggestAlternativeSlugs } from '$domain/theme';
+import { ArtistAccountStatus } from '$domain/account';
 import { artistLoginSchema, artistSignupSchema, safeRedirectPathSchema } from '$schemas/auth';
 import { auth, createSessionForUser } from '$lib/server/auth';
 import { db, schema } from '$lib/server/db';
 import { seedDatabase } from '$lib/server/seed';
+import { submitSlugPetition } from '$lib/server/services/account';
 
 function resolveRedirectTarget(rawRedirect: string | null | undefined): {
 	redirectTo: string;
@@ -47,6 +49,7 @@ export const load: ServerLoad = async ({ request, url }) => {
 	const initialMode =
 		url.searchParams.get('mode') === 'signup' ? ('signup' as const) : ('login' as const);
 	const resetSuccess = url.searchParams.get('reset') === 'success';
+	const accountClosed = url.searchParams.get('closed') === '1';
 
 	const defaultRole =
 		url.searchParams.get('role') === 'fan' ||
@@ -65,7 +68,8 @@ export const load: ServerLoad = async ({ request, url }) => {
 		hasExplicitRedirect,
 		defaultRole,
 		initialMode,
-		resetSuccess
+		resetSuccess,
+		accountClosed
 	};
 };
 
@@ -105,6 +109,19 @@ export const actions: Actions = {
 				return fail(400, {
 					mode: 'login' as const,
 					error: 'Invalid email or password.',
+					values: { email: parsed.data.email }
+				});
+			}
+
+			const artist = await db.query.artists.findFirst({
+				where: eq(schema.artists.userId, res.user.id)
+			});
+
+			if (artist && artist.accountStatus === ArtistAccountStatus.Closed) {
+				await db.delete(schema.sessions).where(eq(schema.sessions.userId, res.user.id));
+				return fail(403, {
+					mode: 'login' as const,
+					error: 'This artist account has been closed. All issues remain preserved in read-only archive mode for stub holders.',
 					values: { email: parsed.data.email }
 				});
 			}
@@ -171,9 +188,15 @@ export const actions: Actions = {
 
 		if (existingArtist) {
 			const slugSuggestions = await getAvailableSlugSuggestions(cleanSlug);
+			const isClosed = existingArtist.accountStatus === ArtistAccountStatus.Closed;
+			const errorMsg = isClosed
+				? `The handle "/a/${cleanSlug}" belonged to an artist who closed their Quire account (kept reserved to prevent impersonation). Choose another handle below or submit a petition to acquire it.`
+				: `Another band has already registered "/a/${cleanSlug}". Choose another handle below, or if the original owner is no longer active, submit a petition to acquire it.`;
 			return fail(409, {
 				mode: 'signup' as const,
-				error: `The handle "/a/${cleanSlug}" is already claimed. Choose a different handle or pick an available option below.`,
+				error: errorMsg,
+				collidedSlug: cleanSlug,
+				collidedArtistClosed: isClosed,
 				slugSuggestions,
 				values: {
 					name: parsed.data.name,
@@ -238,6 +261,7 @@ export const actions: Actions = {
 				payoutsEnabled: false,
 				verified: false,
 				generalWallApproveFirst: false,
+				accountStatus: ArtistAccountStatus.Active,
 				createdAt: now,
 				updatedAt: now
 			});
@@ -277,6 +301,55 @@ export const actions: Actions = {
 				: '/dashboard?onboarding=1';
 
 		throw redirect(303, targetUrl);
+	},
+
+	petitionSlug: async ({ request }) => {
+		await seedDatabase();
+		const formData = await request.formData();
+		const requestedSlug = normalizeArtistSlug(String(formData.get('requestedSlug') || ''));
+		const petitionerName = String(formData.get('petitionerName') || '');
+		const petitionerEmail = String(formData.get('petitionerEmail') || '');
+		const evidenceUrl = String(formData.get('evidenceUrl') || '');
+		const rationale = String(formData.get('rationale') || '');
+
+		const res = await submitSlugPetition({
+			requestedSlug,
+			petitionerName,
+			petitionerEmail,
+			evidenceUrl,
+			rationale
+		});
+
+		const slugSuggestions = requestedSlug
+			? await getAvailableSlugSuggestions(requestedSlug)
+			: [];
+
+		if (!res.ok) {
+			return fail(400, {
+				mode: 'signup' as const,
+				petitionError: res.error.message,
+				collidedSlug: requestedSlug,
+				slugSuggestions,
+				values: {
+					name: petitionerName.trim(),
+					email: petitionerEmail.trim().toLowerCase(),
+					slug: requestedSlug
+				}
+			});
+		}
+
+		return {
+			mode: 'signup' as const,
+			petitionSubmitted: true,
+			petitionedSlug: requestedSlug,
+			existingArtistClosed: res.value.existingArtistClosed,
+			slugSuggestions,
+			values: {
+				name: petitionerName.trim(),
+				email: petitionerEmail.trim().toLowerCase(),
+				slug: requestedSlug
+			}
+		};
 	},
 
 	googleSignIn: async ({ request, url, cookies }) => {

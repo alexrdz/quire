@@ -79,9 +79,25 @@ export async function ensureSchemaTables() {
 			payouts_enabled integer DEFAULT false NOT NULL,
 			verified integer DEFAULT false NOT NULL,
 			general_wall_approve_first integer DEFAULT false NOT NULL,
+			account_status text DEFAULT 'active' NOT NULL,
+			closed_at integer,
 			created_at integer NOT NULL,
 			updated_at integer NOT NULL,
 			FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade
+		)`,
+		`CREATE TABLE IF NOT EXISTS slug_petitions (
+			id text PRIMARY KEY NOT NULL,
+			requested_slug text NOT NULL,
+			existing_artist_id text NOT NULL,
+			existing_artist_closed integer DEFAULT false NOT NULL,
+			petitioner_name text NOT NULL,
+			petitioner_email text NOT NULL,
+			evidence_url text,
+			rationale text NOT NULL,
+			status text DEFAULT 'pending' NOT NULL,
+			created_at integer NOT NULL,
+			updated_at integer NOT NULL,
+			FOREIGN KEY (existing_artist_id) REFERENCES artists(id) ON UPDATE no action ON DELETE cascade
 		)`,
 		`CREATE TABLE IF NOT EXISTS payout_change_tokens (
 			id text PRIMARY KEY NOT NULL,
@@ -212,6 +228,8 @@ export async function ensureSchemaTables() {
 		await client.execute(stmt);
 	}
 
+	await ensureColumnExists('artists', 'account_status', "text DEFAULT 'active' NOT NULL");
+	await ensureColumnExists('artists', 'closed_at', 'integer');
 	await ensureColumnExists('issues', 'archived_at', 'integer');
 	await ensureColumnExists('tips', 'status', "text DEFAULT 'succeeded' NOT NULL");
 	await ensureColumnExists('tips', 'refunded_at', 'integer');
@@ -229,6 +247,10 @@ export async function ensureSchemaTables() {
 		`CREATE UNIQUE INDEX IF NOT EXISTS artists_slug_unique ON artists (slug)`,
 		`CREATE INDEX IF NOT EXISTS artists_user_id_idx ON artists (user_id)`,
 		`CREATE INDEX IF NOT EXISTS artists_stripe_account_id_idx ON artists (stripe_account_id)`,
+		`CREATE INDEX IF NOT EXISTS artists_account_status_idx ON artists (account_status)`,
+		`CREATE INDEX IF NOT EXISTS slug_petitions_slug_status_idx ON slug_petitions (requested_slug, status)`,
+		`CREATE INDEX IF NOT EXISTS slug_petitions_artist_idx ON slug_petitions (existing_artist_id)`,
+		`CREATE INDEX IF NOT EXISTS slug_petitions_email_idx ON slug_petitions (petitioner_email)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS payout_change_tokens_token_hash_unique ON payout_change_tokens (token_hash)`,
 		`CREATE INDEX IF NOT EXISTS payout_change_tokens_artist_status_idx ON payout_change_tokens (artist_id, status)`,
 		`CREATE INDEX IF NOT EXISTS payout_change_tokens_expires_at_idx ON payout_change_tokens (expires_at)`,

@@ -2,6 +2,12 @@ import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqli
 import { relations } from 'drizzle-orm';
 import { TIP_STATUSES, TipStatus } from '../../domain/tipping';
 import { NOTE_STATUSES, NoteStatus } from '../../domain/wall';
+import {
+	ARTIST_ACCOUNT_STATUSES,
+	ArtistAccountStatus,
+	SLUG_PETITION_STATUSES,
+	SlugPetitionStatus
+} from '../../domain/account';
 
 /**
  * Better Auth Tables (Extended with accountType)
@@ -107,12 +113,49 @@ export const artists = sqliteTable(
 		generalWallApproveFirst: integer('general_wall_approve_first', { mode: 'boolean' })
 			.default(false)
 			.notNull(),
+		accountStatus: text('account_status', { enum: ARTIST_ACCOUNT_STATUSES })
+			.default(ArtistAccountStatus.Active)
+			.notNull(),
+		closedAt: integer('closed_at', { mode: 'timestamp' }),
 		createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 		updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
 	},
 	(table) => [
 		index('artists_user_id_idx').on(table.userId),
-		index('artists_stripe_account_id_idx').on(table.stripeAccountId)
+		index('artists_stripe_account_id_idx').on(table.stripeAccountId),
+		index('artists_account_status_idx').on(table.accountStatus)
+	]
+);
+
+/**
+ * Handle-claim petitions when another artist makes a case to acquire an
+ * already-registered or closed /a/[slug] handle.
+ */
+export const slugPetitions = sqliteTable(
+	'slug_petitions',
+	{
+		id: text('id').primaryKey(),
+		requestedSlug: text('requested_slug').notNull(),
+		existingArtistId: text('existing_artist_id')
+			.notNull()
+			.references(() => artists.id, { onDelete: 'cascade' }),
+		existingArtistClosed: integer('existing_artist_closed', { mode: 'boolean' })
+			.default(false)
+			.notNull(),
+		petitionerName: text('petitioner_name').notNull(),
+		petitionerEmail: text('petitioner_email').notNull(),
+		evidenceUrl: text('evidence_url'),
+		rationale: text('rationale').notNull(),
+		status: text('status', { enum: SLUG_PETITION_STATUSES })
+			.default(SlugPetitionStatus.Pending)
+			.notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+	},
+	(table) => [
+		index('slug_petitions_slug_status_idx').on(table.requestedSlug, table.status),
+		index('slug_petitions_artist_idx').on(table.existingArtistId),
+		index('slug_petitions_email_idx').on(table.petitionerEmail)
 	]
 );
 
@@ -393,7 +436,15 @@ export const artistsRelations = relations(artists, ({ one, many }) => ({
 	notes: many(notes),
 	noteReplies: many(noteReplies),
 	blocks: many(blocks),
-	payoutChangeTokens: many(payoutChangeTokens)
+	payoutChangeTokens: many(payoutChangeTokens),
+	slugPetitions: many(slugPetitions)
+}));
+
+export const slugPetitionsRelations = relations(slugPetitions, ({ one }) => ({
+	existingArtist: one(artists, {
+		fields: [slugPetitions.existingArtistId],
+		references: [artists.id]
+	})
 }));
 
 export const payoutChangeTokensRelations = relations(payoutChangeTokens, ({ one }) => ({
