@@ -165,6 +165,67 @@ function resolveSafeExtension(filename: string, mimeType: string): string {
 	return MIME_TO_EXT[mimeType] ?? '.bin';
 }
 
+const OPTIMIZABLE_RASTER_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_RASTER_EDGE_PX = 1600;
+
+interface SharpPipelineLike {
+	rotate(): SharpPipelineLike;
+	resize(
+		width: number,
+		height: number,
+		options: { fit: 'inside'; withoutEnlargement: boolean }
+	): SharpPipelineLike;
+	webp(options: { quality: number }): SharpPipelineLike;
+	toBuffer(): Promise<Buffer>;
+}
+
+type SharpFactory = (input: Buffer) => SharpPipelineLike;
+
+/**
+ * Optional server-side raster optimization hook. Uses `sharp` when installed
+ * in the deployment runtime to auto-rotate, cap max dimension at 1600px, and
+ * convert to WebP when smaller; gracefully passes through the original buffer otherwise.
+ */
+export async function optimizeRasterImageBuffer(
+	buffer: Buffer,
+	mimeType: string
+): Promise<{ buffer: Buffer; mimeType: string; extOverride?: string }> {
+	if (!OPTIMIZABLE_RASTER_MIMES.has(mimeType)) {
+		return { buffer, mimeType };
+	}
+
+	const moduleName = 'sharp';
+	try {
+		const mod = (await import(/* @vite-ignore */ moduleName)) as {
+			default?: SharpFactory;
+		};
+		const sharpFn =
+			typeof mod?.default === 'function'
+				? mod.default
+				: ((mod as unknown as SharpFactory) ?? null);
+		if (typeof sharpFn !== 'function') {
+			return { buffer, mimeType };
+		}
+
+		const optimized = await sharpFn(buffer)
+			.rotate()
+			.resize(MAX_RASTER_EDGE_PX, MAX_RASTER_EDGE_PX, {
+				fit: 'inside',
+				withoutEnlargement: true
+			})
+			.webp({ quality: 84 })
+			.toBuffer();
+
+		if (optimized.byteLength > 0 && optimized.byteLength < buffer.byteLength) {
+			return { buffer: optimized, mimeType: 'image/webp', extOverride: '.webp' };
+		}
+	} catch {
+		// Fallback to original bytes when sharp is absent or image decode fails
+	}
+
+	return { buffer, mimeType };
+}
+
 /**
  * Uploads a validated image or audio buffer to Cloudflare R2 if configured,
  * or falls back to local /static/uploads in development (ADR 0004).
@@ -183,7 +244,10 @@ export async function uploadMedia(
 		return validation;
 	}
 
-	const ext = resolveSafeExtension(options.filename, normalizedMime);
+	const optimized = await optimizeRasterImageBuffer(options.buffer, normalizedMime);
+	const finalBuffer = optimized.buffer;
+	const finalMime = optimized.mimeType;
+	const ext = optimized.extOverride ?? resolveSafeExtension(options.filename, finalMime);
 	const uniqueKey = `${crypto.randomUUID()}${ext}`;
 
 	// 1. Cloudflare R2 Upload
@@ -193,8 +257,8 @@ export async function uploadMedia(
 				new PutObjectCommand({
 					Bucket: R2_BUCKET_NAME,
 					Key: uniqueKey,
-					Body: options.buffer,
-					ContentType: normalizedMime
+					Body: finalBuffer,
+					ContentType: finalMime
 				})
 			);
 
@@ -216,7 +280,7 @@ export async function uploadMedia(
 		const uploadsDir = path.resolve(process.cwd(), 'static/uploads');
 		await fs.mkdir(uploadsDir, { recursive: true });
 		const filePath = path.join(uploadsDir, uniqueKey);
-		await fs.writeFile(filePath, options.buffer);
+		await fs.writeFile(filePath, finalBuffer);
 
 		return ok({
 			url: `/uploads/${uniqueKey}`,

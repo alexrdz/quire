@@ -180,3 +180,59 @@ export function buildSlugPetitionConfirmationTemplate(params: {
 
 	return { subject, html, text };
 }
+
+export function buildSlugPetitionDecisionTemplate(params: {
+	petitionerName: string;
+	requestedSlug: string;
+	decision: 'approved' | 'rejected';
+	note?: string;
+}): EmailTemplate {
+	const safeName = escapeHtml(params.petitionerName);
+	const safeSlug = escapeHtml(params.requestedSlug);
+	const trimmedNote = params.note?.trim();
+	const safeNote = trimmedNote ? escapeHtml(trimmedNote) : '';
+
+	if (params.decision === 'approved') {
+		const subject = `Handle petition approved: /a/${params.requestedSlug} is now available`;
+		const html = wrapEmailLayout(
+			`/a/${safeSlug} has been released`,
+			`<p style="margin:0 0 16px 0;">Hello ${safeName},</p>
+<p style="margin:0 0 16px 0;">Your handle petition for <strong style="color:#01FFC3;">/a/${safeSlug}</strong> has been approved. The handle is now released and ready for your artist registration on Quire.</p>
+${safeNote ? `<p style="margin:0 0 16px 0;font-size:13px;color:#d4d4d8;">Reviewer note: ${safeNote}</p>` : ''}
+<p style="margin:0;font-size:13px;color:#a1a1aa;">Visit Sign Up and claim <strong>${safeSlug}</strong> to set up your Back Page and Issue #1.</p>`,
+			'Handles are claimed on a first-come basis once released.'
+		);
+
+		const text = [
+			`Hello ${params.petitionerName},`,
+			'',
+			`Your handle petition for /a/${params.requestedSlug} has been approved. The handle is now released and ready for your artist registration on Quire.`,
+			...(trimmedNote ? ['', `Reviewer note: ${trimmedNote}`] : []),
+			'',
+			`Visit Sign Up and claim "${params.requestedSlug}" to set up your Back Page and Issue #1.`
+		].join('\n');
+
+		return { subject, html, text };
+	}
+
+	const subject = `Update on your handle petition for /a/${params.requestedSlug}`;
+	const html = wrapEmailLayout(
+		`Handle petition not approved`,
+		`<p style="margin:0 0 16px 0;">Hello ${safeName},</p>
+<p style="margin:0 0 16px 0;">Thank you for submitting a petition for <strong style="color:#01FFC3;">/a/${safeSlug}</strong>. After reviewing the existing artist profile and submitted evidence, we are unable to transfer this handle.</p>
+${safeNote ? `<p style="margin:0 0 16px 0;font-size:13px;color:#d4d4d8;">Reviewer note: ${safeNote}</p>` : ''}
+<p style="margin:0;font-size:13px;color:#a1a1aa;">You can register a different handle on Quire anytime to start publishing gig zines.</p>`,
+		'Quire preserves active artist handles and fan collections to prevent impersonation.'
+	);
+
+	const text = [
+		`Hello ${params.petitionerName},`,
+		'',
+		`Thank you for submitting a petition for /a/${params.requestedSlug}. After reviewing the existing artist profile and submitted evidence, we are unable to transfer this handle.`,
+		...(trimmedNote ? ['', `Reviewer note: ${trimmedNote}`] : []),
+		'',
+		'You can register a different handle on Quire anytime to start publishing gig zines.'
+	].join('\n');
+
+	return { subject, html, text };
+}
