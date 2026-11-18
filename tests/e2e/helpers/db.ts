@@ -2,8 +2,8 @@ import { createClient } from '@libsql/client';
 
 /**
  * Direct access to the local test database that `pnpm preview` (NODE_ENV=test)
- * serves from. Used only to arrange time-dependent fixtures and to reset
- * rate-limit counters, since every e2e request comes from the same address.
+ * serves from. Used only to reset rate-limit counters, since every e2e request
+ * comes from the same address.
  */
 function client() {
 	return createClient({ url: 'file:local.db' });
@@ -16,21 +16,6 @@ export async function resetRateLimits(): Promise<void> {
 		await db.execute('DELETE FROM rate_limits');
 	} catch {
 		// Table not created yet: the server creates it on first request.
-	} finally {
-		db.close();
-	}
-}
-
-/** Puts an Issue's Stamp Window around the current time, so its QR scans as "at the gig". */
-export async function openStampWindow(slug: string): Promise<void> {
-	const db = client();
-	const now = Date.now();
-	try {
-		// Drizzle stores timestamp columns as Unix seconds.
-		await db.execute({
-			sql: 'UPDATE issues SET stamp_window_start = ?, stamp_window_end = ? WHERE slug = ?',
-			args: [Math.floor((now - 60 * 60 * 1000) / 1000), Math.floor((now + 47 * 60 * 60 * 1000) / 1000), slug]
-		});
 	} finally {
 		db.close();
 	}
