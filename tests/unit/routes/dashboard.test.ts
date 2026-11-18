@@ -2,7 +2,9 @@ import { afterEach, describe, it, expect } from 'vitest';
 import { actions, load } from '../../../src/routes/(site)/dashboard/+page.server';
 import { db, schema } from '$lib/server/db';
 import { authSecret } from '$lib/server/auth';
-import { TipReversalStatus, TipStatus } from '$domain/tipping';
+import { render } from 'svelte/server';
+import { ALL_FEATURES_ON } from '../helpers/features';
+import DashboardPage from '../../../src/routes/(site)/dashboard/+page.svelte';
 import { NoteStatus } from '$domain/wall';
 import { eq } from 'drizzle-orm';
 import { seedDatabase } from '$lib/server/seed';
@@ -212,7 +214,7 @@ describe('Dashboard +page.server', () => {
 		}
 	});
 
-	it('breaks out refunds, chargebacks, and per-tip ledger rows in load', async () => {
+	it('shows tip-tap counts, labelled as taps, with no dollar figures (ADR 0008)', async () => {
 		await seedDatabase();
 		const fixture = await createFreshArtistSession(crypto.randomBytes(3).toString('hex'));
 		const issueId = crypto.randomUUID();
@@ -234,77 +236,41 @@ describe('Dashboard +page.server', () => {
 			updatedAt: now
 		});
 
-		await db.insert(schema.tips).values([
-			{
-				id: crypto.randomUUID(),
-				artistId: fixture.artistId,
-				issueId,
-				amountGross: 1000,
-				feeStripe: 59,
-				feePlatform: 50,
-				amountNet: 891,
-				fanCoveredFees: false,
-				stripePaymentId: `pi_test_succ_${crypto.randomBytes(6).toString('hex')}`,
-				status: TipStatus.Succeeded,
-				createdAt: new Date(now.getTime() - 2000)
-			},
-			{
-				id: crypto.randomUUID(),
-				artistId: fixture.artistId,
-				issueId,
-				amountGross: 1000,
-				feeStripe: 59,
-				feePlatform: 50,
-				amountNet: -109,
-				fanCoveredFees: false,
-				stripePaymentId: `pi_test_ref_${crypto.randomBytes(6).toString('hex')}`,
-				status: TipReversalStatus.Refunded,
-				refundedAt: now,
-				createdAt: new Date(now.getTime() - 1000)
-			},
-			{
-				id: crypto.randomUUID(),
-				artistId: fixture.artistId,
-				issueId: null,
-				amountGross: 2000,
-				feeStripe: 88,
-				feePlatform: 100,
-				amountNet: -100,
-				fanCoveredFees: true,
-				stripePaymentId: `pi_test_disp_${crypto.randomBytes(6).toString('hex')}`,
-				status: TipReversalStatus.Disputed,
-				refundedAt: now,
-				createdAt: now
-			}
-		]);
+		const tap = (issue: string | null, cents: number) => ({
+			id: crypto.randomUUID(),
+			artistId: fixture.artistId,
+			issueId: issue,
+			amountSelectedCents: cents,
+			createdAt: now
+		});
+		await db
+			.insert(schema.tipTaps)
+			.values([tap(issueId, 500), tap(issueId, 1000), tap(issueId, 2000), tap(null, 500)]);
 
 		const req = new Request('http://localhost:4173/dashboard', {
 			headers: { cookie: fixture.cookie }
 		});
 		const data = (await (load as any)({ request: req, url: new URL(req.url) })) as any;
 
-		expect(data.latestRecap.totalGrossCents).toBe(2000);
-		expect(data.latestRecap.totalFeesCents).toBe(218);
-		expect(data.latestRecap.reversalsCents).toBe(1000);
-		expect(data.latestRecap.totalNetCents).toBe(782);
-		expect(data.latestRecap.refundCount).toBe(1);
-		expect(data.latestRecap.disputeCount).toBe(0);
+		expect(data.latestRecap.tipTaps).toBe(3);
+		expect(data.issues[0].tipTaps).toBe(3);
+		expect(data.generalRow.tipTaps).toBe(1);
+		expect(data.totalTipTaps).toBe(4);
+		// No money anywhere in the load: no gross, fees, net, payouts or a ledger.
+		const json = JSON.stringify({ recap: data.latestRecap, general: data.generalRow, issues: data.issues });
+		expect(json).not.toMatch(/gross|fee|net(Cents)?"|payout|amountSelected/i);
+		expect(data.tipLedger).toBeUndefined();
 
-		expect(data.generalRow.grossCents).toBe(2000);
-		expect(data.generalRow.reversalsCents).toBe(2000);
-		expect(data.generalRow.netCents).toBe(-100);
-		expect(data.generalRow.disputeCount).toBe(1);
-
-		expect(data.issues[0].tipSummary.reversalsCents).toBe(1000);
-		expect(data.tipLedger).toHaveLength(3);
-		expect(data.tipLedger[0].sourceLabel).toBe('General (Back Page)');
-		expect(data.tipLedger[0].status).toBe(TipReversalStatus.Disputed);
-		expect(data.tipLedger[0].reversalCents).toBe(2000);
-		expect(data.tipLedger[1].sourceLabel).toBe('Brooklyn @ Union Pool');
-		expect(data.tipLedger[1].status).toBe(TipReversalStatus.Refunded);
-		expect(data.tipLedger[1].reversalCents).toBe(1000);
-		expect(data.tipLedger[2].status).toBe(TipStatus.Succeeded);
-		expect(data.tipLedger[2].reversalCents).toBe(0);
+		const { body } = render(DashboardPage, {
+			props: { data: { ...data, features: ALL_FEATURES_ON, emailConfirmation: null } }
+		});
+		const text = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+		expect(text).toContain('3 tip taps');
+		expect(text).toContain('1 tip tap');
+		expect(text).toContain('Check Venmo for what came in.');
+		expect(text).not.toMatch(/Gross|Net Artist Payout|Stripe|5% platform/);
+		// No dollar sign next to tip-tap data.
+		expect(text).not.toMatch(/\$\s*\d[^<]{0,40}tip taps?|tip taps?[^<]{0,40}\$\s*\d/i);
 	});
 
 	it('supports hide, restore, reply, deleteReply, blockFan, and unblockFan moderation actions', async () => {

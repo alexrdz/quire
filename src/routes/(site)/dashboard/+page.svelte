@@ -3,7 +3,7 @@
 	import { Container, Box, Stack, Cluster, Grid } from '$lib/components/layout';
 	import ArtistTopNav from '$lib/components/dashboard/ArtistTopNav.svelte';
 	import QrCaseDisplay from '$lib/components/dashboard/QrCaseDisplay.svelte';
-	import { formatUsdCents, isTipReversed, TipStatus } from '$domain/tipping';
+	import { CHECK_VENMO, formatTipTaps } from '$lib/components/tips/tip-taps';
 	import { NoteStatus } from '$domain/wall';
 
 	let { data } = $props();
@@ -12,17 +12,7 @@
 	let replyText = $state('');
 	let showArtistQrModal = $state(false);
 	let showCaseDisplay = $state(false);
-	let tipFilter = $state<'all' | 'issues' | 'general' | 'reversals'>('all');
 	let noteFilter = $state<'all' | 'review' | 'live' | 'hidden'>('all');
-
-	const filteredTipLedger = $derived(
-		(data.tipLedger ?? []).filter((tip) => {
-			if (tipFilter === 'issues') return tip.issueId !== null;
-			if (tipFilter === 'general') return tip.issueId === null;
-			if (tipFilter === 'reversals') return isTipReversed(tip.status);
-			return true;
-		})
-	);
 
 	const blockedFanIds = $derived(
 		new Set((data.blockedFans ?? []).map((b) => b.fanUserId))
@@ -44,16 +34,6 @@
 			return true;
 		})
 	);
-
-	function formatTipTimestamp(value: Date | string): string {
-		const dateObj = value instanceof Date ? value : new Date(value);
-		if (Number.isNaN(dateObj.getTime())) return '';
-		return dateObj.toLocaleDateString('en-US', {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric'
-		});
-	}
 </script>
 
 <svelte:head>
@@ -152,7 +132,7 @@
 							</span>
 							<h2 class="launchpad-heading">Launch Your Band Zine in 3 Steps</h2>
 							<p class="text-muted subtext-small">
-								Set your Master Template once, publish a gig zine in under a minute, and turn on Stripe Express payouts whenever you are ready.
+								Set your Master Template once, publish a gig zine in under a minute, and add your Venmo so fans can tip you.
 							</p>
 						</Stack>
 
@@ -209,20 +189,20 @@
 							<Box as="article" variant="subtle" padding="lg" radius="md" class="launchpad-step-card">
 								<Stack gap="md" class="launchpad-step-stack">
 									<Cluster justify="between" align="center" gap="xs">
-										<span class="font-mono text-muted step-number">STEP 03 · ON-DEMAND</span>
-										<span class="meta-chip {data.artist.payoutsEnabled ? 'meta-highlight' : 'meta-support'}">
-											{data.artist.payoutsEnabled ? 'Payouts Active' : 'Connect When Ready'}
+										<span class="font-mono text-muted step-number">STEP 03 · ~1 MIN</span>
+										<span class="meta-chip {data.hasVenmo ? 'meta-highlight' : 'meta-support'}">
+											{data.hasVenmo ? 'Venmo Added' : 'Not Added Yet'}
 										</span>
 									</Cluster>
 									<Stack gap="2xs">
-										<h3 class="step-title">Connect Stripe Express</h3>
+										<h3 class="step-title">Add your Venmo</h3>
 										<p class="text-muted step-desc">
-											Tip buttons stay hidden until payouts are enabled. Connect Stripe Express whenever you are ready to accept 1-tap tips.
+											Tip buttons appear once you add your Venmo username. Fans tap an amount and Venmo opens to pay you directly; Quire takes no cut.
 										</p>
 									</Stack>
 									<Cluster gap="xs" class="step-actions">
 										<a href="/dashboard/settings" class="btn-action-support">
-											{data.artist.payoutsEnabled ? 'Manage Payouts →' : 'Connect When Ready →'}
+											{data.hasVenmo ? 'Manage Venmo →' : 'Add your Venmo →'}
 										</a>
 									</Cluster>
 								</Stack>
@@ -270,20 +250,20 @@
 					</Stack>
 				</Box>
 			{:else}
-				<!-- Stripe Callout if Payouts Not Enabled -->
-				{#if !data.artist.payoutsEnabled}
+				<!-- Venmo callout until the Artist adds a username (ADR 0008) -->
+				{#if !data.hasVenmo}
 					<Box as="section" variant="raised" padding="md" radius="lg" class="stripe-warning-box">
 						<Cluster justify="between" align="center" gap="md">
 							<Stack gap="xs">
 								<span class="text-support stripe-callout-title">
-									● Stripe Connect Onboarding Pending
+									Add your Venmo to show tip buttons
 								</span>
 								<p class="text-muted stripe-callout-text">
-									Tip buttons remain hidden on your Cover, Issue pages, and Back Page until payouts are enabled.
+									Tip buttons stay hidden on your Cover, Issue pages and Back Page until you add your Venmo username.
 								</p>
 							</Stack>
 							<a href="/dashboard/settings" class="btn-action-support">
-								Enable Payouts →
+								Add your Venmo →
 							</a>
 						</Cluster>
 					</Box>
@@ -321,31 +301,13 @@
 							</Cluster>
 
 							<Grid min="xs" gap="md">
-								<Box variant="subtle" padding="md" radius="md">
+								<Box variant="subtle" padding="md" radius="md" data-testid="recap-tip-taps">
 									<Stack gap="2xs">
-										<span class="text-muted metric-label">Gross Tips</span>
+										<span class="text-muted metric-label">Tip Taps</span>
 										<span class="text-support metric-value">
-											{formatUsdCents(data.latestRecap.totalGrossCents)}
+											{formatTipTaps(data.latestRecap.tipTaps)}
 										</span>
-										<span class="text-muted metric-sub">
-											{data.latestRecap.tipCount} tippers · {formatUsdCents(data.latestRecap.totalFeesCents)} fees
-										</span>
-									</Stack>
-								</Box>
-
-								<Box variant="subtle" padding="md" radius="md">
-									<Stack gap="2xs">
-										<span class="text-muted metric-label">Net Artist Payout</span>
-										<span class="metric-value metric-white">
-											{formatUsdCents(data.latestRecap.totalNetCents)}
-										</span>
-										{#if data.latestRecap.reversalsCents > 0}
-											<span class="text-support metric-sub">
-												Refunds & chargebacks: -{formatUsdCents(data.latestRecap.reversalsCents)} ({data.latestRecap.refundCount + data.latestRecap.disputeCount})
-											</span>
-										{:else}
-											<span class="text-muted metric-sub">After Stripe & 5% platform cut</span>
-										{/if}
+										<span class="text-muted metric-sub">{CHECK_VENMO}</span>
 									</Stack>
 								</Box>
 
@@ -381,7 +343,7 @@
 						<Stack gap="3xs">
 							<h2 class="section-heading">All Gigs & Issues</h2>
 							<p class="text-muted subtext-small">
-								Money and people across every stop, plus General Back Page activity. Issues are archived, never deleted.
+								Tip taps and people across every stop, plus General Back Page activity. Tip taps count taps on your tip buttons, not payments: {CHECK_VENMO} Issues are archived, never deleted.
 							</p>
 						</Stack>
 						<Cluster gap="xs">
@@ -403,7 +365,7 @@
 									<th class="table-cell">Date</th>
 									<th class="table-cell">City & Venue</th>
 									<th class="table-cell">Status</th>
-									<th class="table-cell">Gross / Fees / Net</th>
+									<th class="table-cell">Tip Taps</th>
 									<th class="table-cell">Stamps</th>
 									<th class="table-cell">Notes</th>
 									<th class="table-cell align-end">Actions</th>
@@ -411,7 +373,6 @@
 							</thead>
 							<tbody>
 								{#each data.issues as issue}
-									{@const summary = issue.tipSummary}
 									{@const stamps = ((issue.collections as Array<{ kind: string }> | undefined) || []).filter((c) => c.kind === 'stamped').length}
 									{@const noteCount = ((issue.notes as Array<unknown> | undefined) || []).length}
 									<tr class="table-body-row">
@@ -425,15 +386,8 @@
 												{issue.status}
 											</span>
 										</td>
-										<td class="table-cell font-mono">
-											<div class="cell-primary-text">{formatUsdCents(summary.grossCents)} gross</div>
-											<div class="text-muted cell-subtext">
-												-{formatUsdCents(summary.feesCents)} fees
-												{#if summary.reversalsCents > 0}
-													· <span class="text-support">-{formatUsdCents(summary.reversalsCents)} reversals</span>
-												{/if}
-												→ <strong class="text-highlight">{formatUsdCents(summary.netCents)} net</strong>
-											</div>
+										<td class="table-cell">
+											<div class="cell-primary-text">{formatTipTaps(issue.tipTaps)}</div>
 										</td>
 										<td class="table-cell font-semibold">{stamps}</td>
 										<td class="table-cell">{noteCount}</td>
@@ -467,15 +421,8 @@
 										<td class="table-cell">
 											<span class="meta-chip meta-accent">Always Live</span>
 										</td>
-										<td class="table-cell font-mono">
-											<div class="cell-primary-text">{formatUsdCents(data.generalRow.grossCents)} gross</div>
-											<div class="text-muted cell-subtext">
-												-{formatUsdCents(data.generalRow.feesCents)} fees
-												{#if data.generalRow.reversalsCents > 0}
-													· <span class="text-support">-{formatUsdCents(data.generalRow.reversalsCents)} reversals</span>
-												{/if}
-												→ <strong class="text-highlight">{formatUsdCents(data.generalRow.netCents)} net</strong>
-											</div>
+										<td class="table-cell" data-testid="general-tip-taps">
+											<div class="cell-primary-text">{formatTipTaps(data.generalRow.tipTaps)}</div>
 										</td>
 										<td class="table-cell text-muted">—</td>
 										<td class="table-cell">{data.generalRow.noteCount}</td>
@@ -490,114 +437,6 @@
 											</Cluster>
 										</td>
 									</tr>
-								{/if}
-							</tbody>
-						</table>
-					</Box>
-				</Stack>
-			{/if}
-
-			<!-- PER-TIP BREAKDOWN LEDGER (SPEC.md §5.4 & §6.5) -->
-			{#if data.tipLedger && data.tipLedger.length > 0}
-				<Stack as="section" gap="md">
-					<Cluster justify="between" align="center" gap="md">
-						<Stack gap="3xs">
-							<h2 class="section-heading">Tip Breakdown Ledger</h2>
-							<p class="text-muted subtext-small">
-								Individual gross amount, Stripe &amp; 5% platform fees, absorbed refunds or chargebacks, and net artist payout.
-							</p>
-						</Stack>
-
-						<Cluster gap="xs" role="tablist" aria-label="Filter tips">
-							<button
-								type="button"
-								class="btn-filter-tab {tipFilter === 'all' ? 'is-active' : ''}"
-								onclick={() => (tipFilter = 'all')}
-							>
-								All ({data.tipLedger.length})
-							</button>
-							<button
-								type="button"
-								class="btn-filter-tab {tipFilter === 'issues' ? 'is-active' : ''}"
-								onclick={() => (tipFilter = 'issues')}
-							>
-								Issues
-							</button>
-							<button
-								type="button"
-								class="btn-filter-tab {tipFilter === 'general' ? 'is-active' : ''}"
-								onclick={() => (tipFilter = 'general')}
-							>
-								General
-							</button>
-							<button
-								type="button"
-								class="btn-filter-tab {tipFilter === 'reversals' ? 'is-active' : ''}"
-								onclick={() => (tipFilter = 'reversals')}
-							>
-								Refunds &amp; Disputes
-							</button>
-						</Cluster>
-					</Cluster>
-
-					<Box variant="raised" padding="none" class="table-container-shell">
-						<table class="gigs-table">
-							<thead>
-								<tr class="table-header-row">
-									<th class="table-cell">Date</th>
-									<th class="table-cell">Source</th>
-									<th class="table-cell">Status</th>
-									<th class="table-cell">Gross</th>
-									<th class="table-cell">Fees &amp; Reversals</th>
-									<th class="table-cell align-end">Net Payout</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#if filteredTipLedger.length === 0}
-									<tr class="table-body-row">
-										<td class="table-cell text-muted" colspan="6">
-											No tips match this filter yet.
-										</td>
-									</tr>
-								{:else}
-									{#each filteredTipLedger as tip (tip.id)}
-										<tr class="table-body-row">
-											<td class="table-cell font-mono">{formatTipTimestamp(tip.createdAt)}</td>
-											<td class="table-cell">
-												<div class="cell-primary-text">{tip.sourceLabel}</div>
-												{#if tip.fanCoveredFees}
-													<span class="meta-chip meta-highlight">Fan covered Stripe fee</span>
-												{/if}
-											</td>
-											<td class="table-cell">
-												<span
-													class="status-badge {tip.status === TipStatus.Succeeded
-														? ''
-														: 'status-cancelled'}"
-												>
-													{tip.status}
-												</span>
-											</td>
-											<td class="table-cell font-mono cell-primary-text">
-												{formatUsdCents(tip.amountGross)}
-											</td>
-											<td class="table-cell font-mono">
-												<div class="text-muted cell-subtext">
-													Stripe {formatUsdCents(tip.feeStripe)} · Quire 5% {formatUsdCents(tip.feePlatform)}
-												</div>
-												{#if tip.reversalCents > 0}
-													<div class="text-support cell-subtext">
-														{tip.status === TipStatus.Disputed ? 'Chargeback' : 'Refund'} absorbed: -{formatUsdCents(tip.reversalCents)}
-													</div>
-												{/if}
-											</td>
-											<td class="table-cell align-end font-mono">
-												<strong class={tip.amountNet < 0 ? 'text-support' : 'text-highlight'}>
-													{formatUsdCents(tip.amountNet)}
-												</strong>
-											</td>
-										</tr>
-									{/each}
 								{/if}
 							</tbody>
 						</table>
