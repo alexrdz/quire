@@ -8,6 +8,7 @@ import DashboardPage from '../../../src/routes/(site)/dashboard/+page.svelte';
 import { NoteStatus } from '$domain/wall';
 import { eq } from 'drizzle-orm';
 import { seedDatabase } from '$lib/server/seed';
+import { getConfig } from '$lib/server/config';
 import crypto from 'node:crypto';
 import { makeSignature } from 'better-auth/crypto';
 
@@ -132,7 +133,7 @@ describe('Dashboard +page.server', () => {
 		expect(data.latestRecap).toBeDefined();
 		expect(data.generalRow).toBeDefined();
 		expect(data.artistQrSvg).toContain('<svg');
-		expect(data.artistBackPageUrl).toBe('http://localhost:4173/a/the-neon-velvet');
+		expect(data.artistBackPageUrl).toBe(`${getConfig().core.appUrl}/a/the-neon-velvet`);
 		expect(data.hasCustomizedTemplate).toBe(true);
 		expect(data.onboarding).toBe(false);
 	});
@@ -149,7 +150,7 @@ describe('Dashboard +page.server', () => {
 		expect(initial.issues).toEqual([]);
 		expect(initial.onboarding).toBe(true);
 		expect(initial.hasCustomizedTemplate).toBe(false);
-		expect(initial.artistBackPageUrl).toBe(`http://localhost:4173/a/${fixture.slug}`);
+		expect(initial.artistBackPageUrl).toBe(`${getConfig().core.appUrl}/a/${fixture.slug}`);
 
 		// Customizing accent color flips hasCustomizedTemplate to true
 		await db
@@ -214,6 +215,18 @@ describe('Dashboard +page.server', () => {
 		}
 	});
 
+	it('builds the Artist QR and Back Page URL from the configured app URL, not the Host header', async () => {
+		await seedDatabase();
+		const fixture = await createFreshArtistSession(crypto.randomBytes(3).toString('hex'));
+		const req = new Request('https://evil.example/dashboard', {
+			headers: { cookie: fixture.cookie, host: 'evil.example' }
+		});
+		const data = (await (load as any)({ request: req, url: new URL(req.url) })) as any;
+		expect(data.artistBackPageUrl).toBe(`${getConfig().core.appUrl}/a/${fixture.slug}`);
+		expect(data.artistBackPageUrl).not.toContain('evil.example');
+		expect(data.artistQrSvg).not.toContain('evil.example');
+	});
+
 	it('shows tip-tap counts, labelled as taps, with no dollar figures (ADR 0008)', async () => {
 		await seedDatabase();
 		const fixture = await createFreshArtistSession(crypto.randomBytes(3).toString('hex'));
@@ -257,8 +270,11 @@ describe('Dashboard +page.server', () => {
 		expect(data.generalRow.tipTaps).toBe(1);
 		expect(data.totalTipTaps).toBe(4);
 		// No money anywhere in the load: no gross, fees, net, payouts or a ledger.
-		const json = JSON.stringify({ recap: data.latestRecap, general: data.generalRow, issues: data.issues });
-		expect(json).not.toMatch(/gross|fee|net(Cents)?"|payout|amountSelected/i);
+		// Check property names only: values such as a random hex secretKey can contain "fee".
+		const keys = [data.latestRecap, data.generalRow, ...data.issues].flatMap((o: object) => Object.keys(o));
+		for (const key of keys) {
+			expect(key).not.toMatch(/gross|fee|^net|payout|amountSelected|tipSummary/i);
+		}
 		expect(data.tipLedger).toBeUndefined();
 
 		const { body } = render(DashboardPage, {

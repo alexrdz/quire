@@ -3,6 +3,7 @@ import { redirect, fail, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { db, schema } from '$lib/server/db';
 import { eq, and, desc, isNull } from 'drizzle-orm';
 import { auth } from '$lib/server/auth';
+import { getConfig } from '$lib/server/config';
 import {
 	blockFanFromWalls,
 	deleteWallNote,
@@ -108,7 +109,9 @@ export const load: ServerLoad = async ({ request, url }) => {
 	});
 
 	const requestUrl = url ?? new URL(request.url);
-	const origin = requestUrl.origin;
+	// The permanent Artist QR is printed on stickers: build it from the configured
+	// app URL, never from the request's Host header.
+	const origin = getConfig().core.appUrl;
 	const artistBackPageUrl = `${origin}/a/${artist.slug}`;
 	const artistQrSvg = await generateArtistQrSvg(origin, artist.slug);
 	const onboarding = requestUrl.searchParams.get('onboarding') === '1';
