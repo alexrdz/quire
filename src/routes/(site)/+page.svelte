@@ -66,9 +66,9 @@
             </Cluster>
 
             <h1 class="hero-headline">
-              Your Venmo QR collects money.
+              A Venmo sign gets you tips.
               <span class="neon-highlight-text"
-                >This collects money and people.</span
+                >This gets you tips and people.</span
               >
             </h1>
 
@@ -132,7 +132,7 @@
                 <Stack gap="none" class="metric-text-wrap">
                   <span class="metric-value">1-Tap Direct Tips</span>
                   <span class="metric-label"
-                    >Stripe Connect straight to bank</span
+                    >Straight to your Venmo, no cut</span
                   >
                 </Stack>
               </Cluster>
@@ -222,16 +222,17 @@
                   </svg>
                 </div>
                 <Stack gap="xs">
-                  <h3 class="feature-card-title">1-Tap Direct Tipping</h3>
+                  <h3 class="feature-card-title">Tips Straight to Your Venmo</h3>
                   <p class="feature-card-desc">
-                    Fans don't download an app or fill out sign-up forms in a loud
-                    room. They tap Apple Pay or card, and 100% of the funds route
-                    directly to your Stripe Connect account.
+                    No handle to search, no amount to type in a loud room. A fan
+                    taps an amount and Venmo opens with it and a note filled in.
+                    The money goes straight to your Venmo. Quire never handles it
+                    and takes no cut.
                   </p>
                 </Stack>
                 <Cluster gap="xs" class="card-tag-row">
-                  <span class="card-feature-item">Apple Pay / Google Pay</span>
-                  <span class="card-feature-item">Instant Payouts</span>
+                  <span class="card-feature-item">Prefilled Venmo</span>
+                  <span class="card-feature-item">Zero Quire Cut</span>
                 </Cluster>
               </Stack>
             </Box>
@@ -409,14 +410,14 @@
                 <Stack gap="xs">
                   <h3 class="feature-card-title">Real Fan Support</h3>
                   <p class="feature-card-desc">
-                    Skip corporate merchandise markups. Send $3, $5, or $20
-                    directly to the band members while standing in front of the
-                    stage. Your name lights up on the show wall.
+                    Skip corporate merchandise markups. Tap $3, $5, or $20 while
+                    you're standing in front of the stage and Venmo opens to pay
+                    the band directly. Then leave them a note on the show wall.
                   </p>
                 </Stack>
                 <Cluster gap="xs" class="card-tag-row">
                   <span class="card-feature-item">Direct Love</span>
-                  <span class="card-feature-item">Zero App Friction</span>
+                  <span class="card-feature-item">No Middleman Cut</span>
                 </Cluster>
               </Stack>
             </Box>
@@ -673,7 +674,7 @@
               <h3 class="step-heading">Fans Scan & Connect</h3>
               <p class="step-body">
                 Fans scan with their native phone camera. No app download. They
-                tip via Apple Pay, stamp their ticket stub, and sign your wall.
+                tip you through Venmo, stamp their ticket stub, and sign your wall.
               </p>
               <div class="step-meta">Fan engagement: 0.8s load</div>
             </Stack>
@@ -687,7 +688,7 @@
       <Stack gap="sm" align="center" class="section-header-centered">
         <span class="section-eyebrow pink">WHY IT MATTERS</span>
         <h2 class="section-title">
-          Why Bands Dumped Venmo Signs & Link Trees
+          Why a Venmo Sign Isn't Enough
         </h2>
         <p class="section-subtitle">
           Compare how traditional gig tactics stack up against a
@@ -706,7 +707,7 @@
             <thead>
               <tr>
                 <th class="col-feature">Experience</th>
-                <th class="col-traditional">Venmo QR / Link in Bio</th>
+                <th class="col-traditional">Venmo Sign / Link in Bio</th>
                 <th class="col-quire">Quire Digital Zine</th>
               </tr>
             </thead>
@@ -732,10 +733,10 @@
               <tr>
                 <td class="col-feature">Tip Friction</td>
                 <td class="col-traditional"
-                  >Requires specific app, searching handle, manually entering $</td
+                  >Searching a handle and typing an amount in a loud room</td
                 >
                 <td class="col-quire highlight-td"
-                  >1-tap Apple Pay/Google Pay in web browser</td
+                  >Tap an amount; Venmo opens with it and a note filled in</td
                 >
               </tr>
               <tr>
