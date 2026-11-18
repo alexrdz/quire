@@ -1,10 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Physical QR Scan & Attendance Flow', () => {
-	// Fixme: the sample Issues have fixed October 2026 Stamp Windows, so a valid scan is now
-	// correctly refused as OUTSIDE_STAMP_WINDOW. Fails on prod/phase-0 too; needs seed dates
-	// relative to seed time (follow-up, see PRODUCTION_PLAN.md Phase 1 status).
-	test.fixme('scanning with valid secret key sets attendance cookie and redirects to cover', async ({ page }) => {
+	// The seed keeps this sample Issue's Stamp Window open relative to seed time.
+	test('scanning with valid secret key sets attendance cookie and redirects to cover', async ({ page }) => {
 		// Valid secret from seed
 		const response = await page.goto('/scan/neon-velvet-brooklyn-2026-10-12?k=kickoff_babys_secret_2026');
 		expect(response?.status()).toBeLessThan(400);

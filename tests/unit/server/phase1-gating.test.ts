@@ -91,6 +91,23 @@ describe('1.1 seed gating', () => {
 		await expect(seedDatabase()).resolves.toBeTruthy();
 	});
 
+	it('leaves the Brooklyn sample Stamp Window open right after seeding', async () => {
+		const { seedDatabase, OPEN_WINDOW_SAMPLE_SLUG } = await import('$lib/server/seed');
+		const { db, schema } = await import('$lib/server/db');
+		const { eq } = await import('drizzle-orm');
+		const { isWithinStampWindow } = await import('$domain/stamping');
+
+		await seedDatabase();
+		const issue = await db.query.issues.findFirst({
+			where: eq(schema.issues.slug, OPEN_WINDOW_SAMPLE_SLUG)
+		});
+		expect(issue?.date).toBe('2026-10-12');
+		const window = { start: issue!.stampWindowStart!, end: issue!.stampWindowEnd! };
+		expect(isWithinStampWindow(new Date(), window)).toBe(true);
+		// Stored with second precision.
+		expect(Math.abs(window.end.getTime() - window.start.getTime() - 48 * 60 * 60 * 1000)).toBeLessThanOrEqual(1000);
+	});
+
 	it('leaves no seedDatabase() calls in route files', async () => {
 		const { readFile } = await import('node:fs/promises');
 		const files = [
