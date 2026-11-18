@@ -372,7 +372,7 @@
 											type="file"
 											disabled={!data.features.uploads}
 											name="audioFile"
-											accept="audio/mpeg,audio/mp3,audio/mp4,audio/wav,audio/ogg,audio/webm,audio/aac"
+											accept="audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/webm,audio/aac"
 											class="bookbinder-input"
 										/>
 										{#if !data.features.uploads}
@@ -525,7 +525,7 @@
 										disabled={!data.features.uploads}
 										name="photoFile"
 										multiple
-										accept="image/jpeg,image/png,image/webp,image/avif,image/svg+xml"
+										accept="image/jpeg,image/png,image/webp,image/avif"
 										onchange={optimizeFileInputFilesOnChange}
 										class="bookbinder-input"
 									/>
@@ -563,7 +563,7 @@
 										type="file"
 										disabled={!data.features.uploads}
 										name="audioFile"
-										accept="audio/mpeg,audio/mp3,audio/mp4,audio/wav,audio/ogg,audio/webm,audio/aac"
+										accept="audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/webm,audio/aac"
 										class="bookbinder-input"
 									/>
 									{#if !data.features.uploads}

@@ -9,7 +9,7 @@ import {
 	buildSlugPetitionDecisionTemplate
 } from './templates';
 
-import { getConfig } from '../config';
+import { allowsStandIn, getConfig } from '../config';
 
 import { FEATURE_UNAVAILABLE } from '$lib/features';
 
@@ -134,8 +134,9 @@ async function sendViaResendHttp(
 }
 
 /**
- * Sends a transactional email via Resend when RESEND_API_KEY is configured,
- * or falls back to structured dev console logging ONLY when RESEND_API_KEY is unset.
+ * Sends a transactional email via Resend when RESEND_API_KEY is configured.
+ * Without it: development and test log the email to the console, the Demo
+ * suppresses it silently, and production returns EMAIL_UNAVAILABLE without logging (ADR 0007).
  */
 export async function sendTransactionalEmail(input: {
 	to: string;
@@ -156,13 +157,15 @@ export async function sendTransactionalEmail(input: {
 
 	if (!apiKey) {
 		const { mode } = getConfig();
-		if (mode === 'production') {
-			return err({ code: 'EMAIL_UNAVAILABLE', message: FEATURE_UNAVAILABLE.email });
-		}
 		if (mode === 'demo') {
 			// The Demo never sends or logs email (ADR 0007).
 			return ok({ id: `demo_email_${crypto.randomUUID()}`, mode: 'suppressed' });
 		}
+		if (!allowsStandIn('email', mode)) {
+			// Production: no console fallback, so bodies, tokens and links are never logged.
+			return err({ code: 'EMAIL_UNAVAILABLE', message: FEATURE_UNAVAILABLE.email });
+		}
+		// Development and test only.
 		const devId = `dev_email_${crypto.randomUUID()}`;
 		console.info(
 			`[email:dev-fallback] RESEND_API_KEY not configured. Simulated send id=${devId} to=${parsed.data.to} subject="${parsed.data.subject}"`

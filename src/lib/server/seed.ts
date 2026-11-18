@@ -3,6 +3,7 @@ import { hashPassword } from 'better-auth/crypto';
 import { client, db, schema } from './db';
 import { eq, and } from 'drizzle-orm';
 import { calculateStampWindow } from '$domain/stamping';
+import { allowsSampleData, getConfig } from './config';
 
 async function ensureColumnExists(tableName: string, columnName: string, columnDef: string) {
 	try {
@@ -281,7 +282,18 @@ export async function ensureSchemaTables() {
 	}
 }
 
+export const SEED_REFUSED_MESSAGE =
+	'Refusing to seed sample data in production mode. Run it with NODE_ENV=development or DEMO_MODE=true (ADR 0007).';
+
+/**
+ * Loads the sample Artist, Fan and Issues. Development, test and the Demo only:
+ * throws in production so sample accounts with known passwords never reach a real database.
+ */
 export async function seedDatabase() {
+	if (!allowsSampleData(getConfig().mode)) {
+		throw new Error(SEED_REFUSED_MESSAGE);
+	}
+
 	await ensureSchemaTables();
 
 	const existingArtist = await db.query.artists.findFirst({

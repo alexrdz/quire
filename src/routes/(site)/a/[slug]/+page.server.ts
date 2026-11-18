@@ -1,12 +1,11 @@
 import { error, fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
-import { getConfig } from '$lib/server/config';
+import { allowsStandIn, getConfig } from '$lib/server/config';
 import { FEATURE_UNAVAILABLE } from '$lib/features';
 import { ArtistAccountStatus } from '$domain/account';
 import { groupIssuesByMonth } from '$domain/issue';
 import { db, schema } from '$lib/server/db';
 import { eq, and, desc, isNull, inArray } from 'drizzle-orm';
 import { auth, createSessionForUser } from '$lib/server/auth';
-import { seedDatabase } from '$lib/server/seed';
 import { createTipCheckout } from '$lib/server/services/payments';
 import { submitWallNote, flagWallNote } from '$lib/server/services/moderation';
 import { initiateTipSchema } from '$schemas/tipping';
@@ -100,9 +99,10 @@ export const actions: Actions = {
 			return fail(502, { fanSignInError: FEATURE_UNAVAILABLE.fanSignIn });
 		}
 
-		// Stand-in sign-in: development, test and the Demo only (features.fanSignIn is false in production without Google keys).
-
-		await seedDatabase();
+		// Stand-in sign-in as the sample Fan: development, test and the Demo only (ADR 0007).
+		if (!allowsStandIn('fanSignIn', getConfig().mode)) {
+			return fail(503, { fanSignInError: FEATURE_UNAVAILABLE.fanSignIn });
+		}
 		const fanUser = await db.query.users.findFirst({
 			where: eq(schema.users.email, 'maya@example.com')
 		});

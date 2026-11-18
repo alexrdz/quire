@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { hashPassword, makeSignature } from 'better-auth/crypto';
 import { db, schema } from '$lib/server/db';
@@ -10,6 +10,7 @@ import {
 	load as settingsLoad
 } from '../../../src/routes/(site)/dashboard/settings/+page.server';
 import { load as confirmPayoutLoad } from '../../../src/routes/(site)/dashboard/settings/confirm-payout/+page.server';
+import { seedDatabase } from '$lib/server/seed';
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -110,6 +111,11 @@ function buildFormRequest(
 		body: formData
 	});
 }
+
+// Creates the tables and sample data on a fresh test database (no route seeds any more).
+beforeAll(async () => {
+	await seedDatabase();
+});
 
 beforeEach(() => {
 	process.env = { ...ORIGINAL_ENV };

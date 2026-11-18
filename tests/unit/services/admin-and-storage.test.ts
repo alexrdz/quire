@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { ArtistAccountStatus, SlugPetitionStatus } from '$domain/account';
 import { db, schema } from '$lib/server/db';
-import { optimizeRasterImageBuffer, uploadMedia } from '$lib/server/services/storage';
+import sharp from 'sharp';
+import { uploadMedia } from '$lib/server/services/storage';
 import {
 	approveSlugPetition,
 	listSlugPetitions,
@@ -108,40 +109,17 @@ async function seedArtistAndFanWithStub(opts: { accountStatus: 'active' | 'close
 	return { artistId, slug, issueId, collectionId, suffix };
 }
 
-describe('Storage Media Optimization & Validation', () => {
-	it('preserves SVG uploads untouched without raster conversion', async () => {
-		const svgBytes = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"/></svg>');
-		const res = await uploadMedia({
-			filename: 'poster.svg',
-			contentType: 'image/svg+xml',
-			buffer: svgBytes,
-			allowedKind: 'image'
-		});
-
+describe('Storage', () => {
+	it('stores a raster upload locally as WebP in test mode', async () => {
+		const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#ff2a6d' } })
+			.png()
+			.toBuffer();
+		const res = await uploadMedia({ filename: 'cover.png', buffer: png, allowedKind: 'image' });
 		expect(res.ok).toBe(true);
 		if (!res.ok) return;
 		uploadedKeys.push(res.value.key);
-
-		expect(res.value.key.endsWith('.svg')).toBe(true);
+		expect(res.value.key.endsWith('.webp')).toBe(true);
 		expect(res.value.url).toBe(`/uploads/${res.value.key}`);
-	});
-
-	it('falls back gracefully on optimizeRasterImageBuffer when sharp is absent or bytes are minimal', async () => {
-		const pngStub = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-		const optimized = await optimizeRasterImageBuffer(pngStub, 'image/png');
-		expect(optimized.buffer.equals(pngStub)).toBe(true);
-		expect(optimized.mimeType).toBe('image/png');
-
-		const uploadRes = await uploadMedia({
-			filename: 'cover.png',
-			contentType: 'image/png',
-			buffer: pngStub,
-			allowedKind: 'image'
-		});
-		expect(uploadRes.ok).toBe(true);
-		if (!uploadRes.ok) return;
-		uploadedKeys.push(uploadRes.value.key);
-		expect(uploadRes.value.key.endsWith('.png')).toBe(true);
 	});
 });
 

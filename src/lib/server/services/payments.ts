@@ -9,7 +9,7 @@ import {
 } from '$domain/tipping';
 import { type Result, type DomainError, ok, err } from '$domain/types';
 
-import { getConfig } from '$lib/server/config';
+import { allowsStandIn, getConfig } from '$lib/server/config';
 import { getStripeClient } from '$lib/server/payments/stripe';
 
 import { FEATURE_UNAVAILABLE } from '$lib/features';
@@ -37,8 +37,9 @@ export type TipCheckoutResult =
 
 /**
  * Creates a tip checkout session:
- * - If Stripe Connect is configured with live/test key, creates Stripe PaymentIntent.
- * - If Stripe is unconfigured (offline/dev/demo), runs 1-tap local simulator and writes tip record (ADR 0003).
+ * - When Stripe keys are configured (live keys in production, test keys in the Demo), creates a Stripe PaymentIntent.
+ * - Otherwise, in development, test and the Demo only, runs the 1-tap local simulator and writes a tip record.
+ *   Production never simulates a tip; it returns the tier-2 "Tips are temporarily unavailable" error (ADR 0007).
  */
 export async function createTipCheckout(
 	params: CreateTipParams
@@ -98,8 +99,8 @@ export async function createTipCheckout(
 		}
 	}
 
-	// 2. Offline / Demo Mock Payment Simulator (ADR 0003). Never in production (ADR 0007).
-	if (config.mode === 'production') {
+	// 2. Local tip simulator: development, test and the Demo only. Never in production (ADR 0007).
+	if (!allowsStandIn('payments', config.mode)) {
 		return err({ code: 'PAYMENTS_UNAVAILABLE', message: FEATURE_UNAVAILABLE.payments });
 	}
 	const tipId = crypto.randomUUID();

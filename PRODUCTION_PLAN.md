@@ -53,10 +53,15 @@ Acceptance: unit tests for config parsing per mode; e2e against `pnpm build && p
 
 ## Phase 1: Blockers
 
+**Status (2026-11-18): done on `prod/phase-1` (PR into `prod/phase-0`).** `pnpm check`, `pnpm test`, `pnpm check:sizing` and `pnpm build` green; `pnpm test:e2e` green (12 passed, 1 marked fixme, see the last note).
+- Landed: `seedDatabase()` throws outside `development | test | demo`, and the error tells you to run it with `NODE_ENV=development` or `DEMO_MODE=true`. The seed calls in `/login`, `/a/[slug]` and `/i/[slug]` are gone, so seeding runs only from `hooks.server.ts` (`config.autoSeed`), `/demo` and `pnpm db:seed`. `/demo` is 404 in production. The sample Fan sign-in (`googleSignIn`, both `googleAuth` actions), the tip simulator, the console email fallback and the local `static/uploads` path now each check the mode explicitly through `allowsStandIn()` / `allowsSampleData()` in `config.ts`, so a wrongly set feature flag still can't turn them on in production. Uploads detect the type from the bytes with `file-type`, SVG is gone everywhere, every image is re-encoded with `sharp` to WebP (max edge 1600px, no EXIF/GPS, appended payloads dropped), and audio must pass the magic-byte check.
+- User decisions: `/demo` works in `development`, `test` and `demo`, and is 404 in production. The e2e suite logs in through it under `NODE_ENV=test`. The `db:seed` script stays as it is in `package.json`.
+- Notes for later phases: audio is stored as uploaded after the magic-byte check. Serving uploads with `X-Content-Type-Options: nosniff` and a strict `Content-Type` belongs with the R2/CDN work (3.4). `sharp` works under `pnpm build` + `pnpm preview`, where a real upload came back as WebP. The Netlify function bundle size check stays open until adapter-netlify lands in 3.4. The `/demo` `redirect` parameter is still unvalidated (open-redirect item, Phase 2). `tests/e2e/scan-attendance.spec.ts` (valid-secret scan) is marked `test.fixme`. It fails on `prod/phase-0` too, because the sample Issues have fixed October 2026 Stamp Windows, so it needs relative seed dates (follow-up).
+
 1.1 **Seed and `/demo` gated to dev, test and Demo**
 - `seedDatabase()` throws unless mode is `development`, `test` or `demo`.
 - Remove the seed calls from `/login` (load and all actions), `/a/[slug]` and `/i/[slug]`. Seeding happens only from `hooks.server.ts` (dev/demo) and `pnpm db:seed`.
-- `/demo` returns 404 unless mode is `demo` or `development`.
+- `/demo` returns 404 in production; it works in `development`, `test` (the e2e suite logs in through it) and `demo`.
 
 1.2 **Mock sign-in removed outside dev/Demo**
 - `googleSignIn` (login) and `googleAuth` (zine) no longer create a Maya session in production; they return the tier-2 message.
