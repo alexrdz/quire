@@ -73,7 +73,7 @@ const DETECTED_EXT_TO_MIME: Record<string, string> = {
 	ogg: 'audio/ogg',
 	oga: 'audio/ogg',
 	opus: 'audio/ogg',
-	// Browser recordings in WebM are detected as video/webm; only audio is served from it.
+	// file-type reports every WebM as video/webm; detectMediaType only accepts audio-only ones.
 	webm: 'audio/webm',
 	aac: 'audio/aac'
 };
@@ -108,7 +108,73 @@ export async function detectMediaType(buffer: Buffer): Promise<string | null> {
 		// Only audio-branded MP4 containers count as audio.
 		return detected.mime.startsWith('audio/') ? 'audio/mp4' : null;
 	}
+	if (detected.ext === 'webm') {
+		// Browser recordings are WebM; reject any that carry a video (or unknown) track.
+		return isAudioOnlyWebm(buffer) ? 'audio/webm' : null;
+	}
 	return DETECTED_EXT_TO_MIME[detected.ext] ?? null;
+}
+
+const EBML_SEGMENT = 0x18538067;
+const EBML_TRACKS = 0x1654ae6b;
+const EBML_TRACK_ENTRY = 0xae;
+const EBML_TRACK_TYPE = 0x83;
+const EBML_CLUSTER = 0x1f43b675;
+const MATROSKA_TRACK_TYPE_AUDIO = 2;
+
+/** Reads an EBML variable-length integer at `offset`. Element IDs keep their marker bit; sizes drop it. */
+function readVint(
+	buffer: Buffer,
+	offset: number,
+	keepMarker: boolean
+): { value: number; length: number; unknown: boolean } | null {
+	const first = buffer[offset];
+	if (first === undefined || first === 0) return null;
+	const length = Math.clz32(first) - 23;
+	if (length > 8 || offset + length > buffer.length) return null;
+	let value = keepMarker ? first : first & (0xff >> length);
+	let allOnes = value === 0xff >> length;
+	for (let i = 1; i < length; i++) {
+		const byte = buffer[offset + i]!;
+		value = value * 256 + byte;
+		allOnes &&= byte === 0xff;
+	}
+	return { value, length, unknown: !keepMarker && allOnes };
+}
+
+/**
+ * True when a WebM file declares at least one track and every track is audio.
+ * Walks Segment > Tracks > TrackEntry > TrackType and stops at the first Cluster,
+ * so only the header is read.
+ */
+export function isAudioOnlyWebm(buffer: Buffer): boolean {
+	const trackTypes: number[] = [];
+
+	const walk = (start: number, end: number): boolean => {
+		let offset = start;
+		while (offset < end) {
+			const id = readVint(buffer, offset, true);
+			if (!id) return false;
+			const size = readVint(buffer, offset + id.length, false);
+			if (!size) return false;
+			const dataStart = offset + id.length + size.length;
+			const dataEnd = size.unknown ? end : Math.min(end, dataStart + size.value);
+
+			if (id.value === EBML_CLUSTER) return true;
+			if (id.value === EBML_SEGMENT || id.value === EBML_TRACKS || id.value === EBML_TRACK_ENTRY) {
+				if (!walk(dataStart, dataEnd)) return false;
+				if (id.value === EBML_TRACKS) return true;
+			} else if (id.value === EBML_TRACK_TYPE) {
+				trackTypes.push(buffer.readUIntBE(dataStart, Math.min(Math.max(size.value, 1), 6)));
+			}
+			if (size.unknown) return true;
+			offset = dataEnd;
+		}
+		return true;
+	};
+
+	if (!walk(0, buffer.length)) return false;
+	return trackTypes.length > 0 && trackTypes.every((type) => type === MATROSKA_TRACK_TYPE_AUDIO);
 }
 
 function maxBytesFor(kind: MediaKindFilter): number {

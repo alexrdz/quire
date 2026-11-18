@@ -187,6 +187,38 @@ describe('audio magic bytes', () => {
 		expect(result.value.key.endsWith('.wav')).toBe(true);
 	});
 
+	/** Minimal WebM: EBML header (DocType webm) + Segment (unknown size) > Tracks > TrackEntry > TrackType. */
+	function webm(trackTypes: number[]): Buffer {
+		const el = (id: number[], body: Buffer) =>
+			Buffer.concat([Buffer.from(id), Buffer.from([0x80 | body.length]), body]);
+		const docType = el([0x42, 0x82], Buffer.from('webm'));
+		const header = el([0x1a, 0x45, 0xdf, 0xa3], docType);
+		const entries = trackTypes.map((type, i) =>
+			el([0xae], Buffer.concat([el([0xd7], Buffer.from([i + 1])), el([0x83], Buffer.from([type]))]))
+		);
+		const tracks = el([0x16, 0x54, 0xae, 0x6b], Buffer.concat(entries));
+		const segment = Buffer.concat([
+			Buffer.from([0x18, 0x53, 0x80, 0x67, 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
+			tracks
+		]);
+		return Buffer.concat([header, segment, Buffer.alloc(64)]);
+	}
+
+	it('accepts an audio-only WebM recording', async () => {
+		const result = await uploadMedia({ buffer: webm([2]), allowedKind: 'audio' });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		uploadedKeys.push(result.value.key);
+		expect(result.value.key.endsWith('.webm')).toBe(true);
+	});
+
+	it('rejects a WebM with a video track', async () => {
+		for (const tracks of [[1], [1, 2], []]) {
+			const result = await uploadMedia({ buffer: webm(tracks), allowedKind: 'audio' });
+			expect(result.ok, JSON.stringify(tracks)).toBe(false);
+		}
+	});
+
 	it('rejects text labelled audio/mpeg', async () => {
 		const file = new File(['<script>alert(1)</script>'], 'song.mp3', { type: 'audio/mpeg' });
 		const result = await uploadFormFile(file, { kind: 'audio' });
