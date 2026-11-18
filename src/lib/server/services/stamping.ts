@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { getConfig } from '$lib/server/config';
 import { db, schema } from '$lib/server/db';
 import { eq, and } from 'drizzle-orm';
 import {
@@ -17,8 +18,7 @@ import {
 	err
 } from '$domain/types';
 
-const COOKIE_SECRET =
-	process.env.COOKIE_SECRET || 'quire_attendance_hmac_secret_48hr_window_key_1234';
+const COOKIE_SECRET = getConfig().core.cookieSecret;
 
 /**
  * Signs an attendance scan token using HMAC SHA-256.

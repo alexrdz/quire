@@ -1,5 +1,4 @@
 import crypto from 'node:crypto';
-import Stripe from 'stripe';
 import { db, schema } from '$lib/server/db';
 import { eq } from 'drizzle-orm';
 import {
@@ -10,14 +9,10 @@ import {
 } from '$domain/tipping';
 import { type Result, type DomainError, ok, err } from '$domain/types';
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const isStripeConfigured = Boolean(STRIPE_SECRET_KEY && STRIPE_SECRET_KEY.startsWith('sk_'));
+import { allowsStandIn, getConfig } from '$lib/server/config';
+import { getStripeClient } from '$lib/server/payments/stripe';
 
-const stripe = isStripeConfigured
-	? new Stripe(STRIPE_SECRET_KEY!, {
-			apiVersion: '2025-01-27.acacia' as any
-		})
-	: null;
+import { FEATURE_UNAVAILABLE } from '$lib/features';
 
 export interface CreateTipParams {
 	artistId: string;
@@ -42,12 +37,18 @@ export type TipCheckoutResult =
 
 /**
  * Creates a tip checkout session:
- * - If Stripe Connect is configured with live/test key, creates Stripe PaymentIntent.
- * - If Stripe is unconfigured (offline/dev/demo), runs 1-tap local simulator and writes tip record (ADR 0003).
+ * - When Stripe keys are configured (live keys in production, test keys in the Demo), creates a Stripe PaymentIntent.
+ * - Otherwise, in development, test and the Demo only, runs the 1-tap local simulator and writes a tip record.
+ *   Production never simulates a tip; it returns the tier-2 "Tips are temporarily unavailable" error (ADR 0007).
  */
 export async function createTipCheckout(
 	params: CreateTipParams
 ): Promise<Result<TipCheckoutResult, DomainError>> {
+	const config = getConfig();
+	if (!config.features.payments) {
+		return err({ code: 'PAYMENTS_UNAVAILABLE', message: FEATURE_UNAVAILABLE.payments });
+	}
+
 	const breakdownResult = calculateTipBreakdown(
 		params.amountGrossCents,
 		params.fanCoveredFees ?? false
@@ -68,7 +69,8 @@ export async function createTipCheckout(
 	}
 
 	// 1. Stripe Connect flow
-	if (isStripeConfigured && stripe && artist.stripeAccountId && artist.payoutsEnabled) {
+	const stripe = config.live.payments ? getStripeClient() : null;
+	if (stripe && artist.stripeAccountId && artist.payoutsEnabled) {
 		try {
 			const paymentIntent = await stripe.paymentIntents.create({
 				amount: breakdown.totalChargedCents,
@@ -97,7 +99,10 @@ export async function createTipCheckout(
 		}
 	}
 
-	// 2. Offline / Demo Mock Payment Simulator (ADR 0003)
+	// 2. Local tip simulator: development, test and the Demo only. Never in production (ADR 0007).
+	if (!allowsStandIn('payments', config.mode)) {
+		return err({ code: 'PAYMENTS_UNAVAILABLE', message: FEATURE_UNAVAILABLE.payments });
+	}
 	const tipId = crypto.randomUUID();
 	const simulatedPaymentId = `mock_pi_${crypto.randomBytes(12).toString('hex')}`;
 

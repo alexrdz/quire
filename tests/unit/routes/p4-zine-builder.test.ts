@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { asc, eq } from 'drizzle-orm';
 import { hashPassword, makeSignature } from 'better-auth/crypto';
 import { db, schema } from '$lib/server/db';
@@ -12,6 +12,8 @@ import {
 	load as bookbinderLoad
 } from '../../../src/routes/(site)/dashboard/bookbinder/[id]/+page.server';
 import { load as readerLoad } from '../../../src/routes/(zine)/i/[slug]/+page.server';
+import { TINY_JPEG, TINY_MP3, TINY_PNG } from '../helpers/media';
+import { seedDatabase } from '$lib/server/seed';
 
 interface TestArtistFixture {
 	userId: string;
@@ -100,6 +102,11 @@ function buildPostRequest(urlStr: string, cookie: string, formData: FormData): R
 	});
 }
 
+// Creates the tables and sample data on a fresh test database (no route seeds any more).
+beforeAll(async () => {
+	await seedDatabase();
+});
+
 afterEach(async () => {
 	while (createdFixtures.length > 0) {
 		const fixture = createdFixtures.pop()!;
@@ -149,7 +156,7 @@ describe('P4 Quick Issue + Bookbinder + Reader', () => {
 		formData.set('saveMode', 'published');
 		formData.set(
 			'photoFile',
-			new File([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], 'soundcheck.png', {
+			new File([TINY_PNG], 'soundcheck.png', {
 				type: 'image/png'
 			})
 		);
@@ -175,7 +182,7 @@ describe('P4 Quick Issue + Bookbinder + Reader', () => {
 		expect(issue?.issuePages[1].kind).toBe('photo');
 
 		const photoContent = JSON.parse(issue!.issuePages[1].contentJson);
-		expect(photoContent.imageUrl).toMatch(/^\/uploads\/.+\.png$/);
+		expect(photoContent.imageUrl).toMatch(/^\/uploads\/.+\.webp$/);
 		expect(photoContent.body).toBe('Soundcheck on Frankford Ave');
 	});
 
@@ -426,7 +433,7 @@ describe('P4 Quick Issue + Bookbinder + Reader', () => {
 		photoForm.set('body', 'Pedalboard close-up');
 		photoForm.set(
 			'photoFile',
-			new File([new Uint8Array([255, 216, 255, 224])], 'rig.jpg', { type: 'image/jpeg' })
+			new File([TINY_JPEG], 'rig.jpg', { type: 'image/jpeg' })
 		);
 		const addPhoto = (await (bookbinderActions.addPage as any)({
 			request: buildPostRequest(`${baseUrl}?/addPage`, fixture.cookie, photoForm),
@@ -442,7 +449,7 @@ describe('P4 Quick Issue + Bookbinder + Reader', () => {
 		audioForm.set('body', '4-track bounce');
 		audioForm.set(
 			'audioFile',
-			new File([new Uint8Array([73, 68, 51, 3, 0])], 'rough.mp3', { type: 'audio/mpeg' })
+			new File([TINY_MP3], 'rough.mp3', { type: 'audio/mpeg' })
 		);
 		const addAudio = (await (bookbinderActions.addPage as any)({
 			request: buildPostRequest(`${baseUrl}?/addPage`, fixture.cookie, audioForm),
@@ -480,7 +487,7 @@ describe('P4 Quick Issue + Bookbinder + Reader', () => {
 
 		expect(readerData.issuePages).toHaveLength(3);
 		const [pPhoto, pAudio, pVideo] = readerData.issuePages;
-		expect(JSON.parse(pPhoto.contentJson).imageUrl).toMatch(/^\/uploads\/.+\.jpg$/);
+		expect(JSON.parse(pPhoto.contentJson).imageUrl).toMatch(/^\/uploads\/.+\.webp$/);
 		expect(JSON.parse(pAudio.contentJson).audioUrl).toMatch(/^\/uploads\/.+\.mp3$/);
 		expect(JSON.parse(pVideo.contentJson).videoUrl).toBe(
 			'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
@@ -517,7 +524,7 @@ describe('Bookbinder photo pile pages', () => {
 	}
 
 	function jpeg(name: string): File {
-		return new File([new Uint8Array([255, 216, 255, 224])], name, { type: 'image/jpeg' });
+		return new File([TINY_JPEG], name, { type: 'image/jpeg' });
 	}
 
 	async function readPage(issueId: string) {
@@ -547,7 +554,7 @@ describe('Bookbinder photo pile pages', () => {
 		const [page] = await readPage(issueId);
 		expect(page.content.photos).toHaveLength(4);
 		for (const photo of page.content.photos.slice(0, 3)) {
-			expect(photo.url).toMatch(/^\/uploads\/.+\.jpg$/);
+			expect(photo.url).toMatch(/^\/uploads\/.+\.webp$/);
 		}
 		expect(page.content.photos[3].url).toBe('https://images.example.com/four.jpg');
 		expect(page.content.imageUrl).toBe(page.content.photos[0].url);

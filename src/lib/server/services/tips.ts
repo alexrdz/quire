@@ -22,7 +22,7 @@ import {
 	type PayoutChangeAction
 } from '$schemas/payouts';
 import { verifyUserCredentialPassword } from '$lib/server/auth';
-import { sendPayoutAccountChangeConfirmationEmail } from '$lib/server/email';
+import { sendPayoutAccountChangeConfirmationEmail, type EmailSendReceipt } from '$lib/server/email';
 import {
 	createExpressConnectedAccount,
 	createExpressOnboardingLink,
@@ -199,7 +199,7 @@ export async function requestPayoutAccountChange(input: {
 	action?: PayoutChangeAction;
 	newStripeAccountId: string | null;
 	origin: string;
-}): Promise<Result<{ confirmationSent: boolean; emailMode: 'resend' | 'dev_console' }, DomainError>> {
+}): Promise<Result<{ confirmationSent: boolean; emailMode: EmailSendReceipt['mode'] }, DomainError>> {
 	const parsed = payoutChangeServiceInputSchema.safeParse(input);
 	if (!parsed.success) {
 		return err({

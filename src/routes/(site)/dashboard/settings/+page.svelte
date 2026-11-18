@@ -5,12 +5,15 @@
 
 	type PayoutActionOption = 'connect' | 'replace' | 'disconnect';
 
+	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
+
 	let { data, form } = $props();
 
 	let generalWallApproveFirst = $state(false);
 	let confirmPassword = $state('');
 	let selectedAction = $state<PayoutActionOption>('connect');
 
+	const payoutChangesBlocked = $derived(!data.features.payments || !data.features.email);
 	const hasAnyAccount = $derived(Boolean(data.artist.stripeAccountId));
 	const hasLiveAccount = $derived(hasAnyAccount && !data.isSeededDemoAccount);
 
@@ -258,10 +261,18 @@
 						</Box>
 					{/if}
 
-					{#if !data.stripeConfigured}
-						<Box variant="subtle" padding="sm" radius="md" class="info-box">
-							Stripe Connect API keys are not configured on this server (<span class="font-mono">STRIPE_SECRET_KEY</span> is unset). Password verification and confirmation emails still execute, and the confirmation route will display the missing key error until Stripe is configured.
-						</Box>
+					{#if !data.features.payments}
+						<FeatureNotice
+							feature="payments"
+							mode={data.features.mode}
+							detail="Payout setup is paused until tips are back. Your existing payout account is unchanged."
+						/>
+					{:else if !data.features.email}
+						<FeatureNotice
+							feature="email"
+							mode={data.features.mode}
+							detail="Payout changes need a confirmation email, so they are paused for now."
+						/>
 					{/if}
 
 					{#if form?.payoutConfirmationSent}
@@ -336,7 +347,7 @@
 							{/if}
 						</Stack>
 
-						<button type="submit" class="btn-save">
+						<button type="submit" class="btn-save" disabled={payoutChangesBlocked}>
 							{actionButtonLabel}
 						</button>
 					</form>
@@ -416,7 +427,7 @@
 									Confirm your band email address so you never miss payout security alerts or password reset links.
 								</p>
 								<form method="POST" action="?/resendVerification" use:enhance>
-									<button type="submit" class="btn-secondary">
+									<button type="submit" class="btn-secondary" disabled={!data.features.email}>
 										Resend Verification Email
 									</button>
 								</form>

@@ -1,4 +1,6 @@
 import { fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
+import { getConfig } from '$lib/server/config';
+import { featureUnavailableMessage } from '$lib/features';
 import { auth } from '$lib/server/auth';
 import { passwordResetConfirmSchema, passwordResetRequestSchema } from '$schemas/auth';
 
@@ -31,6 +33,15 @@ export const load: ServerLoad = async ({ url }) => {
 
 export const actions: Actions = {
 	request: async ({ request }) => {
+		const { features, mode } = getConfig();
+		if (!features.email) {
+			return fail(503, {
+				action: 'request' as const,
+				error: featureUnavailableMessage('email', mode),
+				email: ''
+			});
+		}
+
 		const formData = await request.formData();
 		const emailRaw = String(formData.get('email') || '');
 		const parsed = passwordResetRequestSchema.safeParse({ email: emailRaw });

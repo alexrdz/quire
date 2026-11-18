@@ -1,10 +1,16 @@
-import { redirect, type RequestHandler } from '@sveltejs/kit';
+import { error, redirect, type RequestHandler } from '@sveltejs/kit';
+import { allowsSampleData, getConfig } from '$lib/server/config';
 import { db, schema } from '$lib/server/db';
 import { eq } from 'drizzle-orm';
 import { seedDatabase } from '$lib/server/seed';
 import { createSessionForUser } from '$lib/server/auth';
 
+/** Sample logins: development, test and the Demo only. Not found in production (ADR 0007). */
 export const GET: RequestHandler = async ({ cookies, url }) => {
+	if (!allowsSampleData(getConfig().mode)) {
+		throw error(404, 'Not found');
+	}
+
 	await seedDatabase();
 
 	const role = url.searchParams.get('role') || 'artist';

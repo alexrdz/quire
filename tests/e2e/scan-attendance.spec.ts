@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Physical QR Scan & Attendance Flow', () => {
+	// The seed keeps this sample Issue's Stamp Window open relative to seed time.
 	test('scanning with valid secret key sets attendance cookie and redirects to cover', async ({ page }) => {
 		// Valid secret from seed
 		const response = await page.goto('/scan/neon-velvet-brooklyn-2026-10-12?k=kickoff_babys_secret_2026');

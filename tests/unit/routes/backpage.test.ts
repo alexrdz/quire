@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { ALL_FEATURES_ON } from '../helpers/features';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { render } from 'svelte/server';
@@ -92,7 +93,7 @@ describe('Artist Back Page Monthly Collapsing (/a/[slug])', () => {
 		const { default: BackPageComponent } = await import('../../../src/routes/(site)/a/[slug]/+page.svelte');
 		const rendered = render(BackPageComponent, {
 			props: {
-				data: data as never,
+				data: { ...data, features: ALL_FEATURES_ON } as never,
 				form: null
 			}
 		});

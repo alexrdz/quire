@@ -7,22 +7,14 @@ import {
 	type TipBreakdown
 } from '$domain/tipping';
 import { type Result, type DomainError, ok, err } from '$domain/types';
-
-try {
-	process.loadEnvFile?.('.env');
-} catch {}
+import { getConfig } from '$lib/server/config';
 
 const STRIPE_API_VERSION: Stripe.LatestApiVersion = '2025-02-24.acacia';
 
 let cachedClient: { secretKey: string; client: Stripe } | null = null;
 
 function readStripeSecretKey(): string | null {
-	const raw = process.env.STRIPE_SECRET_KEY?.trim();
-	if (!raw) return null;
-	if (!raw.startsWith('sk_') && !raw.startsWith('rk_')) {
-		return null;
-	}
-	return raw;
+	return getConfig().integrations.stripe.secretKey;
 }
 
 export function isStripeConfigured(): boolean {
@@ -420,7 +412,7 @@ export function verifyStripeWebhookEvent(
 	signature: string | null | undefined,
 	webhookSecretOverride?: string
 ): Result<Stripe.Event, DomainError> {
-	const webhookSecret = (webhookSecretOverride ?? process.env.STRIPE_WEBHOOK_SECRET ?? '').trim();
+	const webhookSecret = (webhookSecretOverride ?? getConfig().integrations.stripe.webhookSecret ?? '').trim();
 
 	const parsed = webhookVerifySchema.safeParse({
 		signature: signature ?? '',

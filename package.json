@@ -10,6 +10,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "check:sizing": "node --import tsx scripts/check-fluid-sizing.ts",
+    "check:env": "node --import tsx scripts/check-env.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
@@ -42,7 +43,9 @@
     "@libsql/client": "^0.14.0",
     "better-auth": "^1.1.18",
     "drizzle-orm": "^0.39.3",
+    "file-type": "^22.3.0",
     "qrcode": "^1.5.4",
+    "sharp": "^0.35.5",
     "stripe": "^17.6.0",
     "zod": "^4.0.0"
   }

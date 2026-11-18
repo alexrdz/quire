@@ -1,4 +1,5 @@
 import { error, redirect, type RequestHandler } from '@sveltejs/kit';
+import { getConfig } from '$lib/server/config';
 import { processIssueScan } from '$lib/server/services/stamping';
 
 export const GET: RequestHandler = async ({ params, url, cookies }) => {
@@ -21,7 +22,7 @@ export const GET: RequestHandler = async ({ params, url, cookies }) => {
 	cookies.set(`quire_scan_${slug}`, result.value.token, {
 		path: '/',
 		httpOnly: true,
-		secure: process.env.NODE_ENV === 'production',
+		secure: getConfig().isDeployed,
 		sameSite: 'lax',
 		maxAge: 60 * 60 * 24 * 30
 	});

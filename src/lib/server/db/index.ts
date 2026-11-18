@@ -1,34 +1,33 @@
-import { createClient } from '@libsql/client';
+import { createClient, type Client } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
+import { getConfig } from '../config';
 import * as schema from './schema';
 
-const isTest = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
+const { core } = getConfig();
 
-if (!isTest) {
-	try {
-		process.loadEnvFile?.('.env');
-	} catch {}
+/**
+ * When the core configuration is invalid (ADR 0007), the database handles throw on
+ * first use instead of at import, so `hooks.server.ts` can still serve the 503 page
+ * and the build can still analyse route modules.
+ */
+function unavailable<T extends object>(name: string): T {
+	return new Proxy({} as T, {
+		get(_target, prop) {
+			if (prop === 'then') return undefined;
+			throw new Error(`${name} is unavailable: core configuration is invalid (${core.issues.join(', ')}).`);
+		}
+	});
 }
 
-// In test environment or local fallback, use local SQLite database file
-const rawUrl = process.env.DATABASE_URL;
-const url =
-	isTest && (!rawUrl || rawUrl.startsWith('libsql://'))
-		? 'file:local.db'
-		: rawUrl || 'file:local.db';
+export const client: Client = core.ok
+	? createClient({
+			url: core.databaseUrl,
+			...(core.databaseAuthToken ? { authToken: core.databaseAuthToken } : {})
+		})
+	: unavailable<Client>('Database client');
 
-const isFileDb = url.startsWith('file:');
-const authToken = isFileDb || isTest ? undefined : process.env.DATABASE_AUTH_TOKEN;
+type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
-if (!isFileDb && !isTest && !authToken) {
-	throw new Error('DATABASE_AUTH_TOKEN is required when connecting to a remote libSQL/Turso database.');
-}
-
-export const client = createClient({
-	url,
-	...(authToken ? { authToken } : {})
-});
-
-export const db = drizzle(client, { schema });
+export const db: DrizzleDb = core.ok ? drizzle(client, { schema }) : unavailable<DrizzleDb>('Database');
 export type Database = typeof db;
 export { schema };

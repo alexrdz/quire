@@ -4,19 +4,15 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { makeSignature, verifyPassword } from 'better-auth/crypto';
 import { and, eq } from 'drizzle-orm';
+import { getConfig } from './config';
 import { db, schema } from './db';
 import { sendPasswordResetEmail, sendVerificationEmail } from './email';
 
-try {
-	process.loadEnvFile?.('.env');
-} catch {}
+const config = getConfig();
 
-export const authSecret =
-	process.env.BETTER_AUTH_SECRET ||
-	'quire_development_secret_at_least_32_characters_long';
+export const authSecret = config.core.authSecret;
 
-const baseAuthUrl =
-	process.env.BETTER_AUTH_URL || process.env.PUBLIC_APP_URL || 'http://localhost:5173';
+const baseAuthUrl = config.core.appUrl;
 
 export const auth = betterAuth({
 	baseURL: baseAuthUrl,
@@ -59,13 +55,15 @@ export const auth = betterAuth({
 			}
 		}
 	},
-	socialProviders: {
-		google: {
-			clientId: process.env.GOOGLE_CLIENT_ID || 'mock_google_client_id',
-			clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'mock_google_client_secret',
-			enabled: true
-		}
-	},
+	socialProviders: config.integrations.google
+		? {
+				google: {
+					clientId: config.integrations.google.clientId,
+					clientSecret: config.integrations.google.clientSecret,
+					enabled: true
+				}
+			}
+		: {},
 	user: {
 		changeEmail: {
 			enabled: true
@@ -106,7 +104,7 @@ export async function createSessionForUser(cookies: Cookies, userId: string): Pr
 	cookies.set('better-auth.session_token', signedCookie, {
 		path: '/',
 		httpOnly: true,
-		secure: process.env.NODE_ENV === 'production',
+		secure: config.isDeployed,
 		sameSite: 'lax',
 		maxAge: 60 * 60 * 24 * 7
 	});

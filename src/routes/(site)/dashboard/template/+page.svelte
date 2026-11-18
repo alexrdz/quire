@@ -6,6 +6,8 @@
 	import { checkAccentContrast } from '$domain/theme';
 	import { optimizeFileInputOnChange } from '$lib/utils/image-optimize';
 
+	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
+
 	let { data, form } = $props();
 
 	let accentColor = $state('#05D9E8');
@@ -240,16 +242,20 @@
 							<Stack gap="sm">
 								<Stack gap="3xs">
 									<label for="coverArtFile" class="subtext-small text-muted">
-										Upload Cover Image (JPEG, PNG, WebP, AVIF, SVG — max 10 MB)
+										Upload Cover Image (JPEG, PNG, WebP, AVIF, max 10 MB)
 									</label>
 									<input
 										id="coverArtFile"
 										type="file"
+										disabled={!data.features.uploads}
 										name="coverArtFile"
-										accept="image/*"
+										accept="image/jpeg,image/png,image/webp,image/avif"
 										onchange={handleCoverFileChange}
 										class="form-field-input file-field-input"
 									/>
+									{#if !data.features.uploads}
+										<FeatureNotice feature="uploads" mode={data.features.mode} />
+									{/if}
 								</Stack>
 
 								<Stack gap="3xs">
@@ -502,10 +508,14 @@
 														<input
 															id="edit-audio-file-{tPage.id}"
 															type="file"
+															disabled={!data.features.uploads}
 															name="audioFile"
-															accept="audio/*"
+															accept="audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/webm,audio/aac"
 															class="form-field-input file-field-input"
 														/>
+														{#if !data.features.uploads}
+															<FeatureNotice feature="uploads" mode={data.features.mode} />
+														{/if}
 													</Stack>
 												{:else if tPage.kind === 'photo'}
 													<Split ratio="1-1" gap="sm" collapse="sm">
@@ -516,11 +526,15 @@
 															<input
 																id="edit-photo-file-{tPage.id}"
 																type="file"
+																disabled={!data.features.uploads}
 																name="photoFile"
-																accept="image/*"
+																accept="image/jpeg,image/png,image/webp,image/avif"
 																onchange={optimizeFileInputOnChange}
 																class="form-field-input file-field-input"
 															/>
+															{#if !data.features.uploads}
+																<FeatureNotice feature="uploads" mode={data.features.mode} />
+															{/if}
 														</Stack>
 														<Stack gap="3xs">
 															<label for="edit-photo-url-{tPage.id}" class="subtext-small text-muted">
@@ -671,10 +685,14 @@
 								<input
 									id="new-audio-file"
 									type="file"
+									disabled={!data.features.uploads}
 									name="audioFile"
-									accept="audio/*"
+									accept="audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/webm,audio/aac"
 									class="form-field-input file-field-input"
 								/>
+								{#if !data.features.uploads}
+									<FeatureNotice feature="uploads" mode={data.features.mode} />
+								{/if}
 							</Stack>
 						{:else if newPageKind === 'photo'}
 							<Split ratio="1-1" gap="sm" collapse="sm" class="w-full">
@@ -685,11 +703,15 @@
 									<input
 										id="new-photo-file"
 										type="file"
+										disabled={!data.features.uploads}
 										name="photoFile"
-										accept="image/*"
+										accept="image/jpeg,image/png,image/webp,image/avif"
 										onchange={optimizeFileInputOnChange}
 										class="form-field-input file-field-input"
 									/>
+									{#if !data.features.uploads}
+										<FeatureNotice feature="uploads" mode={data.features.mode} />
+									{/if}
 								</Stack>
 								<Stack gap="3xs">
 									<label for="new-photo-url" class="subtext-small text-muted">

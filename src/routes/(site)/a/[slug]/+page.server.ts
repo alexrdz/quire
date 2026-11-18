@@ -1,10 +1,11 @@
 import { error, fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
+import { allowsStandIn, getConfig } from '$lib/server/config';
+import { FEATURE_UNAVAILABLE } from '$lib/features';
 import { ArtistAccountStatus } from '$domain/account';
 import { groupIssuesByMonth } from '$domain/issue';
 import { db, schema } from '$lib/server/db';
 import { eq, and, desc, isNull, inArray } from 'drizzle-orm';
 import { auth, createSessionForUser } from '$lib/server/auth';
-import { seedDatabase } from '$lib/server/seed';
 import { createTipCheckout } from '$lib/server/services/payments';
 import { submitWallNote, flagWallNote } from '$lib/server/services/moderation';
 import { initiateTipSchema } from '$schemas/tipping';
@@ -79,13 +80,12 @@ export const load: ServerLoad = async ({ params, request }) => {
 export const actions: Actions = {
 	googleAuth: async ({ request, params, cookies }) => {
 		const callbackURL = `/a/${params.slug}#general-wall`;
-		const hasGoogleKeys = Boolean(
-			process.env.GOOGLE_CLIENT_ID &&
-				process.env.GOOGLE_CLIENT_ID !== 'mock_google_client_id' &&
-				process.env.GOOGLE_CLIENT_SECRET
-		);
+		const { features, live } = getConfig();
+		if (!features.fanSignIn) {
+			return fail(503, { fanSignInError: FEATURE_UNAVAILABLE.fanSignIn });
+		}
 
-		if (hasGoogleKeys) {
+		if (live.fanSignIn) {
 			const res = await auth.api.signInSocial({
 				body: {
 					provider: 'google',
@@ -96,9 +96,13 @@ export const actions: Actions = {
 			if (res?.url) {
 				throw redirect(303, res.url);
 			}
+			return fail(502, { fanSignInError: FEATURE_UNAVAILABLE.fanSignIn });
 		}
 
-		await seedDatabase();
+		// Stand-in sign-in as the sample Fan: development, test and the Demo only (ADR 0007).
+		if (!allowsStandIn('fanSignIn', getConfig().mode)) {
+			return fail(503, { fanSignInError: FEATURE_UNAVAILABLE.fanSignIn });
+		}
 		const fanUser = await db.query.users.findFirst({
 			where: eq(schema.users.email, 'maya@example.com')
 		});

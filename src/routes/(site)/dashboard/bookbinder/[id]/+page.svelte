@@ -6,6 +6,8 @@
 	import PhotoPileEditor from '$lib/components/dashboard/PhotoPileEditor.svelte';
 	import { MAX_PHOTOS_PER_PAGE, resolvePhotoEntries } from '$domain/photo-pile';
 
+	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
+
 	let { data, form } = $props();
 
 	let previewIframe = $state<HTMLIFrameElement | null>(null);
@@ -318,7 +320,12 @@
 									/>
 								</Stack>
 								{#key page.contentJson}
-									<PhotoPileEditor pageId={page.id} initial={resolvePhotoEntries(parsed)} />
+									<PhotoPileEditor
+										pageId={page.id}
+										initial={resolvePhotoEntries(parsed)}
+										uploadsEnabled={data.features.uploads}
+										mode={data.features.mode}
+									/>
 								{/key}
 								<Stack gap="xs">
 									<label for="body-{page.id}" class="input-label-sm">Caption / Story</label>
@@ -363,10 +370,14 @@
 										<input
 											id="audio-file-{page.id}"
 											type="file"
+											disabled={!data.features.uploads}
 											name="audioFile"
-											accept="audio/mpeg,audio/mp3,audio/mp4,audio/wav,audio/ogg,audio/webm,audio/aac"
+											accept="audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/webm,audio/aac"
 											class="bookbinder-input"
 										/>
+										{#if !data.features.uploads}
+											<FeatureNotice feature="uploads" mode={data.features.mode} />
+										{/if}
 									</Stack>
 									<Stack gap="xs">
 										<label for="audio-url-{page.id}" class="input-label-sm">Audio URL</label>
@@ -511,12 +522,16 @@
 									<input
 										id="new-photo-file"
 										type="file"
+										disabled={!data.features.uploads}
 										name="photoFile"
 										multiple
-										accept="image/jpeg,image/png,image/webp,image/avif,image/svg+xml"
+										accept="image/jpeg,image/png,image/webp,image/avif"
 										onchange={optimizeFileInputFilesOnChange}
 										class="bookbinder-input"
 									/>
+									{#if !data.features.uploads}
+										<FeatureNotice feature="uploads" mode={data.features.mode} />
+									{/if}
 								</Stack>
 								<Stack gap="xs">
 									<label for="new-photo-url" class="input-label-sm">Or Photo URL</label>
@@ -546,10 +561,14 @@
 									<input
 										id="new-audio-file"
 										type="file"
+										disabled={!data.features.uploads}
 										name="audioFile"
-										accept="audio/mpeg,audio/mp3,audio/mp4,audio/wav,audio/ogg,audio/webm,audio/aac"
+										accept="audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/webm,audio/aac"
 										class="bookbinder-input"
 									/>
+									{#if !data.features.uploads}
+										<FeatureNotice feature="uploads" mode={data.features.mode} />
+									{/if}
 								</Stack>
 								<Stack gap="xs">
 									<label for="new-audio-url" class="input-label-sm">Or Audio URL</label>

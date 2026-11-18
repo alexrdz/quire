@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { eq, like } from 'drizzle-orm';
 import { render } from 'svelte/server';
+import { ALL_FEATURES_ON } from '../helpers/features';
 import { db, schema } from '$lib/server/db';
 import { auth } from '$lib/server/auth';
 import LandingPage from '../../../src/routes/(site)/+page.svelte';
@@ -112,6 +113,7 @@ describe('P1 /login page & server actions', () => {
 		const signupHtml = render(LoginPage, {
 			props: {
 				data: {
+					features: ALL_FEATURES_ON,
 					redirectTo: '/dashboard',
 					hasExplicitRedirect: false,
 					defaultRole: 'artist',
@@ -130,6 +132,7 @@ describe('P1 /login page & server actions', () => {
 		const loginHtml = render(LoginPage, {
 			props: {
 				data: {
+					features: ALL_FEATURES_ON,
 					redirectTo: '/dashboard',
 					hasExplicitRedirect: false,
 					defaultRole: 'artist',
@@ -249,7 +252,7 @@ describe('P1 /login/reset password reset flow', () => {
 
 		const confirmHtml = render(ResetPage, {
 			props: {
-				data: { mode: 'confirm', token: 'sample-token', tokenError: null },
+				data: { features: ALL_FEATURES_ON, mode: 'confirm', token: 'sample-token', tokenError: null },
 				form: null
 			}
 		}).html;

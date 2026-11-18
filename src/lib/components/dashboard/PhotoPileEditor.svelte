@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { Stack, Cluster, Frame } from '$lib/components/layout';
+	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
+	import type { Mode } from '$lib/features';
 	import { optimizeFileInputFilesOnChange } from '$lib/utils/image-optimize';
 	import {
 		MAX_PHOTOS_PER_PAGE,
@@ -12,9 +14,12 @@
 		pageId: string;
 		/** Photos currently saved on the page. */
 		initial: PhotoEntry[];
+		/** False when uploads are switched off (ADR 0007); URL entry still works. */
+		uploadsEnabled?: boolean;
+		mode?: Mode;
 	}
 
-	let { pageId, initial }: Props = $props();
+	let { pageId, initial, uploadsEnabled = true, mode }: Props = $props();
 
 	interface EditableEntry {
 		key: number;
@@ -109,12 +114,16 @@
 			<input
 				id="photo-files-{pageId}"
 				type="file"
+				disabled={!uploadsEnabled}
 				name="photoFile"
 				multiple
-				accept="image/jpeg,image/png,image/webp,image/avif,image/svg+xml"
+				accept="image/jpeg,image/png,image/webp,image/avif"
 				onchange={optimizeFileInputFilesOnChange}
 				class="photo-editor-input"
 			/>
+			{#if !uploadsEnabled}
+				<FeatureNotice feature="uploads" mode={mode} />
+			{/if}
 		</Stack>
 		<Stack gap="xs">
 			<label for="photo-url-{pageId}" class="photo-editor-label">Or Add One By URL</label>

@@ -9,9 +9,9 @@ import {
 	buildSlugPetitionDecisionTemplate
 } from './templates';
 
-try {
-	process.loadEnvFile?.('.env');
-} catch {}
+import { allowsStandIn, getConfig } from '../config';
+
+import { FEATURE_UNAVAILABLE } from '$lib/features';
 
 const sendEmailSchema = z.object({
 	to: z.string().email('Valid recipient email is required'),
@@ -56,7 +56,7 @@ const slugPetitionDecisionEmailInputSchema = z.object({
 
 export interface EmailSendReceipt {
 	id: string;
-	mode: 'resend' | 'dev_console';
+	mode: 'resend' | 'dev_console' | 'suppressed';
 }
 
 interface ResendLikeClient {
@@ -74,13 +74,12 @@ interface ResendLikeClient {
 let cachedResendClient: { apiKey: string; client: ResendLikeClient } | null = null;
 
 function getResendApiKey(): string | null {
-	const raw = process.env.RESEND_API_KEY?.trim();
-	return raw && raw.length > 0 ? raw : null;
+	const config = getConfig();
+	return config.live.email ? (config.integrations.resend?.apiKey ?? null) : null;
 }
 
 function getFromEmail(): string {
-	const raw = process.env.RESEND_FROM_EMAIL?.trim();
-	return raw && raw.length > 0 ? raw : 'Quire <noreply@quire.live>';
+	return getConfig().fromEmail;
 }
 
 async function resolveResendClient(apiKey: string): Promise<ResendLikeClient | null> {
@@ -135,8 +134,9 @@ async function sendViaResendHttp(
 }
 
 /**
- * Sends a transactional email via Resend when RESEND_API_KEY is configured,
- * or falls back to structured dev console logging ONLY when RESEND_API_KEY is unset.
+ * Sends a transactional email via Resend when RESEND_API_KEY is configured.
+ * Without it: development and test log the email to the console, the Demo
+ * suppresses it silently, and production returns EMAIL_UNAVAILABLE without logging (ADR 0007).
  */
 export async function sendTransactionalEmail(input: {
 	to: string;
@@ -156,6 +156,16 @@ export async function sendTransactionalEmail(input: {
 	const from = getFromEmail();
 
 	if (!apiKey) {
+		const { mode } = getConfig();
+		if (mode === 'demo') {
+			// The Demo never sends or logs email (ADR 0007).
+			return ok({ id: `demo_email_${crypto.randomUUID()}`, mode: 'suppressed' });
+		}
+		if (!allowsStandIn('email', mode)) {
+			// Production: no console fallback, so bodies, tokens and links are never logged.
+			return err({ code: 'EMAIL_UNAVAILABLE', message: FEATURE_UNAVAILABLE.email });
+		}
+		// Development and test only.
 		const devId = `dev_email_${crypto.randomUUID()}`;
 		console.info(
 			`[email:dev-fallback] RESEND_API_KEY not configured. Simulated send id=${devId} to=${parsed.data.to} subject="${parsed.data.subject}"`

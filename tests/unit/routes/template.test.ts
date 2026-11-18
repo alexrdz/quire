@@ -8,6 +8,7 @@ import { db, schema } from '$lib/server/db';
 import { authSecret } from '$lib/server/auth';
 import { checkAccentContrast } from '$domain/theme';
 import { actions, load } from '../../../src/routes/(site)/dashboard/template/+page.server';
+import { TINY_JPEG, TINY_MP3, TINY_PNG } from '../helpers/media';
 
 interface TestArtistFixture {
 	userId: string;
@@ -174,7 +175,7 @@ describe('Master Template +page.server', () => {
 		validForm.set('typePairing', 'sans-serif');
 		validForm.set(
 			'coverArtFile',
-			new File([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], 'cover.png', {
+			new File([TINY_PNG], 'cover.png', {
 				type: 'image/png'
 			})
 		);
@@ -187,7 +188,7 @@ describe('Master Template +page.server', () => {
 		const updated = await db.query.artists.findFirst({
 			where: eq(schema.artists.id, fixture.artistId)
 		});
-		expect(updated?.coverArtUrl).toMatch(/^\/uploads\/[a-zA-Z0-9-]+\.png$/);
+		expect(updated?.coverArtUrl).toMatch(/^\/uploads\/[a-zA-Z0-9-]+\.webp$/);
 
 		const invalidForm = new FormData();
 		invalidForm.set('accentColor', '#05D9E8');
@@ -214,7 +215,7 @@ describe('Master Template +page.server', () => {
 		audioForm.set('body', 'Recorded on 4-track cassette.');
 		audioForm.set(
 			'audioFile',
-			new File([new Uint8Array([73, 68, 51, 3, 0])], 'demo.mp3', { type: 'audio/mpeg' })
+			new File([TINY_MP3], 'demo.mp3', { type: 'audio/mpeg' })
 		);
 		const addAudioRes = (await (actions.addTemplatePage as any)({
 			request: buildMultipartRequest(fixture.cookie, audioForm)
@@ -228,7 +229,7 @@ describe('Master Template +page.server', () => {
 		photoForm.set('body', 'Before doors opened.');
 		photoForm.set(
 			'photoFile',
-			new File([new Uint8Array([255, 216, 255, 224])], 'soundcheck.jpg', {
+			new File([TINY_JPEG], 'soundcheck.jpg', {
 				type: 'image/jpeg'
 			})
 		);
@@ -254,7 +255,7 @@ describe('Master Template +page.server', () => {
 		});
 		expect(pages).toHaveLength(3);
 		expect(JSON.parse(pages[0].contentJson).audioUrl).toMatch(/^\/uploads\/.+\.mp3$/);
-		expect(JSON.parse(pages[1].contentJson).imageUrl).toMatch(/^\/uploads\/.+\.jpg$/);
+		expect(JSON.parse(pages[1].contentJson).imageUrl).toMatch(/^\/uploads\/.+\.webp$/);
 		expect(JSON.parse(pages[2].contentJson).videoUrl).toBe(
 			'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
 		);

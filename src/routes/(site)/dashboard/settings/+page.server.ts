@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import { getConfig } from '$lib/server/config';
+import { FEATURE_UNAVAILABLE } from '$lib/features';
 import { fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { and, desc, eq, gt } from 'drizzle-orm';
 import { ArtistAccountStatus } from '$domain/account';
@@ -175,6 +177,14 @@ export const actions: Actions = {
 	},
 
 	requestPayoutChange: async ({ request, url }) => {
+		const { features } = getConfig();
+		if (!features.payments) {
+			return fail(503, { payoutError: FEATURE_UNAVAILABLE.payments });
+		}
+		if (!features.email) {
+			return fail(503, { payoutError: FEATURE_UNAVAILABLE.email });
+		}
+
 		const session = await auth.api.getSession({
 			headers: request.headers
 		});
@@ -282,6 +292,10 @@ export const actions: Actions = {
 	},
 
 	resendVerification: async ({ request }) => {
+		if (!getConfig().features.email) {
+			return fail(503, { accountError: FEATURE_UNAVAILABLE.email });
+		}
+
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session?.user) {
 			return fail(401, { accountError: 'Unauthorized' });
