@@ -37,7 +37,7 @@
 				<strong class="email-confirm-bar-title">Confirm your email to publish</strong>
 				<p class="email-confirm-bar-text">
 					We sent a confirmation link to <span class="font-mono">{email}</span>. You can build drafts now;
-					publishing an Issue, uploading media and connecting payouts open up once it is confirmed.
+					publishing an Issue, uploading media and adding your Venmo open up once it is confirmed.
 				</p>
 				{#if !canResend && unavailableMessage}
 					<p class="email-confirm-bar-text" role="status">

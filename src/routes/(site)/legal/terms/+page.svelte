@@ -32,7 +32,7 @@
 			</li>
 			<li>Fans sign in with Google only when they sign a Wall, save an Issue, or claim a Stamp.</li>
 			<li>You must provide accurate information and keep your credentials secure.</li>
-			<li>You must be at least 13 years old to use Quire, and at least 18 to receive payouts.</li>
+			<li>You must be at least 13 years old to use Quire.</li>
 		</ul>
 	</Stack>
 
@@ -59,11 +59,13 @@
 	<Stack as="section" gap="xs">
 		<h2>6. Tips and payments</h2>
 		<ul>
-			<li>Payments are processed by Stripe. Artists must complete Stripe Connect onboarding to receive tips and agree to Stripe's terms.</li>
-			<li>Tips are in US dollars, with a $2 minimum and a $500 maximum.</li>
-			<li>A tip is charged only when the fan taps to pay. Failed payments are not retried.</li>
-			<li>Quire keeps a 5% platform fee on each tip. Stripe also charges processing fees. By default the artist absorbs both, and a fan may choose to cover them.</li>
-			<li>Tips are voluntary gifts to the artist. Refunds, disputes and chargebacks are the artist's responsibility and are deducted from the artist's balance.</li>
+			<li>Quire does not process payments. A tip button opens Venmo with an amount and a note filled in, and the fan sends the payment to the artist in Venmo.</li>
+			<li>Quire never holds or handles the money and takes no cut of tips.</li>
+			<li>Payments are governed by Venmo's terms between the fan, the artist and Venmo. Venmo expects people who receive payments for goods and services to use a business profile; artists are responsible for following Venmo's rules.</li>
+			<li>Tip amounts offered are in US dollars, from $2 to $500. Venmo is available only in the United States.</li>
+			<li>Venmo opens only when a fan taps a tip button. Quire never opens Venmo on its own or sends reminders.</li>
+			<li>Tips are voluntary gifts to the artist. Refunds, disputes and any other problems with a payment are between the fan and the artist in Venmo. Quire cannot see, reverse or refund payments.</li>
+			<li>Quire counts tip button taps for the artist's dashboard. A tap is not a payment and does not show that money was sent.</li>
 			<li>Tips cannot include a message. Use the Wall for messages.</li>
 		</ul>
 	</Stack>

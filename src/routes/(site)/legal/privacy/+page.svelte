@@ -19,15 +19,16 @@
 		<ul>
 			<li>
 				<strong>Artists:</strong> band name, email address, a hashed password, the content you
-				upload (art, photos, audio, text, setlists), and your payout status. Stripe collects your identity and bank details directly.
+				upload (art, photos, audio, text, setlists), and the Venmo username you add for tips.
 			</li>
 			<li>
 				<strong>Fans who sign in:</strong> the name and email address from your Google account, the
 				notes you post, and the Issues you save or stamp.
 			</li>
 			<li>
-				<strong>Tips:</strong> amount, fees, time and a Stripe payment reference. Card details go to Stripe
-				and never reach our servers.
+				<strong>Tip taps:</strong> when a tip button is tapped, we record only that it was tapped: the
+				artist, the Issue (if any), the amount selected and the time. We do not record who tapped.
+				Payments happen in Venmo; we never see them or any payment details.
 			</li>
 			<li>
 				<strong>Device storage:</strong> a signed scan token saved on your device to let you claim a Stamp
@@ -43,8 +44,8 @@
 	<Stack as="section" gap="xs">
 		<h2>3. How we use it</h2>
 		<ul>
-			<li>To operate Quire: publish Issues, display Walls, process tips and issue Stamps.</li>
-			<li>To send transactional email such as verification, password reset and payout confirmations.</li>
+			<li>To operate Quire: publish Issues, display Walls, show tip buttons and tip tap counts, and issue Stamps.</li>
+			<li>To send transactional email such as verification, password reset and Venmo username change confirmations.</li>
 			<li>To prevent fraud and abuse, and to keep the service secure.</li>
 			<li>To comply with legal obligations.</li>
 		</ul>
@@ -54,7 +55,6 @@
 		<h2>4. Service providers</h2>
 		<p>We share information only with providers that help us run the service:</p>
 		<ul>
-			<li>Stripe, for payments and artist payouts.</li>
 			<li>Resend, for transactional email.</li>
 			<li>Google, for fan sign-in.</li>
 			<li>Turso, for database hosting.</li>
@@ -74,13 +74,18 @@
 			Wall. A "Was there" mark appears on notes from fans who stamped that Issue. Your email
 			address is never shown publicly.
 		</p>
+		<p>
+			Tips are sent through Venmo, which Quire does not operate. Depending on your Venmo privacy
+			settings, a Venmo payment and its note may be public. The note Quire fills in names only the
+			artist, never the venue, city or date, and you can edit it in Venmo before you pay. Venmo's own
+			privacy policy covers your payment.
+		</p>
 	</Stack>
 
 	<Stack as="section" gap="xs">
 		<h2>6. Retention</h2>
 		<p>
-			Issues are archived, not deleted, so fans' Stubs, tip records and Walls persist. We keep
-			payment records as long as needed for accounting, tax and dispute purposes. We delete or
+			Issues are archived, not deleted, so fans' Stubs, tip tap counts and Walls persist. We delete or
 			anonymize other personal information when you ask us to, unless we must keep it by law.
 		</p>
 	</Stack>
