@@ -142,15 +142,20 @@ function readVint(
 	return { value, length, unknown: !keepMarker && allOnes };
 }
 
+/** Segment > Tracks > TrackEntry is three levels; one spare. Deeper nesting is malformed. */
+const MAX_WEBM_DEPTH = 4;
+
 /**
  * True when a WebM file declares at least one track and every track is audio.
  * Walks Segment > Tracks > TrackEntry > TrackType and stops at the first Cluster,
- * so only the header is read.
+ * so only the header is read. Never throws: malformed, truncated or over-nested
+ * input returns false, so the upload fails as UNSUPPORTED_MEDIA_TYPE instead of a 500.
  */
 export function isAudioOnlyWebm(buffer: Buffer): boolean {
 	const trackTypes: number[] = [];
 
-	const walk = (start: number, end: number): boolean => {
+	const walk = (start: number, end: number, depth: number): boolean => {
+		if (depth > MAX_WEBM_DEPTH) return false;
 		let offset = start;
 		while (offset < end) {
 			const id = readVint(buffer, offset, true);
@@ -162,10 +167,12 @@ export function isAudioOnlyWebm(buffer: Buffer): boolean {
 
 			if (id.value === EBML_CLUSTER) return true;
 			if (id.value === EBML_SEGMENT || id.value === EBML_TRACKS || id.value === EBML_TRACK_ENTRY) {
-				if (!walk(dataStart, dataEnd)) return false;
+				if (!walk(dataStart, dataEnd, depth + 1)) return false;
 				if (id.value === EBML_TRACKS) return true;
 			} else if (id.value === EBML_TRACK_TYPE) {
-				trackTypes.push(buffer.readUIntBE(dataStart, Math.min(Math.max(size.value, 1), 6)));
+				const width = size.value;
+				if (width < 1 || width > 6 || dataStart + width > buffer.length) return false;
+				trackTypes.push(buffer.readUIntBE(dataStart, width));
 			}
 			if (size.unknown) return true;
 			offset = dataEnd;
@@ -173,7 +180,11 @@ export function isAudioOnlyWebm(buffer: Buffer): boolean {
 		return true;
 	};
 
-	if (!walk(0, buffer.length)) return false;
+	try {
+		if (!walk(0, buffer.length, 0)) return false;
+	} catch {
+		return false;
+	}
 	return trackTypes.length > 0 && trackTypes.every((type) => type === MATROSKA_TRACK_TYPE_AUDIO);
 }
 

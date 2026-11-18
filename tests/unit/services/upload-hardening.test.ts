@@ -4,6 +4,7 @@ import sharp from 'sharp';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
 	ALLOWED_IMAGE_MIME_TYPES,
+	isAudioOnlyWebm,
 	MAX_RASTER_EDGE_PX,
 	MIME_TO_EXT,
 	uploadFormFile,
@@ -217,6 +218,35 @@ describe('audio magic bytes', () => {
 			const result = await uploadMedia({ buffer: webm(tracks), allowedKind: 'audio' });
 			expect(result.ok, JSON.stringify(tracks)).toBe(false);
 		}
+	});
+
+	it('rejects a WebM whose TrackType is cut off at the end of the file, without throwing', async () => {
+		const full = webm([2]);
+		// Cut inside the TrackType element: keep its ID and size byte but drop the value.
+		const trackTypeAt = full.indexOf(Buffer.from([0x83, 0x81, 0x02]));
+		expect(trackTypeAt).toBeGreaterThan(0);
+		const truncated = full.subarray(0, trackTypeAt + 2);
+		expect(isAudioOnlyWebm(truncated)).toBe(false);
+		const result = await uploadMedia({ buffer: truncated, allowedKind: 'audio' });
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error.code).toBe('UNSUPPORTED_MEDIA_TYPE');
+	});
+
+	it('rejects deeply nested TrackEntry elements, without overflowing the stack', async () => {
+		const header = webm([]).subarray(0, webm([]).indexOf(Buffer.from([0x18, 0x53, 0x80, 0x67])));
+		// 20,000 unknown-size TrackEntry elements, each nested in the previous one.
+		const nested = Buffer.concat([
+			header,
+			Buffer.from([0x18, 0x53, 0x80, 0x67, 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
+			Buffer.from([0x16, 0x54, 0xae, 0x6b, 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
+			Buffer.alloc(20_000 * 2).fill(Buffer.from([0xae, 0xff])),
+			Buffer.from([0x83, 0x81, 0x02])
+		]);
+		expect(() => isAudioOnlyWebm(nested)).not.toThrow();
+		expect(isAudioOnlyWebm(nested)).toBe(false);
+		const result = await uploadMedia({ buffer: nested, allowedKind: 'audio' });
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error.code).toBe('UNSUPPORTED_MEDIA_TYPE');
 	});
 
 	it('rejects text labelled audio/mpeg', async () => {
