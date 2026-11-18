@@ -3,6 +3,7 @@ import { hashPassword } from 'better-auth/crypto';
 import { client, db, schema } from './db';
 import { eq, and } from 'drizzle-orm';
 import { calculateStampWindow } from '$domain/stamping';
+import { allowsSampleData, getConfig } from './config';
 
 async function ensureColumnExists(tableName: string, columnName: string, columnDef: string) {
 	try {
@@ -281,7 +282,41 @@ export async function ensureSchemaTables() {
 	}
 }
 
+/** The sample Issue whose Stamp Window is kept open so the scan flow can be tried (and e2e-tested) at any time. */
+export const OPEN_WINDOW_SAMPLE_SLUG = 'neon-velvet-brooklyn-2026-10-12';
+
+/**
+ * A 48-hour Stamp Window starting one hour before `now`. Used only for the Brooklyn
+ * sample Issue: its fixed 2026-10-12 window has passed, which made a valid scan of the
+ * sample data impossible. Its slug and date label stay unchanged. Sample data only exists
+ * in development, test and the Demo, so this never touches a real Issue.
+ */
+export function openSampleStampWindow(now: Date): { start: Date; end: Date } {
+	const start = new Date(now.getTime() - 60 * 60 * 1000);
+	const end = new Date(start.getTime() + 48 * 60 * 60 * 1000 - 1);
+	return { start, end };
+}
+
+async function reopenSampleStampWindow(now: Date): Promise<void> {
+	const window = openSampleStampWindow(now);
+	await db
+		.update(schema.issues)
+		.set({ stampWindowStart: window.start, stampWindowEnd: window.end })
+		.where(eq(schema.issues.slug, OPEN_WINDOW_SAMPLE_SLUG));
+}
+
+export const SEED_REFUSED_MESSAGE =
+	'Refusing to seed sample data in production mode. Run it with NODE_ENV=development or DEMO_MODE=true (ADR 0007).';
+
+/**
+ * Loads the sample Artist, Fan and Issues. Development, test and the Demo only:
+ * throws in production so sample accounts with known passwords never reach a real database.
+ */
 export async function seedDatabase() {
+	if (!allowsSampleData(getConfig().mode)) {
+		throw new Error(SEED_REFUSED_MESSAGE);
+	}
+
 	await ensureSchemaTables();
 
 	const existingArtist = await db.query.artists.findFirst({
@@ -300,6 +335,7 @@ export async function seedDatabase() {
 
 	if (existingArtist) {
 		await ensureArtistPasswordCredential(existingArtist.userId);
+		await reopenSampleStampWindow(now);
 		return existingArtist;
 	}
 
@@ -417,12 +453,12 @@ export async function seedDatabase() {
 	]);
 
 	// 5. Create 3-City Tour Issues
-	const issue1Window = calculateStampWindow('2026-10-12', 'America/New_York');
+	const issue1Window = openSampleStampWindow(now);
 	const issue1Id = crypto.randomUUID();
 	await db.insert(schema.issues).values({
 		id: issue1Id,
 		artistId,
-		slug: 'neon-velvet-brooklyn-2026-10-12',
+		slug: OPEN_WINDOW_SAMPLE_SLUG,
 		city: 'Brooklyn',
 		venue: "Baby's All Right",
 		date: '2026-10-12',
@@ -430,8 +466,8 @@ export async function seedDatabase() {
 		coverNote: 'Tour kickoff show! Playing the entire new record with extended fuzz jams.',
 		secretKey: 'kickoff_babys_secret_2026',
 		status: 'published',
-		stampWindowStart: issue1Window.ok ? issue1Window.value.start : now,
-		stampWindowEnd: issue1Window.ok ? issue1Window.value.end : now,
+		stampWindowStart: issue1Window.start,
+		stampWindowEnd: issue1Window.end,
 		approveFirst: false,
 		publishedAt: new Date('2026-10-12T12:00:00Z'),
 		createdAt: now,

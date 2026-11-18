@@ -271,14 +271,14 @@
 									<Split ratio="1-1" gap="md" collapse="sm">
 										<Stack gap="xs">
 											<label for="photoFile" class="subtext-small text-muted">
-												Upload Photo (JPEG, PNG, WebP, AVIF, SVG)
+												Upload Photo (JPEG, PNG, WebP, AVIF)
 											</label>
 											<input
 												id="photoFile"
 												type="file"
 												disabled={!data.features.uploads}
 												name="photoFile"
-												accept="image/jpeg,image/png,image/webp,image/avif,image/svg+xml"
+												accept="image/jpeg,image/png,image/webp,image/avif"
 												onchange={optimizeFileInputOnChange}
 												class="form-field-input"
 											/>

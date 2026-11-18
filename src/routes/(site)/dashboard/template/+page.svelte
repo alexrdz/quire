@@ -242,14 +242,14 @@
 							<Stack gap="sm">
 								<Stack gap="3xs">
 									<label for="coverArtFile" class="subtext-small text-muted">
-										Upload Cover Image (JPEG, PNG, WebP, AVIF, SVG — max 10 MB)
+										Upload Cover Image (JPEG, PNG, WebP, AVIF, max 10 MB)
 									</label>
 									<input
 										id="coverArtFile"
 										type="file"
 										disabled={!data.features.uploads}
 										name="coverArtFile"
-										accept="image/*"
+										accept="image/jpeg,image/png,image/webp,image/avif"
 										onchange={handleCoverFileChange}
 										class="form-field-input file-field-input"
 									/>
@@ -510,7 +510,7 @@
 															type="file"
 															disabled={!data.features.uploads}
 															name="audioFile"
-															accept="audio/*"
+															accept="audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/webm,audio/aac"
 															class="form-field-input file-field-input"
 														/>
 														{#if !data.features.uploads}
@@ -528,7 +528,7 @@
 																type="file"
 																disabled={!data.features.uploads}
 																name="photoFile"
-																accept="image/*"
+																accept="image/jpeg,image/png,image/webp,image/avif"
 																onchange={optimizeFileInputOnChange}
 																class="form-field-input file-field-input"
 															/>
@@ -687,7 +687,7 @@
 									type="file"
 									disabled={!data.features.uploads}
 									name="audioFile"
-									accept="audio/*"
+									accept="audio/mpeg,audio/mp4,audio/wav,audio/ogg,audio/webm,audio/aac"
 									class="form-field-input file-field-input"
 								/>
 								{#if !data.features.uploads}
@@ -705,7 +705,7 @@
 										type="file"
 										disabled={!data.features.uploads}
 										name="photoFile"
-										accept="image/*"
+										accept="image/jpeg,image/png,image/webp,image/avif"
 										onchange={optimizeFileInputOnChange}
 										class="form-field-input file-field-input"
 									/>

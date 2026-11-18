@@ -43,6 +43,19 @@ const STAND_IN_MODES: Record<FeatureName, readonly Mode[]> = {
 	uploads: ['development', 'test', 'demo']
 };
 
+/** Modes where sample data, `/demo` and the sample logins exist (ADR 0007). Never production. */
+export const SAMPLE_DATA_MODES: readonly Mode[] = ['development', 'test', 'demo'];
+
+/** True when this mode may run the local stand-in for a feature. Always false in production. */
+export function allowsStandIn(name: FeatureName, mode: Mode): boolean {
+	return STAND_IN_MODES[name].includes(mode);
+}
+
+/** True when this mode may seed sample data and serve `/demo`. Always false in production. */
+export function allowsSampleData(mode: Mode): boolean {
+	return SAMPLE_DATA_MODES.includes(mode);
+}
+
 export interface CoreConfig {
 	ok: boolean;
 	/** Names of the variables that are missing or invalid. Never their values. */

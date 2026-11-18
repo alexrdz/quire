@@ -117,7 +117,7 @@
 				disabled={!uploadsEnabled}
 				name="photoFile"
 				multiple
-				accept="image/jpeg,image/png,image/webp,image/avif,image/svg+xml"
+				accept="image/jpeg,image/png,image/webp,image/avif"
 				onchange={optimizeFileInputFilesOnChange}
 				class="photo-editor-input"
 			/>

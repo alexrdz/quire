@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { getConfig } from '$lib/server/config';
+import { allowsStandIn, getConfig } from '$lib/server/config';
 import { FEATURE_UNAVAILABLE, featureUnavailableMessage } from '$lib/features';
 import { fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { eq, inArray } from 'drizzle-orm';
@@ -8,7 +8,6 @@ import { ArtistAccountStatus } from '$domain/account';
 import { artistLoginSchema, artistSignupSchema, safeRedirectPathSchema } from '$schemas/auth';
 import { auth, createSessionForUser } from '$lib/server/auth';
 import { db, schema } from '$lib/server/db';
-import { seedDatabase } from '$lib/server/seed';
 import { submitSlugPetition } from '$lib/server/services/account';
 
 function resolveRedirectTarget(rawRedirect: string | null | undefined): {
@@ -39,7 +38,6 @@ async function getAvailableSlugSuggestions(baseSlug: string): Promise<string[]> 
 }
 
 export const load: ServerLoad = async ({ request, url }) => {
-	await seedDatabase();
 
 	const session = await auth.api.getSession({
 		headers: request.headers
@@ -77,7 +75,6 @@ export const load: ServerLoad = async ({ request, url }) => {
 
 export const actions: Actions = {
 	login: async ({ request, url, cookies }) => {
-		await seedDatabase();
 		const formData = await request.formData();
 		const emailRaw = String(formData.get('email') || '');
 		const password = String(formData.get('password') || '');
@@ -146,7 +143,6 @@ export const actions: Actions = {
 		if (!features.email) {
 			return fail(503, { mode: 'signup' as const, error: featureUnavailableMessage('email', mode) });
 		}
-		await seedDatabase();
 		const formData = await request.formData();
 		const nameRaw = String(formData.get('name') || '');
 		const slugRaw = String(formData.get('slug') || '');
@@ -310,7 +306,6 @@ export const actions: Actions = {
 	},
 
 	petitionSlug: async ({ request }) => {
-		await seedDatabase();
 		const formData = await request.formData();
 		const requestedSlug = normalizeArtistSlug(String(formData.get('requestedSlug') || ''));
 		const petitionerName = String(formData.get('petitionerName') || '');
@@ -384,10 +379,10 @@ export const actions: Actions = {
 			return fail(502, { fanSignInError: FEATURE_UNAVAILABLE.fanSignIn });
 		}
 
-		// Stand-in sign-in: development, test and the Demo only (features.fanSignIn is false in production without Google keys).
-
-		// Local dev fallback when Google OAuth keys are not configured yet
-		await seedDatabase();
+		// Stand-in sign-in as the sample Fan: development, test and the Demo only (ADR 0007).
+		if (!allowsStandIn('fanSignIn', getConfig().mode)) {
+			return fail(503, { fanSignInError: FEATURE_UNAVAILABLE.fanSignIn });
+		}
 		const fanUser = await db.query.users.findFirst({
 			where: eq(schema.users.email, 'maya@example.com')
 		});
