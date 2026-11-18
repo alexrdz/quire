@@ -4,3 +4,5 @@ Quire integrates Stripe Connect Express (`stripe` SDK) for connected artist acco
 
 
 > Narrowed by ADR 0007: these fallbacks apply only in development, tests and the Demo deployment, never in production.
+
+> Superseded for payments by ADR 0008 (2026-11-18): tips go directly to the Artist's Venmo and Stripe Connect is dormant, so the Stripe fallback no longer runs anywhere. The Resend console fallback (development and tests only, ADR 0007) still applies.
