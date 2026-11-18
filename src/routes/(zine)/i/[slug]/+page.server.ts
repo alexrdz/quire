@@ -5,12 +5,7 @@ import { ArtistAccountStatus } from '$domain/account';
 import { db, schema } from '$lib/server/db';
 import { eq, and, asc, desc } from 'drizzle-orm';
 import { auth, createSessionForUser } from '$lib/server/auth';
-import { createTipCheckout } from '$lib/server/services/payments';
-import {
-	consumeRateLimit,
-	consumeRateLimits,
-	getOrCreateTipDeviceId
-} from '$lib/server/services/rate-limit';
+import { consumeRateLimit } from '$lib/server/services/rate-limit';
 import {
 	submitWallNote,
 	flagWallNote
@@ -20,7 +15,6 @@ import {
 	saveIssueForFan,
 	verifyScanToken
 } from '$lib/server/services/stamping';
-import { initiateTipSchema } from '$schemas/tipping';
 import { submitNoteSchema, flagNoteSchema } from '$schemas/wall';
 import { claimStampSchema, saveIssueSchema } from '$schemas/scan';
 
@@ -165,56 +159,6 @@ export const actions: Actions = {
 			await createSessionForUser(cookies, fanUser.id);
 		}
 		throw redirect(303, callbackURL);
-	},
-
-	tip: async ({ request, url, params, cookies, getClientAddress }) => {
-		const issueRecord = await db.query.issues.findFirst({
-			where: eq(schema.issues.slug, params.slug!),
-			with: { artist: true }
-		});
-		if (issueRecord?.artist.accountStatus === ArtistAccountStatus.Closed) {
-			return fail(403, { error: 'This artist has left Quire.' });
-		}
-
-		const formData = await request.formData();
-		const artistId = String(formData.get('artistId') || '');
-		const issueId = formData.get('issueId') ? String(formData.get('issueId')) : null;
-		const amountGrossCents = Number(formData.get('amountGrossCents') || 0);
-		const fanCoveredFees = formData.get('fanCoveredFees') === 'true';
-
-		const parseResult = initiateTipSchema.safeParse({
-			artistId,
-			issueId,
-			amountGrossCents,
-			fanCoveredFees
-		});
-
-		if (!parseResult.success) {
-			return fail(400, { error: parseResult.error.issues[0]?.message || 'Validation error' });
-		}
-
-		// Per device and per IP, counted independently (PRODUCTION_PLAN 2.3).
-		const tipLimit = await consumeRateLimits([
-			['tipDevice', getOrCreateTipDeviceId(cookies)],
-			['tipIp', getClientAddress()]
-		]);
-		if (!tipLimit.allowed) {
-			return fail(429, { error: tipLimit.message });
-		}
-
-		const tipResult = await createTipCheckout({
-			artistId: parseResult.data.artistId,
-			issueId: parseResult.data.issueId,
-			amountGrossCents: parseResult.data.amountGrossCents,
-			fanCoveredFees: parseResult.data.fanCoveredFees,
-			returnUrl: url.toString()
-		});
-
-		if (!tipResult.ok) {
-			return fail(400, { error: tipResult.error.message });
-		}
-
-		return { success: true, tipResult: tipResult.value };
 	},
 
 	submitNote: async ({ request, params, getClientAddress }) => {

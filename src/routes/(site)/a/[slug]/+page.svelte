@@ -3,30 +3,16 @@
 	import { Container, Box, Stack, Cluster, Grid } from '$lib/components/layout';
 
 	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
+	import VenmoTipPanel from '$lib/components/tips/VenmoTipPanel.svelte';
 
 	let { data, form } = $props();
 
-	let tipDrawerOpen = $state(false);
 	let authDrawerOpen = $state(false);
-	let selectedTipCents = $state(500);
-	let customAmountStr = $state('');
-	let fanCoveredFees = $state(false);
-	let tipMessage = $state('');
 	let noteBody = $state('');
 	let wallMessage = $state('');
 
-	function handleTipPreset(amount: number) {
-		selectedTipCents = amount * 100;
-		customAmountStr = '';
-	}
-
-	function handleCustomAmountChange(val: string) {
-		customAmountStr = val;
-		const num = parseFloat(val);
-		if (!isNaN(num) && num >= 2) {
-			selectedTipCents = Math.round(num * 100);
-		}
-	}
+	/** Tip buttons show only when the Artist has a Venmo username (ADR 0008). */
+	const showTips = $derived(Boolean(data.artist.venmoUsername) && !data.isArtistClosed);
 </script>
 
 <svelte:head>
@@ -81,18 +67,8 @@
 						{/if}
 					</Cluster>
 
-					{#if data.artist.payoutsEnabled && !data.isArtistClosed}
-						{#if data.features.payments}
-							<button
-								type="button"
-								class="btn-hero-support"
-								onclick={() => (tipDrawerOpen = true)}
-							>
-								Support {data.artist.displayName} (${(selectedTipCents / 100).toFixed(2)})
-							</button>
-						{:else}
-							<FeatureNotice feature="payments" mode={data.features.mode} />
-						{/if}
+					{#if showTips}
+						<a href="#tip" class="btn-hero-support">Tip {data.artist.displayName} with Venmo</a>
 					{/if}
 				</Cluster>
 
@@ -127,6 +103,17 @@
 							</a>
 						{/each}
 					</Cluster>
+				{/if}
+
+				{#if showTips && data.artist.venmoUsername}
+					<VenmoTipPanel
+						artistSlug={data.artist.slug}
+						artistName={data.artist.displayName}
+						venmoUsername={data.artist.venmoUsername}
+						issueSlug={null}
+						presets={data.tipPresets}
+						opensVenmo={data.features.tipsOpenVenmo}
+					/>
 				{/if}
 			</Stack>
 
@@ -353,95 +340,6 @@
 	</div>
 {/if}
 
-<!-- GENERAL TIP DRAWER -->
-{#if tipDrawerOpen}
-	<div class="drawer-backdrop">
-		<Stack gap="md" class="glass-drawer bottom-sheet-modal" role="dialog" aria-modal="true" aria-label="Support {data.artist.displayName}">
-			<div class="drawer-handle"></div>
-			<Cluster justify="between" align="center">
-				<Stack gap="3xs">
-					<span class="text-support font-mono eyebrow-tag">GENERAL TIP</span>
-					<h3 class="drawer-title">Support {data.artist.displayName}</h3>
-				</Stack>
-				<button
-					type="button"
-					class="btn-drawer-close"
-					onclick={() => {
-						tipDrawerOpen = false;
-						tipMessage = '';
-					}}
-				>
-					✕ Close
-				</button>
-			</Cluster>
-
-			<Cluster distributeEqually gap="xs">
-				{#each data.tipPresets as preset}
-					<button
-						type="button"
-						class="preset-btn {selectedTipCents === preset * 100 ? 'preset-active' : ''}"
-						onclick={() => handleTipPreset(preset)}
-					>
-						${preset}
-					</button>
-				{/each}
-			</Cluster>
-
-			<Stack gap="xs">
-				<label for="bp-custom-tip" class="drawer-label">Custom Amount ($2 – $500 USD)</label>
-				<input
-					id="bp-custom-tip"
-					type="number"
-					min="2"
-					max="500"
-					step="1"
-					placeholder="Enter custom $..."
-					value={customAmountStr}
-					oninput={(e) => handleCustomAmountChange((e.currentTarget as HTMLInputElement).value)}
-					class="drawer-input"
-				/>
-			</Stack>
-
-			<Cluster as="label" align="center" gap="xs" class="fee-optin-label">
-				<input type="checkbox" bind:checked={fanCoveredFees} />
-				<span class="subtext-small">
-					Cover transaction fees so {data.artist.displayName} receives the full ${(selectedTipCents / 100).toFixed(2)}
-				</span>
-			</Cluster>
-
-			{#if tipMessage}
-				<Box variant="subtle" padding="sm" radius="md" class="tip-confirm-box">
-					{tipMessage}
-				</Box>
-			{/if}
-
-			<form
-				method="POST"
-				action="?/tip"
-				use:enhance={() => {
-					return async ({ result }) => {
-						if (result.type === 'success') {
-							tipMessage = `✓ General Tip Confirmed! $${(selectedTipCents / 100).toFixed(2)} sent to ${data.artist.displayName}.`;
-						} else if (result.type === 'failure' && result.status === 429) {
-							tipMessage = `${String(result.data?.error ?? 'Too many tips right now.')} Nothing was charged.`;
-						} else {
-							tipMessage = "That didn't go through. Nothing was charged.";
-						}
-					};
-				}}
-			>
-				<input type="hidden" name="artistId" value={data.artist.id} />
-				<input type="hidden" name="amountGrossCents" value={selectedTipCents} />
-				<input type="hidden" name="fanCoveredFees" value={String(fanCoveredFees)} />
-
-				<button type="submit" class="btn-submit-tip">
-					Send ${(selectedTipCents / 100).toFixed(2)} General Tip
-				</button>
-			</form>
-		</Stack>
-	</div>
-{/if}
-
 <style>
 	.artist-page-root {
 		background-color: var(--bg-void);
@@ -651,23 +549,6 @@
 		color: #ffffff;
 	}
 
-	.drawer-label {
-		font-size: var(--text-meta);
-		font-weight: var(--weight-semibold);
-		color: #d4d2df;
-	}
-
-	.drawer-input {
-		inline-size: 100%;
-		padding-block: var(--space-xs);
-		padding-inline: var(--space-s);
-		background: rgba(0, 0, 0, 0.5);
-		border: 1px solid var(--glass-border);
-		border-radius: var(--radius-md);
-		color: #ffffff;
-		font-size: var(--text-body);
-	}
-
 	.google-sheet-btn {
 		inline-size: 100%;
 		block-size: 2.9rem;
@@ -678,65 +559,6 @@
 		border: none;
 		border-radius: var(--radius-md);
 		cursor: pointer;
-	}
-
-	.preset-btn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		padding-block: var(--space-xs);
-		font-size: var(--text-body);
-		font-weight: var(--weight-bold);
-		border-radius: 8px;
-		background: rgba(255, 255, 255, 0.05);
-		color: #ffffff;
-		border: 1px solid rgba(255, 255, 255, 0.12);
-		cursor: pointer;
-		transition: background-color 0.15s ease, border-color 0.15s ease;
-	}
-
-	.preset-btn:hover {
-		background: rgba(255, 255, 255, 0.1);
-		border-color: rgba(255, 255, 255, 0.24);
-	}
-
-	.preset-active {
-		background: rgba(1, 255, 195, 0.16);
-		color: var(--highlight);
-		border-color: var(--highlight);
-	}
-
-	:global(.fee-optin-label) {
-		cursor: pointer;
-	}
-
-	:global(.tip-confirm-box) {
-		color: var(--highlight);
-		border-color: var(--highlight);
-		font-size: var(--text-small);
-	}
-
-	.btn-submit-tip {
-		inline-size: 100%;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		padding-block: var(--space-s);
-		padding-inline: var(--space-m);
-		border-radius: 8px;
-		background: var(--support);
-		color: #ffffff;
-		border: 1px solid rgba(255, 42, 109, 0.5);
-		font-size: var(--text-ui);
-		font-weight: var(--weight-bold);
-		cursor: pointer;
-		box-shadow: 0 0 20px rgba(255, 42, 109, 0.35);
-		transition: transform 0.15s ease, box-shadow 0.15s ease;
-	}
-
-	.btn-submit-tip:hover {
-		transform: translateY(-1px);
-		box-shadow: 0 0 26px rgba(255, 42, 109, 0.6);
 	}
 
 	/* Sleek Rectangular Buttons & Badges (Zero 9999px Pills) */
@@ -802,6 +624,7 @@
 
 	.btn-hero-support {
 		display: inline-flex;
+		text-decoration: none;
 		align-items: center;
 		justify-content: center;
 		padding-block: var(--space-xs);

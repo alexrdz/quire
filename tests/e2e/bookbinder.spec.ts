@@ -11,7 +11,8 @@ test.describe('Dashboard & Desktop Bookbinder Flow', () => {
 
 		// Verify Gig Recap stats are visible
 		await expect(page.locator('text=Morning-After Gig Recap')).toBeVisible();
-		await expect(page.locator('text=Gross Tips')).toBeVisible();
+		await expect(page.getByTestId('recap-tip-taps')).toContainText(/\d+ tip taps?/);
+		await expect(page.getByTestId('recap-tip-taps')).toContainText('Check Venmo for what came in.');
 		await expect(page.locator('text=Attended Stamps')).toBeVisible();
 	});
 

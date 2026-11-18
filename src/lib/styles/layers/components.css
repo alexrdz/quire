@@ -526,3 +526,84 @@
 	opacity: 0.55;
 	cursor: not-allowed;
 }
+
+/* Venmo tip panel (ADR 0008, PRODUCTION_PLAN V.4) */
+.venmo-tip-panel {
+	background: var(--glass-surface);
+	border: 1px solid rgba(255, 42, 109, 0.35);
+	color: var(--paper);
+}
+
+.venmo-tip-title {
+	margin-block: 0;
+	font-size: var(--text-body);
+	font-weight: var(--weight-bold);
+}
+
+.venmo-tip-hint,
+.venmo-tip-label {
+	margin-block: 0;
+	font-size: var(--text-small);
+	color: #a1a1aa;
+}
+
+.venmo-tip-preset,
+.venmo-tip-go {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding-block: var(--space-xs);
+	padding-inline: var(--space-s);
+	border-radius: 8px;
+	font-weight: var(--weight-bold);
+	line-height: 1.2;
+	text-decoration: none;
+	cursor: pointer;
+	transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.venmo-tip-preset {
+	font-size: var(--text-body);
+	background: rgba(255, 255, 255, 0.05);
+	color: #ffffff;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.venmo-tip-preset:hover,
+.venmo-tip-preset:focus-visible {
+	background: rgba(255, 42, 109, 0.16);
+	border-color: var(--support);
+}
+
+.venmo-tip-go {
+	font-size: var(--text-small);
+	background: var(--support);
+	color: #ffffff;
+	border: 1px solid rgba(255, 42, 109, 0.5);
+}
+
+.venmo-tip-go[aria-disabled='true'] {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.venmo-tip-custom-field {
+	flex: 1 1 8rem;
+}
+
+.venmo-tip-input {
+	inline-size: 100%;
+	padding-block: var(--space-xs);
+	padding-inline: var(--space-s);
+	background: rgba(0, 0, 0, 0.5);
+	border: 1px solid var(--glass-border);
+	border-radius: var(--radius-md);
+	color: #ffffff;
+	font-size: var(--text-body);
+}
+
+.venmo-tip-message {
+	margin-block: 0;
+	font-size: var(--text-small);
+	color: var(--highlight);
+}
