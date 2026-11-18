@@ -7,6 +7,11 @@ import { ArtistAccountStatus } from '$domain/account';
 import { db, schema } from '$lib/server/db';
 import { auth, clearSessionCookie, verifyUserCredentialPassword } from '$lib/server/auth';
 import { sendPayoutAccountChangeConfirmationEmail } from '$lib/server/email';
+import {
+	EMAIL_CONFIRMATION_REQUIRED,
+	isEmailConfirmed,
+	resendEmailConfirmation
+} from '$lib/server/email/verification';
 import { closeArtistAccount } from '$lib/server/services/account';
 import {
 	inspectConnectedAccountStatus,
@@ -217,6 +222,14 @@ export const actions: Actions = {
 
 		const { confirmPassword, action } = parsed.data;
 
+		// Decision 31: no Stripe Connect onboarding until the band email is confirmed.
+		if (action !== 'disconnect' && !isEmailConfirmed(session.user)) {
+			return fail(403, {
+				payoutError: EMAIL_CONFIRMATION_REQUIRED.payouts,
+				selectedAction: action
+			});
+		}
+
 		if (action === 'disconnect' && !artist.stripeAccountId && !artist.payoutsEnabled) {
 			return fail(400, {
 				payoutError: 'No Stripe payout account is currently connected.',
@@ -292,10 +305,6 @@ export const actions: Actions = {
 	},
 
 	resendVerification: async ({ request }) => {
-		if (!getConfig().features.email) {
-			return fail(503, { accountError: FEATURE_UNAVAILABLE.email });
-		}
-
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session?.user) {
 			return fail(401, { accountError: 'Unauthorized' });
@@ -308,22 +317,17 @@ export const actions: Actions = {
 			return fail(403, { accountError: 'Active artist account required.' });
 		}
 
-		if (session.user.emailVerified) {
-			return { alreadyVerified: true };
+		const result = await resendEmailConfirmation({
+			user: session.user,
+			headers: request.headers,
+			callbackURL: '/dashboard/settings?verified=1',
+			send: (args) => auth.api.sendVerificationEmail(args)
+		});
+		if (!result.ok) {
+			return fail(result.status, { accountError: result.message });
 		}
-
-		try {
-			await auth.api.sendVerificationEmail({
-				body: {
-					email: session.user.email,
-					callbackURL: '/dashboard/settings?verified=1'
-				},
-				headers: request.headers
-			});
-		} catch (err: unknown) {
-			const message =
-				err instanceof Error ? err.message : 'Unable to send verification email right now.';
-			return fail(500, { accountError: message });
+		if (result.alreadyConfirmed) {
+			return { alreadyVerified: true };
 		}
 
 		return {

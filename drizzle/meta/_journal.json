@@ -15,6 +15,20 @@
       "when": 1794868461136,
       "tag": "0001_sharp_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1795027279227,
+      "tag": "0002_schema_catch_up",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1795027279696,
+      "tag": "0003_rate_limits",
+      "breakpoints": true
     }
   ]
 }

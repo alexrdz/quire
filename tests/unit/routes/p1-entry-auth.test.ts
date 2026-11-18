@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { eq, like } from 'drizzle-orm';
 import { render } from 'svelte/server';
+import { uniqueClientAddress } from '../helpers/client';
 import { ALL_FEATURES_ON } from '../helpers/features';
 import { db, schema } from '$lib/server/db';
 import { auth } from '$lib/server/auth';
@@ -158,6 +159,7 @@ describe('P1 /login page & server actions', () => {
 		let redirectInfo: { status: number; location: string } | null = null;
 		try {
 			await loginActions.signup({
+				getClientAddress: uniqueClientAddress(),
 				request: buildPostRequest('http://localhost:5173/login?/signup', {
 					name: 'Velvet Echo',
 					slug,
@@ -197,6 +199,7 @@ describe('P1 /login page & server actions', () => {
 
 		// Seeded artist 'the-neon-velvet' already exists
 		const result = (await loginActions.signup({
+			getClientAddress: uniqueClientAddress(),
 			request: buildPostRequest('http://localhost:5173/login?/signup', {
 				name: 'The Neon Velvet',
 				slug: 'the-neon-velvet',
@@ -262,6 +265,7 @@ describe('P1 /login/reset password reset flow', () => {
 
 	it('returns identical non-enumerating success message for existing and unknown emails', async () => {
 		const unknownRes = (await resetActions.request({
+			getClientAddress: uniqueClientAddress(),
 			request: buildPostRequest('http://localhost:5173/login/reset?/request', {
 				email: `nonexistent-${crypto.randomUUID()}@example.com`
 			})
@@ -294,6 +298,7 @@ describe('P1 /login/reset password reset flow', () => {
 
 		// Request password reset so Better Auth writes the reset-password verification record
 		const reqResult = (await resetActions.request({
+			getClientAddress: uniqueClientAddress(),
 			request: buildPostRequest('http://localhost:5173/login/reset?/request', {
 				email
 			})
@@ -318,6 +323,7 @@ describe('P1 /login/reset password reset flow', () => {
 		let redirectInfo: { status: number; location: string } | null = null;
 		try {
 			await resetActions.confirm({
+				getClientAddress: uniqueClientAddress(),
 				request: buildPostRequest('http://localhost:5173/login/reset?/confirm', {
 					token: rawToken,
 					newPassword: 'new-password-456',

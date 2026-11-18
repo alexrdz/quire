@@ -8,6 +8,11 @@ import { calculateStampWindow } from '$domain/stamping';
 import { generateIssueScanQrSvg } from '$lib/server/services/qr';
 import { uploadFormFile } from '$lib/server/services/storage';
 import { mediaUrlSchema, quickIssueSchema } from '$schemas/issue';
+import {
+	EMAIL_CONFIRMATION_REQUIRED,
+	formHasFileUpload,
+	isEmailConfirmed
+} from '$lib/server/email/verification';
 
 export const load: ServerLoad = async ({ request }) => {
 	const session = await auth.api.getSession({
@@ -93,6 +98,16 @@ export const actions: Actions = {
 		const approveFirst = formData.get('approveFirst') === 'true';
 		const saveModeRaw = String(formData.get('saveMode') || 'published').trim();
 		const saveMode = saveModeRaw === 'draft' ? 'draft' : 'published';
+
+		// Decision 31: publishing and uploads wait for a confirmed band email. Drafts without uploads are fine.
+		if (!isEmailConfirmed(session.user)) {
+			if (saveMode === 'published') {
+				return fail(403, { error: EMAIL_CONFIRMATION_REQUIRED.publish });
+			}
+			if (formHasFileUpload(formData)) {
+				return fail(403, { error: EMAIL_CONFIRMATION_REQUIRED.upload });
+			}
+		}
 
 		const photoFile = formData.get('photoFile');
 		const photoUrlRaw = String(formData.get('photoUrl') || '').trim();

@@ -7,6 +7,11 @@ import { ArtistAccountStatus } from '$domain/account';
 import { checkAccentContrast } from '$domain/theme';
 import { artistTemplateSchema, mediaUrlSchema } from '$schemas/issue';
 import { uploadFormFile, type MediaKindFilter } from '$lib/server/services/storage';
+import {
+	EMAIL_CONFIRMATION_REQUIRED,
+	formHasFileUpload,
+	isEmailConfirmed
+} from '$lib/server/email/verification';
 import { z } from 'zod';
 
 const templatePageKindSchema = z.enum(['text', 'audio', 'photo', 'video']);
@@ -54,7 +59,7 @@ async function requireArtist(headers: Headers) {
 		return { ok: false as const, status: 403 as const, error: 'This artist account has been closed.' };
 	}
 
-	return { ok: true as const, artist };
+	return { ok: true as const, artist, emailConfirmed: isEmailConfirmed(session.user) };
 }
 
 function parseTipPreset(raw: FormDataEntryValue | null, fallback: number): number {
@@ -185,6 +190,10 @@ export const actions: Actions = {
 		const { artist } = authResult;
 
 		const formData = await request.formData();
+		// Decision 31: uploads wait for a confirmed band email; URLs and embeds still work.
+		if (!authResult.emailConfirmed && formHasFileUpload(formData)) {
+			return fail(403, { error: EMAIL_CONFIRMATION_REQUIRED.upload });
+		}
 
 		// 1. Resolve Cover Art (direct image upload takes precedence over URL input)
 		const coverMedia = await resolveMediaInput(formData, {
@@ -268,6 +277,10 @@ export const actions: Actions = {
 		const { artist } = authResult;
 
 		const formData = await request.formData();
+		// Decision 31: uploads wait for a confirmed band email; URLs and embeds still work.
+		if (!authResult.emailConfirmed && formHasFileUpload(formData)) {
+			return fail(403, { error: EMAIL_CONFIRMATION_REQUIRED.upload });
+		}
 		const kindResult = templatePageKindSchema.safeParse(
 			String(formData.get('kind') || 'text').trim()
 		);
@@ -339,6 +352,10 @@ export const actions: Actions = {
 		const { artist } = authResult;
 
 		const formData = await request.formData();
+		// Decision 31: uploads wait for a confirmed band email; URLs and embeds still work.
+		if (!authResult.emailConfirmed && formHasFileUpload(formData)) {
+			return fail(403, { error: EMAIL_CONFIRMATION_REQUIRED.upload });
+		}
 		const pageId = String(formData.get('pageId') || '').trim();
 		if (!pageId) return fail(400, { error: 'Page ID is required.' });
 

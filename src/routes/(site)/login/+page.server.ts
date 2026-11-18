@@ -5,10 +5,16 @@ import { fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { eq, inArray } from 'drizzle-orm';
 import { normalizeArtistSlug, suggestAlternativeSlugs } from '$domain/theme';
 import { ArtistAccountStatus } from '$domain/account';
-import { artistLoginSchema, artistSignupSchema, safeRedirectPathSchema } from '$schemas/auth';
+import {
+	artistLoginSchema,
+	artistSignupSchema,
+	safeRedirectPathSchema,
+	slugPetitionSchema
+} from '$schemas/auth';
 import { auth, createSessionForUser } from '$lib/server/auth';
 import { db, schema } from '$lib/server/db';
 import { submitSlugPetition } from '$lib/server/services/account';
+import { consumeRateLimit, consumeRateLimits } from '$lib/server/services/rate-limit';
 
 function resolveRedirectTarget(rawRedirect: string | null | undefined): {
 	redirectTo: string;
@@ -74,7 +80,7 @@ export const load: ServerLoad = async ({ request, url }) => {
 };
 
 export const actions: Actions = {
-	login: async ({ request, url, cookies }) => {
+	login: async ({ request, url, cookies, getClientAddress }) => {
 		const formData = await request.formData();
 		const emailRaw = String(formData.get('email') || '');
 		const password = String(formData.get('password') || '');
@@ -92,6 +98,15 @@ export const actions: Actions = {
 				mode: 'login' as const,
 				error: parsed.error.issues[0]?.message || 'Please enter both email and password.',
 				values: { email: emailRaw.trim() }
+			});
+		}
+
+		const signInLimit = await consumeRateLimit('signInIp', getClientAddress());
+		if (!signInLimit.allowed) {
+			return fail(429, {
+				mode: 'login' as const,
+				error: signInLimit.message,
+				values: { email: parsed.data.email }
 			});
 		}
 
@@ -138,7 +153,7 @@ export const actions: Actions = {
 		throw redirect(303, parsed.data.redirectTo || '/dashboard');
 	},
 
-	signup: async ({ request, url, cookies }) => {
+	signup: async ({ request, url, cookies, getClientAddress }) => {
 		const { features, mode } = getConfig();
 		if (!features.email) {
 			return fail(503, { mode: 'signup' as const, error: featureUnavailableMessage('email', mode) });
@@ -200,6 +215,19 @@ export const actions: Actions = {
 				collidedSlug: cleanSlug,
 				collidedArtistClosed: isClosed,
 				slugSuggestions,
+				values: {
+					name: parsed.data.name,
+					email: parsed.data.email,
+					slug: cleanSlug
+				}
+			});
+		}
+
+		const signUpLimit = await consumeRateLimit('signUpIp', getClientAddress());
+		if (!signUpLimit.allowed) {
+			return fail(429, {
+				mode: 'signup' as const,
+				error: signUpLimit.message,
 				values: {
 					name: parsed.data.name,
 					email: parsed.data.email,
@@ -305,13 +333,42 @@ export const actions: Actions = {
 		throw redirect(303, targetUrl);
 	},
 
-	petitionSlug: async ({ request }) => {
+	petitionSlug: async ({ request, getClientAddress }) => {
 		const formData = await request.formData();
 		const requestedSlug = normalizeArtistSlug(String(formData.get('requestedSlug') || ''));
 		const petitionerName = String(formData.get('petitionerName') || '');
 		const petitionerEmail = String(formData.get('petitionerEmail') || '');
 		const evidenceUrl = String(formData.get('evidenceUrl') || '');
 		const rationale = String(formData.get('rationale') || '');
+
+		// 3/day per IP and 1/day per petitioner email: each petition emails the address it names.
+		// Only well-formed petitions count, so fixing a typo does not use up the day's petition.
+		const wellFormed = slugPetitionSchema.safeParse({
+			requestedSlug,
+			petitionerName,
+			petitionerEmail,
+			evidenceUrl,
+			rationale
+		});
+		const petitionLimit = wellFormed.success
+			? await consumeRateLimits([
+					['petitionIp', getClientAddress()],
+					['petitionEmail', wellFormed.data.petitionerEmail]
+				])
+			: null;
+		if (petitionLimit && !petitionLimit.allowed) {
+			return fail(429, {
+				mode: 'signup' as const,
+				petitionError: petitionLimit.message,
+				collidedSlug: requestedSlug,
+				slugSuggestions: [] as string[],
+				values: {
+					name: petitionerName.trim(),
+					email: petitionerEmail.trim().toLowerCase(),
+					slug: requestedSlug
+				}
+			});
+		}
 
 		const res = await submitSlugPetition({
 			requestedSlug,

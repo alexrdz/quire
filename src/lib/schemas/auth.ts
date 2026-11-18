@@ -20,13 +20,66 @@ export const artistSlugSchema = z
 
 export type ArtistSlugInput = z.infer<typeof artistSlugSchema>;
 
+const REDIRECT_BASE = 'https://quire.invalid';
+const MAX_REDIRECT_DECODE_PASSES = 3;
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/;
+
+/** Decodes repeatedly so double-encoded payloads are checked too. Null if it is not valid encoding. */
+function fullyDecode(value: string): string | null {
+	let current = value;
+	for (let pass = 0; pass < MAX_REDIRECT_DECODE_PASSES; pass++) {
+		let next: string;
+		try {
+			next = decodeURIComponent(current);
+		} catch {
+			return null;
+		}
+		if (next === current) return current;
+		current = next;
+	}
+	return current;
+}
+
+function isUnsafePathForm(value: string): boolean {
+	return (
+		!value.startsWith('/') ||
+		value.startsWith('//') ||
+		value.includes('\\') ||
+		CONTROL_CHARACTERS.test(value)
+	);
+}
+
+/**
+ * The one redirect checker (PRODUCTION_PLAN 2.1). A redirect target must be a
+ * same-site path: a single leading `/`, no `//` or `/\`, no backslashes and no
+ * control characters, before or after percent-decoding.
+ */
+export function isSafeRedirectPath(value: string): boolean {
+	if (value.length === 0 || value.length > 2048) return false;
+	const decoded = fullyDecode(value);
+	if (decoded === null) return false;
+	if (isUnsafePathForm(value) || isUnsafePathForm(decoded)) return false;
+	try {
+		return new URL(value, REDIRECT_BASE).origin === REDIRECT_BASE;
+	} catch {
+		return false;
+	}
+}
+
 export const safeRedirectPathSchema = z
 	.string()
 	.trim()
-	.refine((val) => val.startsWith('/') && !val.startsWith('//'), {
+	.refine(isSafeRedirectPath, {
 		message: 'Redirect path must be a relative application path'
 	})
 	.default('/dashboard');
+
+/** Parses an untrusted redirect target, falling back to `fallback` when it is missing or unsafe. */
+export function resolveSafeRedirect(raw: unknown, fallback: string): string {
+	if (typeof raw !== 'string' || raw.trim() === '') return fallback;
+	const parsed = safeRedirectPathSchema.safeParse(raw);
+	return parsed.success ? parsed.data : fallback;
+}
 
 export const emailSchema = z
 	.string()

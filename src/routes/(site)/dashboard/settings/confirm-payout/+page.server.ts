@@ -4,6 +4,8 @@ import { and, eq, gt, isNull } from 'drizzle-orm';
 import { db, schema } from '$lib/server/db';
 import { auth } from '$lib/server/auth';
 import { payoutChangeConfirmationSchema } from '$lib/schemas/payouts';
+import { resolveSafeRedirect } from '$schemas/auth';
+import { EMAIL_CONFIRMATION_REQUIRED, isEmailConfirmed } from '$lib/server/email/verification';
 import {
 	createExpressConnectedAccount,
 	createExpressOnboardingLink,
@@ -16,7 +18,10 @@ export const load: ServerLoad = async ({ request, url }) => {
 	});
 
 	if (!session?.user) {
-		const redirectTarget = `/dashboard/settings/confirm-payout${url.search}`;
+		const redirectTarget = resolveSafeRedirect(
+			`/dashboard/settings/confirm-payout${url.search}`,
+			'/dashboard/settings'
+		);
 		throw redirect(303, `/login?redirect=${encodeURIComponent(redirectTarget)}`);
 	}
 
@@ -71,6 +76,16 @@ export const load: ServerLoad = async ({ request, url }) => {
 			status: 'error' as const,
 			errorCode: 'TOKEN_ALREADY_USED',
 			errorMessage: `This payout confirmation link has already been ${statusLabel}. Please request a new confirmation email from Settings & Payouts.`
+		};
+	}
+
+	// Decision 31: Stripe Connect onboarding waits for a confirmed email. Checked before the token is used up.
+	if (record.action !== 'disconnect' && !isEmailConfirmed(session.user)) {
+		return {
+			artist,
+			status: 'error' as const,
+			errorCode: 'EMAIL_NOT_CONFIRMED',
+			errorMessage: EMAIL_CONFIRMATION_REQUIRED.payouts
 		};
 	}
 

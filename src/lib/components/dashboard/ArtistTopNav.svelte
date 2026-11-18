@@ -53,9 +53,11 @@
 				>
 					+ Quick Issue (Phone)
 				</a>
-				<a href="/logout" class="btn-nav-ghost">
-					Sign Out
-				</a>
+				<form method="POST" action="/logout" class="signout-form">
+					<button type="submit" class="btn-nav-ghost">
+						Sign Out
+					</button>
+				</form>
 			</Cluster>
 		</Cluster>
 	</Container>
