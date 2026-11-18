@@ -75,6 +75,12 @@ export const RATE_LIMITS = {
 		windowSeconds: HOUR,
 		message: 'We have sent a few confirmation emails already. Check your inbox, or try again in an hour.'
 	},
+	/** Venmo username change or removal requests (ADR 0008): per Artist. */
+	venmoChange: {
+		max: 3,
+		windowSeconds: HOUR,
+		message: 'You have asked to change your Venmo username a few times already. Please try again in an hour.'
+	},
 	/**
 	 * Sign-in, sign-up and password reset through Quire's own form actions. These
 	 * call Better Auth's server API directly, which bypasses its HTTP rate limiter,

@@ -6,7 +6,9 @@ import {
 	buildPasswordResetTemplate,
 	buildPayoutAccountChangeTemplate,
 	buildSlugPetitionConfirmationTemplate,
-	buildSlugPetitionDecisionTemplate
+	buildSlugPetitionDecisionTemplate,
+	buildVenmoChangeConfirmationTemplate,
+	buildVenmoChangedNoticeTemplate
 } from './templates';
 
 import { allowsStandIn, getConfig } from '../config';
@@ -333,5 +335,59 @@ export async function sendSlugPetitionDecisionEmail(input: {
 	return sendTransactionalEmail({
 		to: parsed.data.to,
 		...template
+	});
+}
+
+const venmoChangeConfirmationInputSchema = z.object({
+	to: z.string().email('Valid recipient email is required'),
+	artistName: z.string().min(1).max(120),
+	oldUsername: z.string().min(1).max(64),
+	newUsername: z.string().min(1).max(64).nullable(),
+	confirmationUrl: z.string().url('Valid confirmation URL is required')
+});
+
+/** Single-use link to confirm a Venmo username change or removal (ADR 0008). */
+export async function sendVenmoChangeConfirmationEmail(input: {
+	to: string;
+	artistName: string;
+	oldUsername: string;
+	newUsername: string | null;
+	confirmationUrl: string;
+}): Promise<Result<EmailSendReceipt, DomainError>> {
+	const parsed = venmoChangeConfirmationInputSchema.safeParse(input);
+	if (!parsed.success) {
+		return err({
+			code: 'INVALID_EMAIL_INPUT',
+			message: parsed.error.issues[0]?.message || 'Invalid Venmo change email input.'
+		});
+	}
+	return sendTransactionalEmail({
+		to: parsed.data.to,
+		...buildVenmoChangeConfirmationTemplate(parsed.data)
+	});
+}
+
+const venmoChangedNoticeInputSchema = z.object({
+	to: z.string().email('Valid recipient email is required'),
+	artistName: z.string().min(1).max(120),
+	newUsername: z.string().min(1).max(64).nullable()
+});
+
+/** Notice after a Venmo username change or removal is applied (ADR 0008). */
+export async function sendVenmoChangedNoticeEmail(input: {
+	to: string;
+	artistName: string;
+	newUsername: string | null;
+}): Promise<Result<EmailSendReceipt, DomainError>> {
+	const parsed = venmoChangedNoticeInputSchema.safeParse(input);
+	if (!parsed.success) {
+		return err({
+			code: 'INVALID_EMAIL_INPUT',
+			message: parsed.error.issues[0]?.message || 'Invalid Venmo notice email input.'
+		});
+	}
+	return sendTransactionalEmail({
+		to: parsed.data.to,
+		...buildVenmoChangedNoticeTemplate(parsed.data)
 	});
 }
