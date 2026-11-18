@@ -222,6 +222,18 @@ export async function ensureSchemaTables() {
 			token_hash text NOT NULL,
 			scanned_at integer NOT NULL,
 			FOREIGN KEY (issue_id) REFERENCES issues(id) ON UPDATE no action ON DELETE cascade
+		)`,
+		`CREATE TABLE IF NOT EXISTS rate_limits (
+			key text PRIMARY KEY NOT NULL,
+			count integer NOT NULL,
+			window_start integer NOT NULL,
+			expires_at integer NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS auth_rate_limits (
+			id text PRIMARY KEY NOT NULL,
+			key text NOT NULL,
+			count integer NOT NULL,
+			last_request integer NOT NULL
 		)`
 	];
 
@@ -274,7 +286,9 @@ export async function ensureSchemaTables() {
 		`CREATE UNIQUE INDEX IF NOT EXISTS collections_fan_issue_unique ON collections (fan_user_id, issue_id)`,
 		`CREATE INDEX IF NOT EXISTS collections_issue_kind_idx ON collections (issue_id, kind)`,
 		`CREATE INDEX IF NOT EXISTS scans_token_hash_idx ON scans (token_hash)`,
-		`CREATE INDEX IF NOT EXISTS scans_issue_scanned_idx ON scans (issue_id, scanned_at)`
+		`CREATE INDEX IF NOT EXISTS scans_issue_scanned_idx ON scans (issue_id, scanned_at)`,
+		`CREATE INDEX IF NOT EXISTS rate_limits_expires_at_idx ON rate_limits (expires_at)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS auth_rate_limits_key_unique ON auth_rate_limits (key)`
 	];
 
 	for (const stmt of indexStatements) {

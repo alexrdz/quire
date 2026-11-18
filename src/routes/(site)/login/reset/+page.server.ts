@@ -2,6 +2,7 @@ import { fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { getConfig } from '$lib/server/config';
 import { featureUnavailableMessage } from '$lib/features';
 import { auth } from '$lib/server/auth';
+import { consumeRateLimit } from '$lib/server/services/rate-limit';
 import { passwordResetConfirmSchema, passwordResetRequestSchema } from '$schemas/auth';
 
 const NON_ENUMERATING_RESET_MESSAGE =
@@ -32,7 +33,7 @@ export const load: ServerLoad = async ({ url }) => {
 };
 
 export const actions: Actions = {
-	request: async ({ request }) => {
+	request: async ({ request, getClientAddress }) => {
 		const { features, mode } = getConfig();
 		if (!features.email) {
 			return fail(503, {
@@ -51,6 +52,15 @@ export const actions: Actions = {
 				action: 'request' as const,
 				error: parsed.error.issues[0]?.message || 'Please enter a valid email address.',
 				email: emailRaw
+			});
+		}
+
+		const resetLimit = await consumeRateLimit('passwordResetIp', getClientAddress());
+		if (!resetLimit.allowed) {
+			return fail(429, {
+				action: 'request' as const,
+				error: resetLimit.message,
+				email: parsed.data.email
 			});
 		}
 
@@ -73,7 +83,7 @@ export const actions: Actions = {
 		};
 	},
 
-	confirm: async ({ request }) => {
+	confirm: async ({ request, getClientAddress }) => {
 		const formData = await request.formData();
 		const token = String(formData.get('token') || '').trim();
 		const newPassword = String(formData.get('newPassword') || '');
@@ -93,6 +103,14 @@ export const actions: Actions = {
 			return fail(400, {
 				action: 'confirm' as const,
 				error: 'Passwords do not match.'
+			});
+		}
+
+		const confirmLimit = await consumeRateLimit('passwordResetIp', getClientAddress());
+		if (!confirmLimit.allowed) {
+			return fail(429, {
+				action: 'confirm' as const,
+				error: confirmLimit.message
 			});
 		}
 

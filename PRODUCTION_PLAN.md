@@ -85,6 +85,20 @@ Acceptance: tests that `x.html` labelled `image/png`, an SVG, and a polyglot are
 
 ## Phase 2: High
 
+**Status (2026-11-18): 2.1-2.4 done on `prod/phase-2` (PR into `prod/phase-0`); 2.5 pending with the user (Stripe dashboard).** `pnpm check`, `pnpm test` (285), `pnpm check:sizing`, `pnpm build` and `pnpm test:e2e` (16) green. Notes for later phases:
+- One redirect checker: `isSafeRedirectPath` / `resolveSafeRedirect` in `src/lib/schemas/auth.ts`. It checks the raw value and the value after up to three rounds of percent-decoding. Any new redirect parameter must go through it.
+- `/logout` has no GET handler (SvelteKit answers 405). Sign-out controls are `<form class="signout-form">` with a `redirectTo` hidden field where needed.
+- All limits live in `RATE_LIMITS` (`src/lib/server/services/rate-limit.ts`). Keys are `action:HMAC(subject)` with `COOKIE_SECRET`, so raw IPs and emails are never stored. Rotating `COOKIE_SECRET` resets every counter and every tip device cookie.
+- Better Auth's own limiter only covers HTTP calls to `/api/auth`; the login, signup and reset form actions call `auth.api.*` directly, so they are limited by the same numbers through `rate-limit.ts` (`signInIp`, `signUpIp`, `passwordResetIp`). Better Auth stores its counters in `auth_rate_limits` (model `authRateLimit`), is off in `test` mode, and reads the client IP from `x-nf-client-connection-ip` (3.4 must keep Netlify as the edge so that header is trustworthy).
+- Verification resend: 3 per hour per artist (`verificationResendUser`), also applied to Better Auth's `/send-verification-email`.
+- Expired `rate_limits` rows are pruned every 200 checks; if the limiter's database call fails, the request is allowed and the error logged (a fan at a gig keeps the page).
+- `drizzle/0002_schema_catch_up.sql` brings the migrations in line with `schema.ts` (they had drifted: petitions, payout tokens, account status, tip status, indexes). Drizzle-kit wrote an `INSERT ... SELECT` that read two columns the old `artists` table did not have; that statement was corrected by hand. `0003_rate_limits.sql` adds only the two new tables. A fresh database migrated with 0000-0003 matches `schema.ts` exactly (`drizzle-kit push` reports no changes), which 3.5 can build on.
+- `seed.ts` `ensureSchemaTables` creates both new tables until 3.5 removes runtime DDL.
+- Email confirmation gate helpers live in `src/lib/server/email/verification.ts`. The bar is `EmailConfirmBar.svelte`, rendered by the new `dashboard/+layout.svelte`; resend posts to `/dashboard?/resendVerification` (the settings page keeps its own resend, sharing the same helper and limit). Disconnecting payouts is not gated.
+- 4.3 (auth guard consolidation) can move the per-route `emailVerified` checks into the dashboard layout guard, but the action-level checks must stay.
+- e2e: `tests/e2e/helpers/db.ts` clears `rate_limits` and reopens the seeded Brooklyn Issue's Stamp Window, because the seeded gig dates are fixed and the scan test had started failing once that window passed. A seed with dates relative to today would remove the need for this.
+- 2.5 (Stripe Radar rule and production webhook secret) is with the user.
+
 2.1 **One redirect checker**
 - Harden `safeRedirectPathSchema`: must start with a single `/`, reject `//`, `/\`, backslashes and control characters.
 - Use it in `/demo`, `/logout`, login actions and the confirm-payout redirect.

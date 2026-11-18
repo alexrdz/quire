@@ -46,9 +46,12 @@
 				<Cluster align="center" gap="xs">
 					<a href="/me/stubs" class="btn-nav-ghost">My Stubs</a>
 					{#if data.session?.user}
-						<a href="/logout?redirect=/a/{data.artist.slug}" class="btn-nav-ghost">
-							Sign Out ({data.session.user.name})
-						</a>
+						<form method="POST" action="/logout" class="signout-form">
+							<input type="hidden" name="redirectTo" value="/a/{data.artist.slug}" />
+							<button type="submit" class="btn-nav-ghost">
+								Sign Out ({data.session.user.name})
+							</button>
+						</form>
 					{:else}
 						<button type="button" class="btn-nav-primary" onclick={() => (authDrawerOpen = true)}>
 							Fan Sign In
@@ -419,6 +422,8 @@
 					return async ({ result }) => {
 						if (result.type === 'success') {
 							tipMessage = `✓ General Tip Confirmed! $${(selectedTipCents / 100).toFixed(2)} sent to ${data.artist.displayName}.`;
+						} else if (result.type === 'failure' && result.status === 429) {
+							tipMessage = `${String(result.data?.error ?? 'Too many tips right now.')} Nothing was charged.`;
 						} else {
 							tipMessage = "That didn't go through. Nothing was charged.";
 						}

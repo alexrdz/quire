@@ -25,6 +25,7 @@ import {
 	type TipStatus
 } from '$domain/tipping';
 import { ArtistAccountStatus } from '$domain/account';
+import { resendEmailConfirmation } from '$lib/server/email/verification';
 
 const DEFAULT_SIGNUP_BIO = 'Live digital zines and tour archive on Quire.';
 
@@ -230,6 +231,27 @@ async function requireArtistContext(request: Request) {
 }
 
 export const actions: Actions = {
+	/** Resend from the confirm-your-email bar on any dashboard page (PRODUCTION_PLAN 2.4). */
+	resendVerification: async ({ request }) => {
+		const ctx = await requireArtistContext(request);
+		if ('errorResponse' in ctx) {
+			return fail(403, { accountError: 'Sign in as an artist to confirm your email.' });
+		}
+
+		const result = await resendEmailConfirmation({
+			user: ctx.session.user,
+			headers: request.headers,
+			callbackURL: '/dashboard?verified=1',
+			send: (args) => auth.api.sendVerificationEmail(args)
+		});
+		if (!result.ok) {
+			return fail(result.status, { accountError: result.message });
+		}
+		return result.alreadyConfirmed
+			? { alreadyVerified: true }
+			: { verificationEmailSent: true, sentToEmail: ctx.session.user.email };
+	},
+
 	createDraft: async ({ request }) => {
 		const ctx = await requireArtistContext(request);
 		if ('errorResponse' in ctx) return ctx.errorResponse;

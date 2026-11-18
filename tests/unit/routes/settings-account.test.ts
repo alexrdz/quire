@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { uniqueClientAddress } from '../helpers/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { hashPassword, makeSignature } from 'better-auth/crypto';
@@ -371,6 +372,7 @@ describe('Item 3: Artist Account Lifecycle, Verification & Handle Petitions', ()
 		loginForm.set('email', fixture.email);
 		loginForm.set('password', fixture.password);
 		const loginFailRes = (await loginActions.login({
+			getClientAddress: uniqueClientAddress(),
 			request: new Request('http://localhost:4173/login?/login', {
 				method: 'POST',
 				body: loginForm
@@ -395,6 +397,7 @@ describe('Item 3: Artist Account Lifecycle, Verification & Handle Petitions', ()
 		signupCollisionForm.set('email', `newband-${crypto.randomBytes(3).toString('hex')}@example.com`);
 		signupCollisionForm.set('password', 'password1234');
 		const collisionRes = (await loginActions.signup({
+			getClientAddress: uniqueClientAddress(),
 			request: new Request('http://localhost:4173/login?/signup', {
 				method: 'POST',
 				body: signupCollisionForm
@@ -419,6 +422,7 @@ describe('Item 3: Artist Account Lifecycle, Verification & Handle Petitions', ()
 			'We are the original touring band and the previous holder closed their account.'
 		);
 		const petitionRes = (await loginActions.petitionSlug({
+			getClientAddress: uniqueClientAddress(),
 			request: new Request('http://localhost:4173/login?/petitionSlug', {
 				method: 'POST',
 				body: petitionForm

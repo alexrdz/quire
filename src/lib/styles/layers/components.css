@@ -458,3 +458,71 @@
 	inline-size: 1em;
 	block-size: 1em;
 }
+
+/* Sign-out control (PRODUCTION_PLAN 2.2): a POST form that looks like the link it replaced */
+.signout-form {
+	display: contents;
+}
+
+.signout-form > button {
+	margin-block: 0;
+	margin-inline: 0;
+	line-height: inherit;
+	cursor: pointer;
+}
+
+/* Confirm-your-email bar on dashboard pages (PRODUCTION_PLAN 2.4) */
+.email-confirm-bar {
+	background-color: var(--bg-void);
+	border-block-end: 1px solid rgba(5, 217, 232, 0.35);
+	color: var(--paper);
+}
+
+.email-confirm-bar-inner {
+	padding-block: var(--space-xs);
+	padding-inline: var(--space-sm);
+}
+
+.email-confirm-bar-title {
+	font-size: var(--text-small);
+	font-weight: var(--weight-semibold);
+	color: var(--accent, #05d9e8);
+}
+
+.email-confirm-bar-text {
+	margin-block: 0;
+	font-size: var(--text-small);
+	color: #a1a1aa;
+}
+
+.email-confirm-bar-feedback {
+	margin-block: 0;
+	font-size: var(--text-small);
+	color: var(--highlight);
+}
+
+.email-confirm-bar-feedback[data-kind='error'] {
+	color: var(--support);
+}
+
+.email-confirm-bar-button {
+	padding-block: var(--space-2xs);
+	padding-inline: var(--space-xs);
+	border: 1px solid rgba(5, 217, 232, 0.45);
+	border-radius: 6px;
+	background: rgba(5, 217, 232, 0.12);
+	color: var(--paper);
+	font-size: var(--text-meta);
+	font-weight: var(--weight-semibold);
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.email-confirm-bar-button:hover:not(:disabled) {
+	background: rgba(5, 217, 232, 0.2);
+}
+
+.email-confirm-bar-button:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}

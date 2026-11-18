@@ -7,6 +7,11 @@ import { eq, and, asc, desc } from 'drizzle-orm';
 import { auth, createSessionForUser } from '$lib/server/auth';
 import { createTipCheckout } from '$lib/server/services/payments';
 import {
+	consumeRateLimit,
+	consumeRateLimits,
+	getOrCreateTipDeviceId
+} from '$lib/server/services/rate-limit';
+import {
 	submitWallNote,
 	flagWallNote
 } from '$lib/server/services/moderation';
@@ -162,7 +167,7 @@ export const actions: Actions = {
 		throw redirect(303, callbackURL);
 	},
 
-	tip: async ({ request, url, params }) => {
+	tip: async ({ request, url, params, cookies, getClientAddress }) => {
 		const issueRecord = await db.query.issues.findFirst({
 			where: eq(schema.issues.slug, params.slug!),
 			with: { artist: true }
@@ -188,6 +193,15 @@ export const actions: Actions = {
 			return fail(400, { error: parseResult.error.issues[0]?.message || 'Validation error' });
 		}
 
+		// Per device and per IP, counted independently (PRODUCTION_PLAN 2.3).
+		const tipLimit = await consumeRateLimits([
+			['tipDevice', getOrCreateTipDeviceId(cookies)],
+			['tipIp', getClientAddress()]
+		]);
+		if (!tipLimit.allowed) {
+			return fail(429, { error: tipLimit.message });
+		}
+
 		const tipResult = await createTipCheckout({
 			artistId: parseResult.data.artistId,
 			issueId: parseResult.data.issueId,
@@ -203,7 +217,7 @@ export const actions: Actions = {
 		return { success: true, tipResult: tipResult.value };
 	},
 
-	submitNote: async ({ request, params }) => {
+	submitNote: async ({ request, params, getClientAddress }) => {
 		const session = await auth.api.getSession({
 			headers: request.headers
 		});
@@ -233,6 +247,11 @@ export const actions: Actions = {
 			return fail(400, { error: parseResult.error.issues[0]?.message || 'Validation error' });
 		}
 
+		const noteLimit = await consumeRateLimit('wallNoteIp', getClientAddress());
+		if (!noteLimit.allowed) {
+			return fail(429, { error: noteLimit.message });
+		}
+
 		const noteResult = await submitWallNote({
 			artistId,
 			issueId,
@@ -247,7 +266,7 @@ export const actions: Actions = {
 		return { success: true, noteId: noteResult.value.noteId, status: noteResult.value.status };
 	},
 
-	flagNote: async ({ request, params }) => {
+	flagNote: async ({ request, params, getClientAddress }) => {
 		const session = await auth.api.getSession({
 			headers: request.headers
 		});
@@ -273,6 +292,11 @@ export const actions: Actions = {
 		const parseResult = flagNoteSchema.safeParse({ noteId });
 		if (!parseResult.success) {
 			return fail(400, { error: parseResult.error.issues[0]?.message || 'Validation error' });
+		}
+
+		const flagLimit = await consumeRateLimit('flagIp', getClientAddress());
+		if (!flagLimit.allowed) {
+			return fail(429, { error: flagLimit.message });
 		}
 
 		const flagResult = await flagWallNote(noteId, session.user.id);

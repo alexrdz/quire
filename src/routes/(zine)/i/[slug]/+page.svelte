@@ -1003,6 +1003,8 @@
 					return async ({ result }) => {
 						if (result.type === 'success') {
 							tipMessage = `✓ Tip Confirmed! $${(selectedTipCents / 100).toFixed(2)} sent to ${data.artist.displayName}.`;
+						} else if (result.type === 'failure' && result.status === 429) {
+							tipMessage = `${String(result.data?.error ?? 'Too many tips right now.')} Nothing was charged.`;
 						} else {
 							tipMessage = "That didn't go through. Nothing was charged.";
 						}

@@ -7,6 +7,7 @@ import { and, eq } from 'drizzle-orm';
 import { getConfig } from './config';
 import { db, schema } from './db';
 import { sendPasswordResetEmail, sendVerificationEmail } from './email';
+import { betterAuthRateLimitRules } from './services/rate-limit';
 
 const config = getConfig();
 
@@ -24,9 +25,29 @@ export const auth = betterAuth({
 			users: schema.users,
 			sessions: schema.sessions,
 			accounts: schema.accounts,
-			verifications: schema.verifications
+			verifications: schema.verifications,
+			authRateLimits: schema.authRateLimits
 		}
 	}),
+	/**
+	 * Database rate limiting for /api/auth (PRODUCTION_PLAN 2.3). Limits come from
+	 * RATE_LIMITS in services/rate-limit.ts. Off in unit and e2e tests, which share
+	 * one address. Netlify sets `x-nf-client-connection-ip` itself and overwrites any
+	 * client value, so Better Auth reads the client IP from it.
+	 */
+	rateLimit: {
+		enabled: config.mode !== 'test',
+		storage: 'database',
+		modelName: 'authRateLimit',
+		window: 60,
+		max: 100,
+		customRules: betterAuthRateLimitRules()
+	},
+	advanced: {
+		ipAddress: {
+			ipAddressHeaders: ['x-nf-client-connection-ip']
+		}
+	},
 	emailAndPassword: {
 		enabled: true,
 		requireEmailVerification: false,

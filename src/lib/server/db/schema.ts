@@ -90,6 +90,34 @@ export const verifications = sqliteTable(
 );
 
 /**
+ * Better Auth database rate limiting (`rateLimit.storage: 'database'`), used for
+ * its own /api/auth endpoints. Model name `authRateLimit` (pluralised by the adapter)
+ * so it does not collide with the app's `rate_limits` table.
+ */
+export const authRateLimits = sqliteTable('auth_rate_limits', {
+	id: text('id').primaryKey(),
+	key: text('key').notNull().unique(),
+	count: integer('count').notNull(),
+	lastRequest: integer('last_request').notNull()
+});
+
+/**
+ * App rate limits (PRODUCTION_PLAN 2.3): one fixed-window counter per action and
+ * subject. `key` is `action:hmac(subject)`, so raw IPs and emails are never stored.
+ * Times are epoch milliseconds.
+ */
+export const rateLimits = sqliteTable(
+	'rate_limits',
+	{
+		key: text('key').primaryKey(),
+		count: integer('count').notNull(),
+		windowStart: integer('window_start').notNull(),
+		expiresAt: integer('expires_at').notNull()
+	},
+	(table) => [index('rate_limits_expires_at_idx').on(table.expiresAt)]
+);
+
+/**
  * Quire Domain Entities
  */
 export const artists = sqliteTable(

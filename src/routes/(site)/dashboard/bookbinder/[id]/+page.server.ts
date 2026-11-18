@@ -16,6 +16,11 @@ import {
 import { createArtistId, createIssueId } from '$domain/types';
 import { issueStatusSchema, mediaUrlSchema, photoEntriesSchema } from '$schemas/issue';
 import { MAX_PHOTOS_PER_PAGE } from '$domain/photo-pile';
+import {
+	EMAIL_CONFIRMATION_REQUIRED,
+	formHasFileUpload,
+	isEmailConfirmed
+} from '$lib/server/email/verification';
 
 const BOOKBINDER_PAGE_KINDS = new Set(['text', 'setlist', 'photo', 'audio', 'video'] as const);
 type BookbinderPageKind = 'text' | 'setlist' | 'photo' | 'audio' | 'video';
@@ -349,6 +354,10 @@ export const actions: Actions = {
 					error: `Cannot transition an issue with status '${existing.status}' back to 'draft'.`
 				});
 			} else if (requestedStatus === 'published') {
+				// Decision 31: publishing waits for a confirmed band email.
+				if (!isEmailConfirmed(owned.session.user)) {
+					return fail(403, { error: EMAIL_CONFIRMATION_REQUIRED.publish });
+				}
 				const res = publishIssue(domainIssue, {
 					secretKey: existing.secretKey,
 					stampWindow: windowCalc.value
@@ -396,6 +405,9 @@ export const actions: Actions = {
 		if ('errorResponse' in owned) return owned.errorResponse;
 
 		const formData = await request.formData();
+		if (!isEmailConfirmed(owned.session.user) && formHasFileUpload(formData)) {
+			return fail(403, { error: EMAIL_CONFIRMATION_REQUIRED.upload });
+		}
 		const pageId = String(formData.get('pageId') || '').trim();
 		const rawKind = String(formData.get('kind') || 'text').trim();
 
@@ -470,6 +482,9 @@ export const actions: Actions = {
 		if ('errorResponse' in owned) return owned.errorResponse;
 
 		const formData = await request.formData();
+		if (!isEmailConfirmed(owned.session.user) && formHasFileUpload(formData)) {
+			return fail(403, { error: EMAIL_CONFIRMATION_REQUIRED.upload });
+		}
 		const rawKind = String(formData.get('kind') || 'text').trim();
 		if (!BOOKBINDER_PAGE_KINDS.has(rawKind as BookbinderPageKind)) {
 			return fail(400, { error: `Unsupported page type '${rawKind}'.` });
