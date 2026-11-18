@@ -12,7 +12,8 @@ import {
 } from '$lib/server/services/rate-limit';
 import { db, schema } from '$lib/server/db';
 import { eq, like } from 'drizzle-orm';
-import { afterAll } from 'vitest';
+import { afterAll, beforeAll } from 'vitest';
+import { seedDatabase } from '$lib/server/seed';
 import { makeSignature } from 'better-auth/crypto';
 import { authSecret } from '$lib/server/auth';
 import { uniqueClientAddress } from '../helpers/client';
@@ -22,6 +23,11 @@ import { actions as loginActions } from '../../../src/routes/(site)/login/+page.
 import { GET as scanGET } from '../../../src/routes/scan/[slug]/+server';
 
 const createdUserIds: string[] = [];
+
+// Creates the schema (and the seeded Artist the petition test names) on a fresh database.
+beforeAll(async () => {
+	await seedDatabase();
+});
 
 afterAll(async () => {
 	for (const id of createdUserIds) {

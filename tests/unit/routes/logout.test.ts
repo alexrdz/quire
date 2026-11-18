@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { seedDatabase } from '$lib/server/seed';
 import { eq } from 'drizzle-orm';
 import { makeSignature } from 'better-auth/crypto';
 import { render } from 'svelte/server';
@@ -9,6 +10,10 @@ import * as logoutRoute from '../../../src/routes/logout/+server';
 import ArtistTopNav from '$lib/components/dashboard/ArtistTopNav.svelte';
 
 const createdUserIds: string[] = [];
+
+beforeAll(async () => {
+	await seedDatabase();
+});
 
 afterEach(async () => {
 	while (createdUserIds.length > 0) {

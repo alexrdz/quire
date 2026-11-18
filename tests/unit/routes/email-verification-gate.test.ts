@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { hashPassword, makeSignature } from 'better-auth/crypto';
 import type { Config } from '$lib/server/config';
@@ -47,7 +47,14 @@ const { load: dashboardLayoutLoad } = await import(
 	'../../../src/routes/(site)/dashboard/+layout.server'
 );
 
+const { seedDatabase } = await import('$lib/server/seed');
+
 const PASSWORD = 'gate-band-password-123';
+
+// Creates the schema on a fresh database.
+beforeAll(async () => {
+	await seedDatabase();
+});
 const createdUserIds: string[] = [];
 
 afterEach(async () => {
