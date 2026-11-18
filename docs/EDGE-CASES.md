@@ -2,18 +2,22 @@
 
 Smaller cases to handle at build time. Major ones have already been decided in `SPEC.md` (see the decision list in `CONTEXT.md`). Each case below has a recommended handling, to be confirmed or changed during the build.
 
-## Tipping
+## Tipping (Venmo, ADR 0008)
 
 | Case | Recommended handling |
 |---|---|
-| A fan taps tip and loses signal during checkout | The flow resets. Show "That didn't go through. Nothing was charged." Nothing is queued or retried (decision 18). |
-| A fan double-taps the tip button | Disable the button while a checkout is in progress, and use one Stripe idempotency key per attempt. |
-| A fan backs out of Apple Pay or Google Pay | Treat it as cancelled and return to the presets. No message, no follow-up. |
-| A custom amount is below $2 or above $500 | Validate inline before checkout. |
-| The fan's card is declined | Show Stripe's message and let them retry or leave. Nothing is stored. |
-| Stripe keys unset in local dev / CI | Use deterministic local development payment fallback to record test tip and update dashboard metrics (ADR 0003). |
-| A chargeback arrives weeks later | Subtract it from the Artist's net and show it as its own line in the dashboard. |
-| An Artist disconnects Stripe while Issues are live | Hide the tip buttons everywhere right away. |
+| A fan taps a tip button and the tap can't be recorded (no signal, server error) | Open Venmo anyway. The tap just isn't counted. Never block a fan from paying an Artist (decision 18). |
+| A fan double-taps the tip button | Open Venmo once; ignore repeat taps for a couple of seconds and record one tap. |
+| A fan doesn't have the Venmo app | The link falls back to venmo.com in the browser. |
+| A fan backs out in Venmo, or the payment fails | Nothing to do: Quire never sees it. The tap stays a tap. No message, no follow-up. |
+| A fan is outside the US | Venmo is US-only. The tip buttons still show; Venmo explains. No special handling. |
+| A fan edits the note in Venmo | Allowed. Quire never sees the note or the payment. |
+| A custom amount is below $2 or above $500 | Validate inline before opening Venmo. |
+| A fan is over the tip-tap rate limit | Open Venmo anyway; don't record the tap. |
+| A tip button is tapped in the Demo, development or tests | Never open Venmo. Record the tap and show "In the Demo, this would open Venmo to pay $5 to @username." |
+| The Artist mistypes their Venmo username | Quire can't verify it. Setup has "Test your link"; fixing it later goes through the password + email confirmation change flow. |
+| An Artist removes their Venmo username while Issues are live | Only after password + email confirmation. Then hide the tip buttons everywhere right away. |
+| An Artist asks how much they made from a gig | The dashboard shows tap counts only and says "Check Venmo for what came in." Never a dollar figure. |
 
 ## Stamping & collecting
 
@@ -29,12 +33,12 @@ Smaller cases to handle at build time. Major ones have already been decided in `
 | Case | Recommended handling |
 |---|---|
 | A busker publishes daily, leaving hundreds of Issues on the Back Page | Group the list by month, with only the latest month expanded. |
-| A new Artist has no Issues | On `/dashboard`, render the **3-Step Studio Launchpad** above the fold (Master Template, Quick Issue or `"New Draft in Bookbinder"` + Busker Fast-Track to Permanent Artist QR & Full-Screen Case Display, Stripe Express) instead of an empty gigs table. Publicly on `/a/[slug]`, links and the General Wall still work (with tip buttons hidden until payouts are enabled) and a clean "No issues yet" state. |
+| A new Artist has no Issues | On `/dashboard`, render the **3-Step Studio Launchpad** above the fold (Master Template, Quick Issue or `"New Draft in Bookbinder"` + Busker Fast-Track to Permanent Artist QR & Full-Screen Case Display, Add your Venmo) instead of an empty gigs table. Publicly on `/a/[slug]`, links and the General Wall still work (with tip buttons hidden until a Venmo username is set) and a clean "No issues yet" state. |
 | An Artist edits city or date after publishing | Allowed. The QR doesn't change, the Stamp Window moves, and Stamps already claimed are kept. |
 | An Artist edits pages after fans have read them | Allowed. Issues are living documents; no version history for the MVP. |
 | Two Artists want the same slug | First come, first served on `/login?mode=signup`. Show a live, editable `/a/band-name` preview derived from the band name (never append a random 3-digit suffix), check availability, and suggest clean alternatives if taken. |
 | An Issue QR for a draft or unpublished Issue is scanned | Show "This issue isn't out yet" with a link to the Back Page. |
-| An Issue QR for an archived Issue is scanned | Show the Issue read-only. Tipping still counts toward it if payouts are enabled. |
+| An Issue QR for an archived Issue is scanned | Show the Issue read-only. Tip taps still count toward it if the Artist has a Venmo username. |
 
 ## The Wall
 
@@ -52,10 +56,11 @@ Smaller cases to handle at build time. Major ones have already been decided in `
 
 | Case | Recommended handling |
 |---|---|
-| A fan deletes their account | Their notes are removed, along with any replies to them. Their Stubs and Saves are deleted. Tips stay, since they were anonymous anyway. |
+| A fan deletes their account | Their notes are removed, along with any replies to them. Their Stubs and Saves are deleted. Tip Taps stay, since they were anonymous anyway. |
 | An Artist closes their account | Issues become archived and read-only, the Back Page shows "This artist has left Quire," and fans keep their Stubs. |
 | A band breaks up and a member keeps the password | It's the band's shared email that controls password resets via Resend (`/login/reset`). Out of scope for the platform. |
-| One bandmate tries to swap the Stripe payout account | Require password re-entry plus a signed Resend email confirmation token (`/dashboard/settings/confirm-payout`) before switching the connected Stripe Express account (`SPEC.md` §6.4). |
+| One bandmate tries to swap or remove the Venmo username | Require password re-entry plus a signed, single-use Resend email confirmation link. The old username stays live until the link is confirmed with a POST, and a notice is emailed after the change (`SPEC.md` §6.4). |
+| The confirmation email is opened by a link scanner or preview bot | Nothing changes: the link only shows the pending change; the confirm button (POST) applies it. |
 | Someone reports an impersonating Artist | Handled manually by the platform. The verified mark is the main signal to fans. |
 | A fan under 13 signs in with Google | Google's own age rules apply. Quire collects no age data. |
 

@@ -32,7 +32,7 @@ The Leaf PHP prototype (`green-room`) validated the core concept, but required a
 ### Alternatives Considered
 1. **Next.js / React with Tailwind CSS**:
    - *Rejected*: Heavy client hydration, CSS runtime / utility class churn that breaks the bespoke, retro-crafted aesthetic defined in the prototype, and complex multi-context auth configurations.
-2. **SvelteKit with Svelte 5 (Runes), Turso (libSQL) + Drizzle, Better Auth, Stripe Connect Express, Resend, Cloudflare R2, and CUBE CSS** *(Chosen)*:
+2. **SvelteKit with Svelte 5 (Runes), Turso (libSQL) + Drizzle, Better Auth, Stripe Connect Express (now dormant: tips moved to Venmo, ADR 0008), Resend, Cloudflare R2, and CUBE CSS** *(Chosen)*:
    - **Svelte 5 Runes**: Predictable fine-grained reactivity (`$state`, `$derived`, `$props`) allowing the Bookbinder split-screen editor to update an interactive mobile preview iframe without external state libraries.
    - **Turso (libSQL) + Drizzle ORM**: Edge-ready SQLite persistence with type-safe schema definitions and zero-friction local SQLite file development.
    - **Better Auth + Resend**: First-class support for single-table unified users with multi-provider auth (Artist email/password with Resend verification & password reset emails, and Fan Google OAuth), plus Resend confirmation emails for shared-account payout changes (`SPEC.md` Section 6.4).
@@ -66,6 +66,8 @@ Artists upload cover art, gig photography, bespoke zine graphics, and audio demo
 ---
 
 ## 4. Payments, Stripe Connect Express & Transactional Email Confirmation
+
+> **Superseded 2026-11-18 by ADR 0008.** Tips now go directly to the Artist's Venmo: the Artist enters a Venmo username, a tip button opens Venmo prefilled, Quire takes no cut and records Tip Taps only. Changing the Venmo username needs the password plus email confirmation. The Stripe Connect Express design below is kept for history; its code is dormant.
 
 ### Problem
 Tips must be anonymous, 1-tap (Apple Pay / Google Pay via Stripe Connect Express with a 5% platform application fee), charged immediately, and never retried in the background. Because Artist logins are shared among bandmates, changing the Stripe payout account requires re-entering the password and confirming via email (`SPEC.md` Section 6.4). At the same time, local development and automated test suites must be able to run deterministically even when external API keys are not configured.
@@ -141,7 +143,7 @@ All three open product design questions for the Artist User Journey are **Confir
    - Newly signed-up Artists with `0` issues see a **3-Step Studio Launchpad** above the fold instead of an empty gigs table:
      - **Step 1: Customize Master Template (`~2 min`)** — cover art upload, WCAG contrast-checked `--accent` against `--bg-void`, type pairing, tip presets, Back Page links, and editable/reorderable recurring pages.
      - **Step 2: Publish First Issue** — `<60 sec` Quick Issue phone flow or `"New Draft in Bookbinder"` desktop split-screen flow, plus a **Busker Fast-Track** to open/download their Permanent Artist QR immediately and display it in **Full-Screen Case Display** mode (chrome-free, high-contrast QR view).
-     - **Step 3: Connect Stripe Express (`Deferred / On-Demand`)** — real Stripe Connect Express onboarding redirect (`accountLinks.create`) to unhide 1-tap Apple Pay / Google Pay tip buttons, with `SPEC.md` §6.4 password re-entry + Resend email confirmation token verification when changing an existing payout account.
+     - **Step 3: Add your Venmo** — enter a Venmo username in settings to show tip buttons; changing or removing it later needs password re-entry + Resend email confirmation (`SPEC.md` §6.4, ADR 0008).
 
 3. **Direct Media Uploads via Cloudflare R2 + Local Dev Fallback (`src/lib/server/storage/`) — Confirmed & Locked In:**
    - Direct image and audio file uploads from phone or laptop are wired into the Master Template cover art field and into Quick Issue / Bookbinder photo and audio fields (backed by Cloudflare R2 in production with automatic `/static/uploads` local dev fallback), alongside URLs and lightweight embeds (`lite-youtube`, Bandcamp).

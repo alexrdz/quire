@@ -1,5 +1,7 @@
 The plan is handed off to the execution agent.Starting with Task 1: the external audit.The external engine couldn't audit Quire. `npx commitshow@0.3.23 audit .` exited with `bad_target` because the repo has no git remote, and `--no-network` gave the same error. So there is no score or delta. The findings below come from my own read of the server code, routes, schema and config.
 
+> Note 2026-11-18: payments later moved from Stripe to direct Venmo links (ADR 0008). Stripe findings here are historical; see the Phase V notes in `PRODUCTION_PLAN.md`.
+
 The CLI wrote `.commitshow/audit.json` (the error) and `audit.stderr.log`. I didn't edit `.gitignore` or any app code. I didn't run `pnpm test` or `pnpm check`. I did run `pnpm check:sizing`, and it passed.
 
 ## Blockers
