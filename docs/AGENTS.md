@@ -8,9 +8,9 @@ All AI agents, subagents, and contributors working on **Quire** must strictly ad
 
 ### 1.1 Inward-Pointing Dependencies
 - **The Dependency Rule:** Dependencies must point exclusively inward toward the domain core.
-  - **Domain Core (`src/lib/domain/`)**: Holds business entities, pure calculations, domain types, and Finite State Machines. It must have **zero imports** from SvelteKit, database drivers, Turso/libSQL, Stripe, Resend, S3/R2 SDKs, or network packages.
+  - **Domain Core (`src/lib/domain/`)**: Holds business entities, pure calculations, domain types, and Finite State Machines. It must have **zero imports** from SvelteKit, database drivers, Turso/libSQL, Stripe (dormant), Resend, S3/R2 SDKs, or network packages.
   - **Application Services (`src/lib/server/services/`)**: Orchestrates domain workflows, implements ports/interfaces, and consumes adapters.
-  - **Infrastructure & Adapters (`src/lib/server/db/`, `src/lib/server/storage/`, `src/lib/server/payments/`, `src/lib/server/email/`)**: Implements persistence (Turso/Drizzle), media storage (Cloudflare R2), payments (Stripe Connect Express), and transactional email (Resend).
+  - **Infrastructure & Adapters (`src/lib/server/db/`, `src/lib/server/storage/`, `src/lib/server/payments/`, `src/lib/server/email/`)**: Implements persistence (Turso/Drizzle), media storage (Cloudflare R2), payments (Stripe Connect Express, dormant per ADR 0008; tips are plain Venmo links built in the domain), and transactional email (Resend).
   - **Presentation Layer (`src/routes/`, `src/lib/components/`)**: SvelteKit routes, components, form actions, and page loaders depend inward on domain types and application services. The domain core never depends on or references UI/route state.
 
 ```
@@ -34,7 +34,7 @@ All AI agents, subagents, and contributors working on **Quire** must strictly ad
 - **Boundary Locations:**
   - Route parameters (`params`) and search query parameters (`url.searchParams`).
   - Form actions (`request.formData()`) and JSON API request bodies.
-  - External webhooks (Stripe webhook payloads).
+  - External webhooks (Stripe webhook payloads; the endpoint is dormant and returns 404, ADR 0008).
   - Storage & client state (`localStorage`, `sessionStorage`, cookies).
 - **Rule:** Never pass raw `any`, unvalidated `FormData`, or unverified JSON payloads into domain services. Validate at the boundary, fail fast with structured errors, and pass strongly typed domain transfer objects inward.
 
@@ -53,7 +53,7 @@ All AI agents, subagents, and contributors working on **Quire** must strictly ad
 
 ### 1.4 Explicit Finite State Machines (FSMs) for Complex Logic
 - Replace ad-hoc boolean flags with deterministic, explicit state machines for all non-trivial workflows:
-  1. **Tip Checkout FSM**: `idle` -> `initiating` -> `awaiting_payment` -> `succeeded` | `failed` -> `reset` (enforces decision 18: no background retry, reset on signal loss).
+  1. **Tip Tap flow** (ADR 0008): `idle` -> `opening_venmo` -> `idle`. A Fan's tap records a Tip Tap (best-effort, never blocking) and opens Venmo; in the Demo, development and tests it shows what would have opened instead. There is no `succeeded` state: Quire never learns whether a payment happened (decision 18: nothing happens unless the Fan taps). *The Stripe Tip Checkout FSM is dormant.*
   2. **Wall Note Submission FSM**: `empty` -> `typing` -> `pending_auth` -> `submitting` -> `live` | `pending_review` | `rejected`.
   3. **Issue Lifecycle FSM**: Strict allowed transitions:
      - `draft` -> `published`

@@ -3,6 +3,8 @@
 Source: `PRODUCTION_AUDIT.md` (2026-11-18), verified against the code the same day.
 Decisions: `docs/CONTEXT.md` (decisions 13, 27, 29-31) and `docs/adr/0007-separate-demo-deployment-and-no-production-fallbacks.md`.
 
+> **Pivot 2026-11-18: tips moved from Stripe to direct Venmo links (ADR 0008).** Stripe code stays but is dormant. Stripe-only items below are marked *Parked* or *Changed*; the new work is **Phase V** (between Phase 2 and Phase 3). Phase 1 and Phase 2 land as written.
+
 ## Audit verification
 
 | Audit finding | Verdict |
@@ -125,11 +127,38 @@ Acceptance: tests that `x.html` labelled `image/png`, an SVG, and a polyglot are
 - Gate on `user.emailVerified`: publishing an Issue (Quick Issue and Bookbinder), all uploads, Stripe Connect onboarding.
 - "Confirm your email to publish" bar with resend action (rate-limited).
 
-2.5 **Stripe Radar** (manual, Stripe dashboard): enable a rule blocking cards after repeated failures; confirm the webhook secret is set on the production endpoint.
+2.5 *Parked (ADR 0008, Stripe dormant).* **Stripe Radar** (manual, Stripe dashboard): enable a rule blocking cards after repeated failures; confirm the webhook secret is set on the production endpoint.
+
+## Phase V: Venmo tips (pivot, ADR 0008)
+
+Lands after Phase 2. Two PRs, in this order: V-A (Dwight), then V-B (Jim).
+
+V.1 **Stripe dormant** (V-A)
+- Stripe code, `tip` table and Stripe columns stay; nothing reaches them. No Stripe key is a core setting or feature flag requirement in any mode; `check-env` and config stop requiring them. `/api/webhooks/stripe` returns 404. No page or setting links to Stripe Connect.
+- The `payments` tier-2 flag no longer gates tips. Config exposes a public `tipsOpenVenmo` flag, true only in production; the Demo, development and tests never open Venmo.
+- The 2.4 email gate on Stripe Connect onboarding moves to setting the Venmo username.
+
+V.2 **Venmo schema** (V-A, pushed first so V-B can build on it)
+- `artists.venmo_username` (nullable), `tip_taps` (id, artist_id, issue_id NULL = General, amount_selected_cents, created_at; no Fan identity), and a pending-change token table for Venmo changes (single-use, hashed, expiring). One drizzle migration; the seed gives the sample Artist a sample username and some sample taps.
+
+V.3 **Venmo username setup and change** (V-A; subsumes 3.3)
+- `/dashboard/settings`: one field, validated (5 to 30 chars of letters, numbers, `-`, `_`; leading `@` stripped), "Test your link", setup copy (Quire takes no cut; Venmo expects a business profile for goods and services).
+- First set: confirmed email required (2.4), nothing else. Change or remove: password re-entry, then a Resend link to the account email; the old username stays live until confirmed. The confirm page load only shows the pending change; a POST action consumes the token and applies it. A notice email follows the change. Email off: changes blocked with "We can't send email right now".
+
+V.4 **Tip button and Tip Taps** (V-B)
+- Tip buttons show only when the Artist has a Venmo username. Presets $2 to $500, USD.
+- A tap records a Tip Tap (rate-limited with the 2.3 tip limits) and opens Venmo with amount and note `Tip for <Artist name> via Quire` (no venue, city or date). Recording is best-effort: over the limit or on failure, Venmo still opens and the tap isn't counted. Venmo opens only from the tap; no automatic redirect.
+- Demo, development and tests: record the tap, never open Venmo, show "In the Demo, this would open Venmo to pay $5 to @username."
+
+V.5 **Dashboard and copy** (V-B)
+- Gig Recap, gig list and General row show tip-tap counts only, labeled as taps, with "Check Venmo for what came in." No dollar figures, fees, net or payouts anywhere. Studio Launchpad step 3 becomes "Add your Venmo".
+- Public copy (home, FAQ, terms, privacy): Quire doesn't process payments and takes no cut; tips go through Venmo under Venmo's terms; Venmo payments may be public depending on the Fan's Venmo settings.
+
+Acceptance: unit tests for username validation, the change flow (password, token single-use and expiry, GET doesn't consume, notice email), tap recording and rate limits, Venmo URL building, and the Demo intercept; e2e for a tap in test mode (tap recorded, Venmo not opened) and the dashboard showing taps without dollar amounts.
 
 ## Phase 3: Medium
 
-3.1 **Webhooks** (`services/tips.ts`)
+3.1 *Parked (ADR 0008, Stripe dormant): revisit only if Stripe is revived.* **Webhooks** (`services/tips.ts`)
 - Refund or dispute with no matching tip: return 500 so Stripe retries, rather than 200 `tip_not_found`.
 - Record gross from `amount_received`; validate `artistId` metadata against the connected account on the event.
 - Idempotency keys on `paymentIntents.create` and `checkout.sessions.create` (derived from a per-tap nonce).
@@ -137,11 +166,11 @@ Acceptance: tests that `x.html` labelled `image/png`, an SVG, and a polyglot are
 
 3.2 **Wall notes**: `submitNote` loads the Issue from the URL slug and uses its `artistId` and `id`; form values for these are ignored. General Wall derives the Artist from its own slug.
 
-3.3 **Payout confirmation**: load only validates and shows the pending change; a POST action consumes the token after the Stripe calls succeed.
+3.3 *Changed: done as part of V.3 for the Venmo username change.* ~~**Payout confirmation**: load only validates and shows the pending change; a POST action consumes the token after the Stripe calls succeed.~~
 
 3.4 **Deployment target and headers**
 - Replace `adapter-auto` with `@sveltejs/adapter-netlify`; add `netlify.toml` with the build command including `check-env`.
-- Security headers in `hooks.server.ts`: CSP allowing self, Stripe.js, YouTube/Vimeo/Bandcamp frames, the R2 public domain; `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `frame-ancestors 'none'` except the Full-Screen Case Display if it is ever embedded.
+- Security headers in `hooks.server.ts`: CSP allowing self, YouTube/Vimeo/Bandcamp frames (no Stripe.js; Venmo is a plain link and needs no CSP entry), the R2 public domain; `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `frame-ancestors 'none'` except the Full-Screen Case Display if it is ever embedded.
 
 3.5 **Schema source of truth**: remove runtime DDL (`ensureSchemaTables`) from `seed.ts`; drizzle migrations are the only schema path, run in the Netlify build for both sites.
 
@@ -154,10 +183,10 @@ Acceptance: tests that `x.html` labelled `image/png`, an SVG, and a polyglot are
 
 ## Phase 4: Low and operations
 
-4.1 `.env.example` lists every variable the config module reads, including `DEMO_MODE`, Resend and Stripe publishable key; `.env` matches it.
+4.1 `.env.example` lists every variable the config module reads, including `DEMO_MODE` and Resend (Stripe variables listed as dormant and optional, ADR 0008); `.env` matches it.
 
 4.2 **Demo deployment** (ADR 0007)
-- Second Netlify site on a `demo.` subdomain with its own Turso database, `DEMO_MODE=true`, Stripe test keys, no Resend key.
+- Second Netlify site on a `demo.` subdomain with its own Turso database, `DEMO_MODE=true`, no Stripe keys, no Resend key. Tip buttons never open Venmo there (ADR 0008).
 - Persistent "You're in the Demo" banner on every page (layout primitive, no inline styles).
 - Nightly reset via a Netlify scheduled function that re-runs migrations and the seed.
 
@@ -166,7 +195,7 @@ Acceptance: tests that `x.html` labelled `image/png`, an SVG, and a polyglot are
 ## Phase 5: Verification
 
 - `pnpm check`, `pnpm test`, `pnpm test:e2e`, `pnpm check:sizing` green.
-- New e2e suite run against a production-mode preview: missing core key returns 503; each missing feature key shows its message; `/demo` is 404; GET `/logout` is 405; open-redirect payloads are rejected; malicious uploads are rejected.
+- New e2e suite run against a production-mode preview: missing core key returns 503; each missing feature key shows its message; `/demo` is 404; GET `/logout` is 405; open-redirect payloads are rejected; malicious uploads are rejected. A tip tap opens a `venmo.com` link with the right username, amount and generic note, and no Stripe key is required.
 - Add a git remote and re-run `npx commitshow audit .` for an external score.
 - Deploy Demo first, then production.
 

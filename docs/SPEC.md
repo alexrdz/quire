@@ -4,13 +4,13 @@
 
 ## 1. Vision
 
-A lightweight platform for touring bands **and buskers** to publish city-specific digital zines ("Issues") that fans open by scanning a QR code at the gig. Fans can tip in one tap, sign an open wall, and collect stubs of the shows they attended. Artists get a morning-after recap made only of money and people — no vanity metrics.
+A lightweight platform for touring bands **and buskers** to publish city-specific digital zines ("Issues") that fans open by scanning a QR code at the gig. Fans can tip in one tap, sign an open wall, and collect stubs of the shows they attended. Artists get a morning-after recap made only of tip taps and people — no vanity metrics.
 
 **Name:** *Quire*, a gathered set of folded pages (what a zine is), pronounced like "choir." It is a print word and a music word at once.
 
-**Positioning:** *"Your Venmo QR collects money. This collects money and people."*
+**Positioning:** *"Your Venmo QR collects money. This collects money and people."* Tips still go straight to the Artist's Venmo; Quire adds the zine, the Wall and the Stubs around them, and takes no cut.
 
-**Project status:** Production platform powered by Turso (libSQL) + Drizzle ORM, Better Auth, Stripe Connect Express, Resend transactional email, and Cloudflare R2 media storage.
+**Project status:** Production platform powered by Turso (libSQL) + Drizzle ORM, Better Auth, direct Venmo tip links (Stripe Connect code kept dormant, ADR 0008), Resend transactional email, and Cloudflare R2 media storage.
 
 ## 2. Core principles
 
@@ -44,7 +44,7 @@ Both live in one user table with an account-type field (`artist` | `fan`), manag
 ### 5.1 Cover (first screen of an Issue)
 - Artist name and cover art, plus city, venue and date
 - A one-line **Cover note** ("Playing till 6pm")
-- **One-tap tip buttons**: three presets plus custom. The default presets are $3 / $5 / $10 and the Artist can change them. Payment goes through Apple Pay or Google Pay via Stripe.
+- **One-tap tip buttons**: three presets plus custom. The default presets are $3 / $5 / $10 and the Artist can change them. A tap opens Venmo with the amount and note filled in; the Fan confirms in Venmo (Section 5.4).
 - **"Open tonight's zine →"**
 - A link to the Back Page
 
@@ -57,20 +57,23 @@ Both live in one user table with an account-type field (`artist` | `fan`), manag
 - The **Endpaper** follows the Wall and offers Save or Stamp
 
 ### 5.3 Back Page
-- One-tap tipping (counted as **General**, not tied to any gig)
+- One-tap Venmo tipping (taps counted as **General**, not tied to any gig)
 - The Artist's links: tickets, Bandcamp, merch, socials
 - A list of **every Issue**, each showing city and date
 - The **General Wall**
 
 ### 5.4 Tipping
-- **Anonymous.** No sign-in and no message attached.
-- **Fees:** the Artist absorbs Stripe fees and the platform cut by default. The fan sees an **unchecked** "Cover the fees so [Artist] gets the full $X" box.
-- **Platform cut:** 5%, taken as a Stripe Connect application fee
-- **Attribution:** a tip made from a Cover or Issue page counts toward that Issue. A tip made from the Back Page counts as General.
-- **Charged only when the fan taps, never later.** A tip is attempted only at the moment the fan starts it. If the attempt fails for any reason, including lost connectivity, the tip flow resets and nothing is queued, saved or retried. The fan sees a plain "That didn't go through. Nothing was charged." and can tap again if they choose. There is no background retry, no "complete later" reminder, and no stored payment intent. *Why: a charge the fan didn't actively make right then would feel shady and erode trust.*
-- **Limits:** a $2 minimum (Stripe takes about $0.33 of a $1 tip) and a $500 maximum. **USD only** for the MVP.
-- **Tips only once payouts work.** Tip buttons are hidden on the Cover, the Issue pages and the Back Page until the Artist's Stripe account can receive payouts.
-- **Refunds and chargebacks** are absorbed by the Artist, the same as fees, and shown in the dashboard.
+> Changed 2026-11-18 (ADR 0008): tips go directly to the Artist's Venmo. Stripe Connect, the 5% platform cut, fee-covering, refunds and chargebacks are gone from the product; the Stripe code is dormant.
+
+- **Direct through Venmo.** A tip button opens Venmo (the app on a phone, venmo.com otherwise) with the Artist's username, the amount and the note filled in. The Fan confirms the payment in Venmo. Quire never touches the money and takes **no cut**; there are no Quire fees.
+- **Anonymous on Quire.** No sign-in on Quire. Quire prefills the note as `Tip for <Artist name> via Quire`, never the venue, city or date, because Venmo payments are public by default. The Fan can edit the note in Venmo; Quire never sees it.
+- **Tip Taps, not tips.** Quire can't see whether a payment went through. When a Fan taps, Quire records a **Tip Tap** (Artist, Issue or General, preset amount, time; no Fan identity). Taps are always labeled as taps and never presented as money received.
+- **Attribution:** a tap from a Cover or Issue page counts toward that Issue. A tap from the Back Page counts as General.
+- **Nothing happens unless the Fan taps.** Venmo opens only from a Fan's tap: no automatic redirect, no queuing, no retry, no "complete later" reminder. Recording the tap is best-effort: if it fails, or the Fan is over a rate limit, Venmo still opens and the tap is simply not counted. A Fan is never blocked from paying an Artist. *Why: anything the Fan didn't actively start right then would feel shady and erode trust.*
+- **Limits:** presets from $2 to $500. **USD only**; Venmo is US-only, so Fans outside the US can't tip.
+- **Tips only once a Venmo username is set.** Tip buttons are hidden on the Cover, the Issue pages and the Back Page until the Artist adds one.
+- **Demo, development and tests never open Venmo.** The tap is recorded and the Fan sees "In the Demo, this would open Venmo to pay $5 to @username." Sample usernames may belong to real people.
+- **Refunds, disputes and failed payments** happen inside Venmo, between the Fan and the Artist. Quire is not involved and shows nothing about them.
 
 ### 5.5 Wall (open guestbook)
 - Public. Every fan can read every note.
@@ -120,26 +123,27 @@ Two purpose-built creation flows exist for phone vs. desktop, and **either tool 
 
 ### 6.3 Issue lifecycle
 - **Status values:** `draft` → `published` → optionally `cancelled` or `archived`
-- **Issues are archived, never deleted.** An archived Issue disappears from the Back Page, but fans' Stubs, tip records and its Wall remain. A fan opening it from My Stubs sees it read-only.
+- **Issues are archived, never deleted.** An archived Issue disappears from the Back Page, but fans' Stubs, Tip Taps and its Wall remain. A fan opening it from My Stubs sees it read-only.
 - **Cancelled:** the Issue stays visible with a "Cancelled" label. Postponing means editing the date, which moves the Stamp Window. Stamps already claimed are kept.
 
-### 6.4 Account safety & Stripe Connect Express
-- **Deferred / on-demand Stripe Connect Express onboarding:** Artists can sign up, customize their Master Template, and publish Issues immediately without connecting payouts. When ready to receive tips, clicking **"Connect with Stripe Express"** triggers real Stripe Connect Express onboarding (`accounts.create({ type: 'express' })` + `accountLinks.create`), redirecting to Stripe to verify bank/identity details. Once `payoutsEnabled === true` (synchronized via verified Stripe webhooks), 1-tap Apple Pay / Google Pay tip buttons automatically appear across the Cover, Issue pages, and Back Page.
-- **Changing an existing payout account:** requires entering the band's password again and confirming via a signed token link sent by Resend transactional email (`/dashboard/settings/confirm-payout`), because the login is shared among bandmates.
+### 6.4 Account safety & Venmo username
+- **Venmo setup is one field:** in `/dashboard/settings`, the Artist enters their Venmo username (5 to 30 characters: letters, numbers, `-`, `_`; a leading `@` is stripped). Quire can't check that the account exists, so setup offers **"Test your link"**, which opens the Artist's Venmo profile. Setting it the first time needs a confirmed email (Section 3) and nothing else. Once set, tip buttons appear across the Cover, Issue pages and Back Page. Setup copy tells the Artist that Venmo expects a business profile for receiving payments for goods and services, and that Quire takes no cut.
+- **Changing or removing the Venmo username:** requires entering the band's password again and confirming via a signed, single-use, expiring link sent to the account email by Resend, because the login is shared among bandmates and a bandmate must not be able to quietly redirect tips. The old username stays live until the link is confirmed. The confirmation page shows the pending change and confirms it with a button (a POST); opening the link alone changes nothing. A notice email goes to the account address after the change. If email is unavailable, changes are blocked with "We can't send email right now."
+- *Stripe Connect Express onboarding (`/dashboard/settings` "Connect with Stripe Express") is dormant (ADR 0008): its code stays in the repo but no page links to it.*
 - **Verified mark:** granted by hand by the platform after a basic check, to discourage impersonating real bands. Unverified Artists can still publish and receive tips.
 
 ### 6.5 Dashboard
 - **First-Time Artist Studio Launchpad (`issues.length === 0`):** When a newly signed-up Artist visits `/dashboard` with `0` issues, `/dashboard` renders a **3-Step Studio Launchpad** above the fold instead of an empty gigs table:
   1. **Step 1: Customize Master Template (`~2 min`)** — cover art upload (`src/lib/server/storage/`), contrast-checked `--accent` against `--bg-void`, type pairing, tip presets, Back Page links, and editable/reorderable recurring pages.
   2. **Step 2: Publish First Issue** — choose between the `<60 sec` **Quick Issue** phone flow (`/dashboard/issues/quick`) or **`"New Draft in Bookbinder"`** desktop split-screen flow, **plus a Busker Fast-Track** to open/download their Permanent Artist QR (`/a/[slug]`) immediately and display it in **Full-Screen Case Display** mode.
-  3. **Step 3: Connect Stripe Express (`Deferred / On-Demand`)** — real Stripe Connect Express onboarding redirect (`accountLinks.create`) to unhide 1-tap Apple Pay / Google Pay tip buttons.
+  3. **Step 3: Add your Venmo** — enter a Venmo username in settings to show tip buttons (Section 6.4).
 - **Gig Recap card** for the most recent Issue (once at least one Issue exists):
-  - Tips: total and number of tippers
+  - Tip taps: a count, labeled as taps, with "Check Venmo for what came in." Never a dollar figure.
   - Stamped: number of fans
   - Notes: newest first, with flagged notes and notes awaiting approval at the top, and a **Reply** action on unanswered notes
   - Saves: number of bookmarks
-- **A list of all gigs**, one row each (city, date, tips, stamps, notes), plus a **General** row for Back Page activity, and direct **"New Draft in Bookbinder"** and **"+ Publish Quick Issue"** actions
-- Each tip shows **gross amount, fees and net amount**
+- **A list of all gigs**, one row each (city, date, tip taps, stamps, notes), plus a **General** row for Back Page activity, and direct **"New Draft in Bookbinder"** and **"+ Publish Quick Issue"** actions
+- **No money figures.** Quire never shows gross, fees, net, payouts or a dollar total of taps, because it can't see what actually came in.
 - No charts, page views or bounce rates. **No email digest.**
 
 ## 7. Look & feel
@@ -160,8 +164,8 @@ Two purpose-built creation flows exist for phone vs. desktop, and **either tool 
 - **App:** SvelteKit (Svelte 5 Runes + TypeScript)
 - **Database:** Turso (libSQL), accessed through Drizzle ORM
 - **Auth:** Better Auth, with email/password for Artists (with email verification and password reset) and Google OAuth for Fans
-- **Payments:** Stripe Connect (Express). Each Artist onboards a connected Express account, tips are processed with a 5% platform `application_fee_amount`, and account/payment state is synchronized via cryptographically verified Stripe webhooks.
-- **Transactional Email:** Resend for Artist email verification, password resets, and payout account change confirmations (Section 6.4).
+- **Tips:** Venmo links (`venmo.com` / the Venmo app) built from the Artist's Venmo username. No payment provider integration, no payment secrets. Stripe Connect code is kept dormant (ADR 0008).
+- **Transactional Email:** Resend for Artist email verification, password resets, and Venmo username change confirmations and notices (Section 6.4).
 - **Storage & Media:** Cloudflare R2 (S3-compatible object storage with zero egress fees) for uploaded cover art and gig photos, plus lightweight embed facades (`lite-youtube`, compact Bandcamp).
 - **Hosting:** Netlify
 
@@ -170,15 +174,19 @@ Two purpose-built creation flows exist for phone vs. desktop, and **either tool 
 ```
 user           id, type (artist|fan), email, name, avatar_url, ...   (Better Auth tables)
 artist         id, user_id, slug, display_name, cover_art, accent_color,
-               type_pairing, tip_presets_json, links_json, stripe_account_id,
-               payouts_enabled, verified, general_wall_approve_first
+               type_pairing, tip_presets_json, links_json, venmo_username,
+               verified, general_wall_approve_first
+               (stripe_account_id, payouts_enabled: dormant, ADR 0008)
 template_page  id, artist_id, position, kind, content_json
 issue          id, artist_id, slug, city, venue, date, timezone, cover_note,
                status (draft|published|cancelled|archived),
                stamp_window_start, stamp_window_end, approve_first, published_at
 issue_page     id, issue_id, position, kind, content_json      (bespoke pages)
-tip            id, artist_id, issue_id NULL (NULL = General), amount_gross,
-               fee_stripe, fee_platform, amount_net, fan_covered_fees, stripe_payment_id, created_at
+tip_tap        id, artist_id, issue_id NULL (NULL = General), amount_selected,
+               created_at                                  (a tap, not a payment)
+venmo_change   id, artist_id, new_username NULL (NULL = remove), token_hash,
+               expires_at, used_at, created_at             (pending username change)
+tip            (dormant Stripe table, ADR 0008)
 note           id, artist_id, issue_id NULL (NULL = General Wall), fan_user_id,
                body, status (live|pending|hidden), flag_count, flag_immune, created_at
 note_reply     id, note_id (unique), body, created_at           (Artist only, one per note)
@@ -190,22 +198,22 @@ scan           id, issue_id, token, created_at                   (proves a QR sc
 
 ## 10. Seeded showcase & interactive sandbox
 
-- **Seeded showcase Artist:** 'The Neon Velvet' on a 3-city tour with rich notes, stubs, tips, and Back Page activity so the platform showcases a live touring workflow out of the box.
+- **Seeded showcase Artist:** 'The Neon Velvet' on a 3-city tour with rich notes, stubs, tip taps, and Back Page activity so the platform showcases a live touring workflow out of the box.
 - **One-click demo login:** An 'Explore as Demo Artist' quick switch (`/demo`) and pre-filled sandbox credentials on the login page to test the dashboard, Bookbinder, and moderation immediately.
 - **Architecture Decision Records (`docs/adr/`):** Living engineering documentation explaining key decisions: why the sticker is the geofence, why tips are anonymous, why the wall is open, why only artists reply, and why the theming is constrained.
 
 ## 11. Decided items (confirmed & locked in)
 
 - **Clean editable Artist slug on sign-up:** Landing Page CTAs route directly to `/login?mode=signup`. Sign-up shows a live, editable URL slug preview (`/a/band-name`) derived from the band name (never appending a random 3-digit suffix), validated first-come, first-served with suggested alternatives on collision because it is baked into the Permanent Artist QR sticker.
-- **First-Time Artist 3-Step Studio Launchpad:** When an Artist visits `/dashboard` with `0` issues, render the 3-Step Studio Launchpad above the fold (1: Customize Master Template, 2: Publish First Issue via Quick Issue or `"New Draft in Bookbinder"` + Busker Fast-Track to Permanent Artist QR in **Full-Screen Case Display** mode, 3: Connect Stripe Express) instead of an empty gigs table.
+- **First-Time Artist 3-Step Studio Launchpad:** When an Artist visits `/dashboard` with `0` issues, render the 3-Step Studio Launchpad above the fold (1: Customize Master Template, 2: Publish First Issue via Quick Issue or `"New Draft in Bookbinder"` + Busker Fast-Track to Permanent Artist QR in **Full-Screen Case Display** mode, 3: Add your Venmo) instead of an empty gigs table.
 - **Full-Screen Case Display mode:** Both Issue QR and Permanent Artist QR views support a chrome-free, high-contrast full-screen phone display mode for propping beside a busker's case or merch table.
 - **Direct media uploads (`src/lib/server/storage/`):** Master Template cover art, Quick Issue photo, and Bookbinder photo & audio fields support direct file uploads from phone or laptop (backed by Cloudflare R2 in production with automatic `/static/uploads` local dev fallback), alongside URLs and lightweight embeds (`lite-youtube`, compact Bandcamp).
 - **WCAG contrast-checked `--accent`:** Artist `--accent` color selection is validated for contrast against `--bg-void` (`#090710`).
-- **Stripe connection timing & account safety:** Deferred / on-demand via real Stripe Connect Express onboarding (`accountLinks.create`). Artists can create an account, customize their template, and publish immediately; tip buttons remain hidden until `payoutsEnabled === true`. Changing an existing payout account requires password re-entry plus Resend email confirmation token verification (Section 6.4).
-- **Transactional email:** Resend handles Artist email verification, password reset flows (`/login/reset`), and payout account change confirmation emails (Section 6.4).
+- **Venmo tips & account safety (ADR 0008):** the Artist adds a Venmo username whenever they like; tip buttons stay hidden until they do. Changing or removing it requires password re-entry plus a Resend email confirmation link (Section 6.4). Quire records Tip Taps, never tips, and takes no cut.
+- **Transactional email:** Resend handles Artist email verification, password reset flows (`/login/reset`), and Venmo username change confirmation and notice emails (Section 6.4).
 - **Stamp Window:** 48-hour calendar window — from 00:00 on the gig date through 23:59:59 the following day in the venue's local time zone.
 - **QR scan validation:** Dedicated scan endpoint with issue secret (`/scan/[issue_slug]?k=[issue_secret]`), issuing a signed HMAC scan token to the device and redirecting to the Cover.
 - **Wall pending action:** Anonymous fans can type their note upfront; tapping 'Post note' triggers Google OAuth with the draft stored in `sessionStorage` and automatically submits upon return. Endpaper 'Claim Stamp' signs in and immediately stamps.
 - **Page sequence:** Cover -> Bespoke pages -> Master Template recurring pages -> Wall -> Endpaper.
-- **Tech stack & styling:** SvelteKit with Svelte 5 (Runes), TypeScript, Turso (libSQL) via Drizzle ORM, Better Auth, Stripe Connect Express, Resend, Cloudflare R2, and hand-crafted CUBE CSS with native `@layer` (no Tailwind).
+- **Tech stack & styling:** SvelteKit with Svelte 5 (Runes), TypeScript, Turso (libSQL) via Drizzle ORM, Better Auth, Venmo links (Stripe dormant), Resend, Cloudflare R2, and hand-crafted CUBE CSS with native `@layer` (no Tailwind).
 - **Seeded tour:** 'The Neon Velvet' 3-city tour with one-click sandbox login.
