@@ -50,14 +50,19 @@ export function formatVenmoAmount(amountCents: number): string {
 	return `${dollars}.${cents}`;
 }
 
-/** The Artist's public Venmo profile, used by "Test your link". */
+/**
+ * The Artist's public Venmo profile, used by "Test your link".
+ * `/u/<username>` is Venmo's canonical public profile path (checked 2026-11-18).
+ */
 export function buildVenmoProfileUrl(username: VenmoUsername): string {
-	return `${VENMO_BASE_URL}/${encodeURIComponent(username)}`;
+	return `${VENMO_BASE_URL}/u/${encodeURIComponent(username)}`;
 }
 
 /**
  * A Venmo pay link with the amount and note filled in:
  * `https://venmo.com/<username>?txn=pay&amount=<d.dd>&note=<urlencoded>`.
+ * Checked 2026-11-18: venmo.com redirects this to account.venmo.com with the
+ * query kept, where the Fan confirms the payment.
  */
 export function buildVenmoPayUrl(input: {
 	username: VenmoUsername;
@@ -66,7 +71,7 @@ export function buildVenmoPayUrl(input: {
 }): string {
 	const amount = formatVenmoAmount(input.amountCents);
 	const note = encodeURIComponent(input.note);
-	return `${buildVenmoProfileUrl(input.username)}?txn=pay&amount=${amount}&note=${note}`;
+	return `${VENMO_BASE_URL}/${encodeURIComponent(input.username)}?txn=pay&amount=${amount}&note=${note}`;
 }
 
 /** Longest Artist name kept in a note, so the note stays short in Venmo's feed. */

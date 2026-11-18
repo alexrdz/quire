@@ -63,7 +63,7 @@ describe('formatVenmoAmount', () => {
 describe('Venmo URLs', () => {
 	it('builds the profile URL', () => {
 		expect(buildVenmoProfileUrl(username('@the-neon-velvet'))).toBe(
-			'https://venmo.com/the-neon-velvet'
+			'https://venmo.com/u/the-neon-velvet'
 		);
 	});
 
