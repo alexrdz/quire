@@ -66,15 +66,15 @@
             </Cluster>
 
             <h1 class="hero-headline">
-              A Venmo sign gets you tips.
+              Your Venmo QR collects tips.
               <span class="neon-highlight-text"
-                >This gets you tips and people.</span
+                >Quire brings the people too.</span
               >
             </h1>
 
             <p class="hero-subtext">
               City-specific digital zines published by touring bands, solo
-              acts, and buskers. 1-tap crowd tipping, attendance-verified
+              acts, and buskers. Tips that open your Venmo prefilled, attendance-verified
               ticket stubs, unreleased demo drops, and a living backstage wall
               for every stop on tour.
             </p>
@@ -130,9 +130,9 @@
                   </svg>
                 </div>
                 <Stack gap="none" class="metric-text-wrap">
-                  <span class="metric-value">1-Tap Direct Tips</span>
+                  <span class="metric-value">Tips Straight to Your Venmo</span>
                   <span class="metric-label"
-                    >Straight to your Venmo, no cut</span
+                    >Quire takes no cut</span
                   >
                 </Stack>
               </Cluster>
@@ -224,15 +224,15 @@
                 <Stack gap="xs">
                   <h3 class="feature-card-title">Tips Straight to Your Venmo</h3>
                   <p class="feature-card-desc">
-                    No handle to search, no amount to type in a loud room. A fan
-                    taps an amount and Venmo opens with it and a note filled in.
-                    The money goes straight to your Venmo. Quire never handles it
-                    and takes no cut.
+                    Keep your Venmo. A fan taps an amount and Venmo opens with
+                    your handle, the amount and a note already filled in. 100% of
+                    the tip goes to your Venmo, and Quire never touches the money.
                   </p>
                 </Stack>
                 <Cluster gap="xs" class="card-tag-row">
-                  <span class="card-feature-item">Prefilled Venmo</span>
-                  <span class="card-feature-item">Zero Quire Cut</span>
+                  <span class="card-feature-item">Opens Venmo Prefilled</span>
+                  <span class="card-feature-item">No Cut</span>
+                  <span class="card-feature-item">No App for Quire</span>
                 </Cluster>
               </Stack>
             </Box>
@@ -674,7 +674,7 @@
               <h3 class="step-heading">Fans Scan & Connect</h3>
               <p class="step-body">
                 Fans scan with their native phone camera. No app download. They
-                tip you through Venmo, stamp their ticket stub, and sign your wall.
+                tip via Venmo, stamp their ticket stub, and sign your wall.
               </p>
               <div class="step-meta">Fan engagement: 0.8s load</div>
             </Stack>
@@ -688,11 +688,11 @@
       <Stack gap="sm" align="center" class="section-header-centered">
         <span class="section-eyebrow pink">WHY IT MATTERS</span>
         <h2 class="section-title">
-          Why a Venmo Sign Isn't Enough
+          More Than a Venmo Sign
         </h2>
         <p class="section-subtitle">
-          Compare how traditional gig tactics stack up against a
-          purpose-built digital zine.
+          Keep your Venmo for the money. Quire adds the zine, the stubs and
+          the wall around it.
         </p>
       </Stack>
 
@@ -707,20 +707,11 @@
             <thead>
               <tr>
                 <th class="col-feature">Experience</th>
-                <th class="col-traditional">Venmo Sign / Link in Bio</th>
+                <th class="col-traditional">Just a Venmo QR / Link in Bio</th>
                 <th class="col-quire">Quire Digital Zine</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td class="col-feature">Atmosphere & Aesthetic</td>
-                <td class="col-traditional"
-                  >Clinical bank app or corporate link buttons</td
-                >
-                <td class="col-quire highlight-td"
-                  >Dark, neon glass, concert visual zine</td
-                >
-              </tr>
               <tr>
                 <td class="col-feature">Audience Retention</td>
                 <td class="col-traditional"
@@ -733,10 +724,10 @@
               <tr>
                 <td class="col-feature">Tip Friction</td>
                 <td class="col-traditional"
-                  >Searching a handle and typing an amount in a loud room</td
+                  >Fan searches your handle and types an amount</td
                 >
                 <td class="col-quire highlight-td"
-                  >Tap an amount; Venmo opens with it and a note filled in</td
+                  >Tap $5 and Venmo opens with your handle, amount and note filled in</td
                 >
               </tr>
               <tr>

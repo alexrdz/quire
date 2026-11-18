@@ -32,11 +32,20 @@ describe('public copy after the Venmo pivot', () => {
 		}
 	});
 
-	it('home says tips go straight to the artist\'s Venmo with no cut', () => {
+	it('home works with Venmo: tips land in the artist\'s Venmo, no cut, Quire brings the people', () => {
 		const body = pages.home();
-		expect(body).toContain('A Venmo sign gets you tips.');
-		expect(body).toMatch(/straight to your Venmo/i);
-		expect(body).toMatch(/takes no cut/i);
+		expect(body).toContain('Your Venmo QR collects tips.');
+		expect(body).toContain('Quire brings the people too.');
+		expect(body).toMatch(/Tips Straight to Your Venmo/);
+		expect(body).toMatch(/Quire takes no cut/);
+		expect(body).toMatch(/Quire never touches the money/);
+		expect(body).toContain('More Than a Venmo Sign');
+		expect(body).toContain('Just a Venmo QR / Link in Bio');
+		// Venmo itself is never knocked as a payment method, and Quire never claims to track payments.
+		expect(body).not.toMatch(/clinical bank app/i);
+		expect(body).not.toMatch(/Dumped Venmo/i);
+		expect(body).not.toMatch(/instant payouts?/i);
+		expect(body).not.toMatch(/(confirms?|tracks?) (your )?payments?/i);
 	});
 
 	it('FAQ covers where the money goes, no cut, Venmo terms and refunds in Venmo', () => {
