@@ -5,9 +5,11 @@
  * the database and integrations. Everything else asks `getConfig()`.
  *
  * Two failure tiers:
+ * Stripe (`payments`) is dormant (ADR 0008): its keys are optional and ignored.
+ *
  * - Core (auth secret, scan-token secret, database, app URL): when invalid in a
  *   deployed mode (production or Demo), the whole site serves a 503 page.
- * - Features (payments, email, Fan sign-in, uploads): when an integration key is
+ * - Features (email, Fan sign-in, uploads): when an integration key is
  *   missing in production, only that feature switches off. In development, test
  *   and the Demo some features fall back to local stand-ins (ADR 0003, ADR 0004).
  *
@@ -23,6 +25,12 @@ export type { FeatureName, Mode, PublicFeatures };
 export type Env = Record<string, string | undefined>;
 
 export const MIN_SECRET_LENGTH = 32;
+
+/**
+ * ADR 0008: tips go straight to the Artist's Venmo. The Stripe code and keys are
+ * kept but nothing reaches Stripe and no Stripe key is required in any mode.
+ */
+export const STRIPE_DORMANT = true;
 
 /** Development and test only. Never accepted in the Demo or production. */
 const DEV_AUTH_SECRET = 'quire_development_auth_secret_do_not_deploy_0000';
@@ -267,7 +275,8 @@ export function parseConfig(rawEnv: Env): Config {
 	const integrations = parseIntegrations(env);
 
 	const live: Record<FeatureName, boolean> = {
-		payments: Boolean(integrations.stripe.secretKey && integrations.stripe.webhookSecret),
+		// Stripe is dormant (ADR 0008): never live, whatever keys are set. Tips go to Venmo.
+		payments: STRIPE_DORMANT ? false : Boolean(integrations.stripe.secretKey && integrations.stripe.webhookSecret),
 		// The Demo never sends real email, even if a key is present.
 		email: Boolean(integrations.resend) && mode !== 'demo',
 		fanSignIn: Boolean(integrations.google),
@@ -323,9 +332,17 @@ export function isFeatureEnabled(name: FeatureName): boolean {
 	return getConfig().features[name];
 }
 
+/**
+ * Whether tip buttons open the real Venmo app/site (ADR 0008). Production only:
+ * elsewhere the sample usernames may belong to real people, so tips are simulated.
+ */
+export function tipsOpenVenmo(mode: Mode): boolean {
+	return mode === 'production';
+}
+
 export function getPublicFeatures(): PublicFeatures {
 	const { features, mode } = getConfig();
-	return { ...features, mode };
+	return { ...features, mode, tipsOpenVenmo: tipsOpenVenmo(mode) };
 }
 
 /** Clears the cache. Tests only. */

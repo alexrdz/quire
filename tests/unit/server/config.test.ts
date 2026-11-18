@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { parseConfig, resolveMode, type Env } from '$lib/server/config';
+import {
+	getPublicFeatures,
+	parseConfig,
+	resolveMode,
+	STRIPE_DORMANT,
+	tipsOpenVenmo,
+	type Env
+} from '$lib/server/config';
 import { featureUnavailableMessage, FEATURE_UNAVAILABLE } from '$lib/features';
 
 const STRONG_AUTH = 'a'.repeat(24) + 'auth_secret_prod_9f3k';
@@ -130,17 +137,37 @@ describe('feature flags', () => {
 		expect(config.live).toEqual(config.features);
 	});
 
-	it('turns every feature on in production with all keys', () => {
+	it('turns every feature on in production with all keys, except dormant Stripe', () => {
 		const config = prod(INTEGRATIONS);
-		expect(config.features).toEqual({ payments: true, email: true, fanSignIn: true, uploads: true });
+		expect(config.features).toEqual({ payments: false, email: true, fanSignIn: true, uploads: true });
 		expect(config.live).toEqual(config.features);
 		expect(config.integrations.r2?.publicUrl).toBe('https://media.quire.live');
 	});
 
-	it('needs both Stripe secret and webhook secret for payments', () => {
-		expect(prod({ STRIPE_SECRET_KEY: 'sk_live_1' }).features.payments).toBe(false);
-		expect(prod({ STRIPE_WEBHOOK_SECRET: 'whsec_1' }).features.payments).toBe(false);
-		expect(prod({ STRIPE_SECRET_KEY: 'pk_live_1', STRIPE_WEBHOOK_SECRET: 'whsec_1' }).features.payments).toBe(false);
+	it('never makes Stripe live and never requires a Stripe key (ADR 0008)', () => {
+		expect(STRIPE_DORMANT).toBe(true);
+		const withStripe = prod({ STRIPE_SECRET_KEY: 'sk_live_1', STRIPE_WEBHOOK_SECRET: 'whsec_1' });
+		expect(withStripe.live.payments).toBe(false);
+		expect(withStripe.features.payments).toBe(false);
+		for (const NODE_ENV of ['development', 'test']) {
+			const local = parseConfig({ NODE_ENV, STRIPE_SECRET_KEY: 'sk_test_1', STRIPE_WEBHOOK_SECRET: 'whsec_1' });
+			expect(local.live.payments).toBe(false);
+		}
+		const demo = parseConfig({ DEMO_MODE: 'true', ...CORE, STRIPE_SECRET_KEY: 'sk_test_1', STRIPE_WEBHOOK_SECRET: 'whsec_1' });
+		expect(demo.live.payments).toBe(false);
+
+		const noStripe = prod({ ...INTEGRATIONS, STRIPE_SECRET_KEY: undefined, STRIPE_WEBHOOK_SECRET: undefined, STRIPE_PUBLISHABLE_KEY: undefined });
+		expect(noStripe.core.ok).toBe(true);
+		expect(noStripe.core.issues.join(' ')).not.toMatch(/STRIPE/);
+		expect(noStripe.features).toEqual({ payments: false, email: true, fanSignIn: true, uploads: true });
+	});
+
+	it('opens Venmo from tip buttons only in production', () => {
+		expect(tipsOpenVenmo('production')).toBe(true);
+		for (const mode of ['development', 'test', 'demo'] as const) {
+			expect(tipsOpenVenmo(mode)).toBe(false);
+		}
+		expect(getPublicFeatures().tipsOpenVenmo).toBe(false);
 	});
 
 	it('needs every Google and R2 value', () => {
@@ -150,8 +177,6 @@ describe('feature flags', () => {
 
 	it('removes each feature independently', () => {
 		const removals: Array<[string, keyof ReturnType<typeof prod>['features']]> = [
-			['STRIPE_SECRET_KEY', 'payments'],
-			['STRIPE_WEBHOOK_SECRET', 'payments'],
 			['RESEND_API_KEY', 'email'],
 			['GOOGLE_CLIENT_SECRET', 'fanSignIn'],
 			['R2_SECRET_ACCESS_KEY', 'uploads']
@@ -160,7 +185,10 @@ describe('feature flags', () => {
 			const config = prod({ ...INTEGRATIONS, [key]: undefined });
 			expect(config.features[feature]).toBe(false);
 			expect(config.core.ok).toBe(true);
-			const others = Object.entries(config.features).filter(([name]) => name !== feature);
+			// payments is always off: Stripe is dormant (ADR 0008).
+			const others = Object.entries(config.features).filter(
+				([name]) => name !== feature && name !== 'payments'
+			);
 			expect(others.every(([, on]) => on)).toBe(true);
 		}
 	});

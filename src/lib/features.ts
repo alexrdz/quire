@@ -4,7 +4,11 @@
  */
 export type Mode = 'development' | 'test' | 'demo' | 'production';
 export type FeatureName = 'payments' | 'email' | 'fanSignIn' | 'uploads';
-export type PublicFeatures = Record<FeatureName, boolean> & { mode: Mode };
+export type PublicFeatures = Record<FeatureName, boolean> & {
+	mode: Mode;
+	/** Tip buttons open Venmo for real. True only in production (ADR 0008). */
+	tipsOpenVenmo: boolean;
+};
 
 export const FEATURE_UNAVAILABLE: Record<FeatureName, string> = {
 	payments: 'Tips are temporarily unavailable.',
