@@ -39,6 +39,17 @@ export interface VenmoUser {
 	emailVerified?: boolean | null;
 }
 
+/**
+ * The emailed confirmation link. Always built from the configured app URL
+ * (BETTER_AUTH_URL / PUBLIC_APP_URL, or the local default in development and
+ * test), never from the request: a forged Host header from someone who knows
+ * the band password would otherwise point the owner's email at their domain.
+ */
+export function buildVenmoConfirmUrl(rawToken: string): string {
+	const appUrl = getConfig().core.appUrl.replace(/\/$/, '');
+	return `${appUrl}${VENMO_CONFIRM_PATH}?token=${rawToken}`;
+}
+
 function hashToken(rawToken: string): string {
 	return crypto.createHash('sha256').update(rawToken).digest('hex');
 }
@@ -92,7 +103,6 @@ export async function requestVenmoChange(input: {
 	user: VenmoUser;
 	rawUsername: string | null;
 	password: string;
-	origin: string;
 	now?: Date;
 }): Promise<
 	Result<
@@ -161,7 +171,7 @@ export async function requestVenmoChange(input: {
 		createdAt: now
 	});
 
-	const confirmationUrl = `${input.origin.replace(/\/$/, '')}${VENMO_CONFIRM_PATH}?token=${rawToken}`;
+	const confirmationUrl = buildVenmoConfirmUrl(rawToken);
 	const sent = await sendVenmoChangeConfirmationEmail({
 		to: user.email,
 		artistName: artist.displayName,

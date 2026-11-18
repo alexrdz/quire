@@ -147,7 +147,7 @@ export const actions: Actions = {
 	 * One field plus Save (ADR 0008). With no username yet this sets it (confirmed
 	 * email required). With one set, it starts a change: password plus email link.
 	 */
-	saveVenmo: async ({ request, url }) => {
+	saveVenmo: async ({ request }) => {
 		const active = await loadActiveArtist(request);
 		if (!active) return fail(401, { venmoError: 'Unauthorized' });
 		const { user, artist } = active;
@@ -181,8 +181,7 @@ export const actions: Actions = {
 			artist,
 			user,
 			rawUsername: parsed.data.venmoUsername,
-			password: parsed.data.confirmPassword,
-			origin: url.origin
+			password: parsed.data.confirmPassword
 		});
 		if (!result.ok) {
 			return fail(VENMO_ERROR_STATUS[result.error.code] ?? 400, {
@@ -199,7 +198,7 @@ export const actions: Actions = {
 	},
 
 	/** Removing the username is a change too: password plus email link. */
-	removeVenmo: async ({ request, url }) => {
+	removeVenmo: async ({ request }) => {
 		const active = await loadActiveArtist(request);
 		if (!active) return fail(401, { venmoError: 'Unauthorized' });
 		const { user, artist } = active;
@@ -215,8 +214,7 @@ export const actions: Actions = {
 			artist,
 			user,
 			rawUsername: null,
-			password: parsed.data.confirmPassword,
-			origin: url.origin
+			password: parsed.data.confirmPassword
 		});
 		if (!result.ok) {
 			return fail(VENMO_ERROR_STATUS[result.error.code] ?? 400, { venmoError: result.error.message });

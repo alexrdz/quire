@@ -303,6 +303,40 @@ describe('changing the Venmo username', () => {
 		expect(page.venmo.pending).toMatchObject({ newUsername: 'new-cassette' });
 	});
 
+	it('builds the emailed link from the configured app URL, never the request Host', async () => {
+		for (const appUrl of [null, 'https://quire.live']) {
+			state.override = appUrl ? (base) => ({ ...base, core: { ...base.core, appUrl } }) : null;
+			const expectedBase = appUrl ?? 'http://localhost:5173';
+			const fixture = await createArtist({ venmoUsername: 'old-cassette' });
+
+			const form = new FormData();
+			form.set('venmoUsername', 'new-cassette');
+			form.set('confirmPassword', PASSWORD);
+			const forged = new Request('https://evil.example/dashboard/settings?/saveVenmo', {
+				method: 'POST',
+				headers: {
+					cookie: fixture.cookie,
+					host: 'evil.example',
+					'x-forwarded-host': 'evil.example',
+					origin: 'https://evil.example'
+				},
+				body: form
+			});
+			const result = await run(settings.actions.saveVenmo, {
+				request: forged,
+				url: new URL('https://evil.example/dashboard/settings?/saveVenmo')
+			});
+			expect(result).toMatchObject({ venmoChangeRequested: true });
+
+			const emails = loggedEmails();
+			expect(emails).not.toContain('evil.example');
+			const links = [...emails.matchAll(/(\S+)\/dashboard\/settings\/confirm-venmo\?token=[a-f0-9]{64}/g)];
+			expect(links.length).toBeGreaterThan(0);
+			expect(links.at(-1)![1]).toBe(expectedBase);
+			consoleInfo.mockClear();
+		}
+	});
+
 	it('stores only a hash of the single-use token, valid for 1 hour', async () => {
 		const fixture = await createArtist({ venmoUsername: 'old-cassette' });
 		const before = Date.now();
