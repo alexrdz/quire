@@ -4,6 +4,8 @@
 	import PhotoPile from '$lib/components/zine/PhotoPile.svelte';
 	import { resolvePhotoEntries } from '$domain/photo-pile';
 
+	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
+
 	let { data, form } = $props();
 
 	// Tip drawer state
@@ -266,13 +268,17 @@
 
 			<Cluster justify="between" align="center" gap="sm" class="cover-actions-strip">
 				{#if data.artist.payoutsEnabled && !data.isArtistClosed}
-					<button
-						type="button"
-						class="btn-hero-tip"
-						onclick={() => (tipDrawerOpen = true)}
-					>
-						Support Artist (${(selectedTipCents / 100).toFixed(2)})
-					</button>
+					{#if data.features.payments}
+						<button
+							type="button"
+							class="btn-hero-tip"
+							onclick={() => (tipDrawerOpen = true)}
+						>
+							Support Artist (${(selectedTipCents / 100).toFixed(2)})
+						</button>
+					{:else}
+						<FeatureNotice feature="payments" mode={data.features.mode} />
+					{/if}
 				{/if}
 
 				<button
@@ -864,7 +870,7 @@
 </div>
 
 <!-- Persistent Floating Tip Trigger (Only when payoutsEnabled per SPEC.md §5.4) -->
-{#if data.artist.payoutsEnabled && !data.isArtistClosed && !tipDrawerOpen && !authDrawerOpen}
+{#if data.features.payments && data.artist.payoutsEnabled && !data.isArtistClosed && !tipDrawerOpen && !authDrawerOpen}
 	<button
 		type="button"
 		class="btn-floating-tip"
@@ -904,19 +910,26 @@
 				{/if}
 			</p>
 
-			<form method="POST" action="?/googleAuth" use:enhance>
-				<input
-					type="hidden"
-					name="targetHash"
-					value={pendingAuthAction === 'stamp' || pendingAuthAction === 'save'
-						? '#page-endpaper'
-						: '#page-wall'}
-				/>
+			{#if form?.fanSignInError}
+				<p class="feature-notice" role="alert">{form.fanSignInError}</p>
+			{/if}
+			{#if data.features.fanSignIn}
+				<form method="POST" action="?/googleAuth" use:enhance>
+					<input
+						type="hidden"
+						name="targetHash"
+						value={pendingAuthAction === 'stamp' || pendingAuthAction === 'save'
+							? '#page-endpaper'
+							: '#page-wall'}
+					/>
 
-				<button type="submit" class="google-sheet-btn">
-					<span>Continue with Google</span>
-				</button>
-			</form>
+					<button type="submit" class="google-sheet-btn">
+						<span>Continue with Google</span>
+					</button>
+				</form>
+			{:else}
+				<FeatureNotice feature="fanSignIn" mode={data.features.mode} />
+			{/if}
 		</Stack>
 	</div>
 {/if}

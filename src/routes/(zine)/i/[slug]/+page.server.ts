@@ -1,4 +1,6 @@
 import { error, fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
+import { getConfig } from '$lib/server/config';
+import { FEATURE_UNAVAILABLE } from '$lib/features';
 import { ArtistAccountStatus } from '$domain/account';
 import { db, schema } from '$lib/server/db';
 import { eq, and, asc, desc } from 'drizzle-orm';
@@ -129,13 +131,12 @@ export const actions: Actions = {
 		const targetHash = String(formData.get('targetHash') || '#page-wall');
 		const callbackURL = `/i/${params.slug}${targetHash}`;
 
-		const hasGoogleKeys = Boolean(
-			process.env.GOOGLE_CLIENT_ID &&
-				process.env.GOOGLE_CLIENT_ID !== 'mock_google_client_id' &&
-				process.env.GOOGLE_CLIENT_SECRET
-		);
+		const { features, live } = getConfig();
+		if (!features.fanSignIn) {
+			return fail(503, { fanSignInError: FEATURE_UNAVAILABLE.fanSignIn });
+		}
 
-		if (hasGoogleKeys) {
+		if (live.fanSignIn) {
 			const res = await auth.api.signInSocial({
 				body: {
 					provider: 'google',
@@ -146,7 +147,10 @@ export const actions: Actions = {
 			if (res?.url) {
 				throw redirect(303, res.url);
 			}
+			return fail(502, { fanSignInError: FEATURE_UNAVAILABLE.fanSignIn });
 		}
+
+		// Stand-in sign-in: development, test and the Demo only (features.fanSignIn is false in production without Google keys).
 
 		await seedDatabase();
 		const fanUser = await db.query.users.findFirst({

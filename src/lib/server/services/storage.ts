@@ -4,27 +4,22 @@ import crypto from 'node:crypto';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { type Result, type DomainError, ok, err } from '$domain/types';
 
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || 'quire-media';
-const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
+import { getConfig } from '$lib/server/config';
 
-const hasR2Credentials = Boolean(
-	R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY
-);
+import { FEATURE_UNAVAILABLE } from '$lib/features';
 
-let s3Client: S3Client | null = null;
-if (hasR2Credentials) {
-	s3Client = new S3Client({
-		region: 'auto',
-		endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-		credentials: {
-			accessKeyId: R2_ACCESS_KEY_ID!,
-			secretAccessKey: R2_SECRET_ACCESS_KEY!
-		}
-	});
-}
+const r2 = getConfig().integrations.r2;
+
+const s3Client: S3Client | null = r2
+	? new S3Client({
+			region: 'auto',
+			endpoint: `https://${r2.accountId}.r2.cloudflarestorage.com`,
+			credentials: {
+				accessKeyId: r2.accessKeyId,
+				secretAccessKey: r2.secretAccessKey
+			}
+		})
+	: null;
 
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 export const MAX_AUDIO_BYTES = 25 * 1024 * 1024; // 25 MB
@@ -233,6 +228,10 @@ export async function optimizeRasterImageBuffer(
 export async function uploadMedia(
 	options: UploadOptions
 ): Promise<Result<UploadResult, DomainError>> {
+	if (!getConfig().features.uploads) {
+		return err({ code: 'UPLOADS_UNAVAILABLE', message: FEATURE_UNAVAILABLE.uploads });
+	}
+
 	const normalizedMime = normalizeMimeType(options.contentType, options.filename);
 	const validation = validateMediaTypeAndSize(
 		normalizedMime,
@@ -251,20 +250,20 @@ export async function uploadMedia(
 	const uniqueKey = `${crypto.randomUUID()}${ext}`;
 
 	// 1. Cloudflare R2 Upload
-	if (hasR2Credentials && s3Client) {
+	if (r2 && s3Client) {
 		try {
 			await s3Client.send(
 				new PutObjectCommand({
-					Bucket: R2_BUCKET_NAME,
+					Bucket: r2.bucketName,
 					Key: uniqueKey,
 					Body: finalBuffer,
 					ContentType: finalMime
 				})
 			);
 
-			const publicUrl = R2_PUBLIC_URL
-				? `${R2_PUBLIC_URL.replace(/\/$/, '')}/${uniqueKey}`
-				: `https://${R2_BUCKET_NAME}.r2.dev/${uniqueKey}`;
+			const publicUrl = r2.publicUrl
+				? `${r2.publicUrl}/${uniqueKey}`
+				: `https://${r2.bucketName}.r2.dev/${uniqueKey}`;
 
 			return ok({ url: publicUrl, key: uniqueKey });
 		} catch (error) {
@@ -275,7 +274,10 @@ export async function uploadMedia(
 		}
 	}
 
-	// 2. Local Fallback (/static/uploads/)
+	// 2. Local Fallback (/static/uploads/), development and the Demo only (ADR 0004, decision 27)
+	if (getConfig().mode === 'production') {
+		return err({ code: 'UPLOADS_UNAVAILABLE', message: FEATURE_UNAVAILABLE.uploads });
+	}
 	try {
 		const uploadsDir = path.resolve(process.cwd(), 'static/uploads');
 		await fs.mkdir(uploadsDir, { recursive: true });
@@ -302,6 +304,10 @@ export async function uploadFormFile(
 	file: File,
 	options?: { kind?: MediaKindFilter }
 ): Promise<Result<UploadResult, DomainError>> {
+	if (!getConfig().features.uploads) {
+		return err({ code: 'UPLOADS_UNAVAILABLE', message: FEATURE_UNAVAILABLE.uploads });
+	}
+
 	if (!file || typeof file.arrayBuffer !== 'function' || file.size <= 0) {
 		return err({
 			code: 'EMPTY_FILE',

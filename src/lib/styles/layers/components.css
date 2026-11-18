@@ -437,3 +437,24 @@
 .info-page details[open] summary {
   margin-block-end: var(--space-2xs);
 }
+
+/* Feature unavailable notice (ADR 0007, tier 2) */
+.feature-notice {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2xs);
+	margin-block: 0;
+	padding-block: var(--space-2xs);
+	padding-inline: var(--space-xs);
+	border: 1px dashed currentColor;
+	border-radius: var(--radius-md);
+	font-size: var(--text-small);
+	line-height: 1.4;
+	opacity: 0.9;
+}
+
+.feature-notice-icon {
+	flex: none;
+	inline-size: 1em;
+	block-size: 1em;
+}

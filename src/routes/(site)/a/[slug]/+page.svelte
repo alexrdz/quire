@@ -2,6 +2,8 @@
 	import { enhance } from '$app/forms';
 	import { Container, Box, Stack, Cluster, Grid } from '$lib/components/layout';
 
+	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
+
 	let { data, form } = $props();
 
 	let tipDrawerOpen = $state(false);
@@ -77,13 +79,17 @@
 					</Cluster>
 
 					{#if data.artist.payoutsEnabled && !data.isArtistClosed}
-						<button
-							type="button"
-							class="btn-hero-support"
-							onclick={() => (tipDrawerOpen = true)}
-						>
-							Support {data.artist.displayName} (${(selectedTipCents / 100).toFixed(2)})
-						</button>
+						{#if data.features.payments}
+							<button
+								type="button"
+								class="btn-hero-support"
+								onclick={() => (tipDrawerOpen = true)}
+							>
+								Support {data.artist.displayName} (${(selectedTipCents / 100).toFixed(2)})
+							</button>
+						{:else}
+							<FeatureNotice feature="payments" mode={data.features.mode} />
+						{/if}
 					{/if}
 				</Cluster>
 
@@ -328,11 +334,18 @@
 				Sign in to post on {data.artist.displayName}’s Wall and access your collected gig stubs.
 			</p>
 
-			<form method="POST" action="?/googleAuth" use:enhance>
-				<button type="submit" class="google-sheet-btn">
-					Continue with Google
-				</button>
-			</form>
+			{#if form?.fanSignInError}
+				<p class="feature-notice" role="alert">{form.fanSignInError}</p>
+			{/if}
+			{#if data.features.fanSignIn}
+				<form method="POST" action="?/googleAuth" use:enhance>
+					<button type="submit" class="google-sheet-btn">
+						Continue with Google
+					</button>
+				</form>
+			{:else}
+				<FeatureNotice feature="fanSignIn" mode={data.features.mode} />
+			{/if}
 		</Stack>
 	</div>
 {/if}

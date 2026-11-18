@@ -10,6 +10,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "check:sizing": "node --import tsx scripts/check-fluid-sizing.ts",
+    "check:env": "node --import tsx scripts/check-env.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

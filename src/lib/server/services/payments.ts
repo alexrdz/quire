@@ -1,5 +1,4 @@
 import crypto from 'node:crypto';
-import Stripe from 'stripe';
 import { db, schema } from '$lib/server/db';
 import { eq } from 'drizzle-orm';
 import {
@@ -10,14 +9,10 @@ import {
 } from '$domain/tipping';
 import { type Result, type DomainError, ok, err } from '$domain/types';
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-const isStripeConfigured = Boolean(STRIPE_SECRET_KEY && STRIPE_SECRET_KEY.startsWith('sk_'));
+import { getConfig } from '$lib/server/config';
+import { getStripeClient } from '$lib/server/payments/stripe';
 
-const stripe = isStripeConfigured
-	? new Stripe(STRIPE_SECRET_KEY!, {
-			apiVersion: '2025-01-27.acacia' as any
-		})
-	: null;
+import { FEATURE_UNAVAILABLE } from '$lib/features';
 
 export interface CreateTipParams {
 	artistId: string;
@@ -48,6 +43,11 @@ export type TipCheckoutResult =
 export async function createTipCheckout(
 	params: CreateTipParams
 ): Promise<Result<TipCheckoutResult, DomainError>> {
+	const config = getConfig();
+	if (!config.features.payments) {
+		return err({ code: 'PAYMENTS_UNAVAILABLE', message: FEATURE_UNAVAILABLE.payments });
+	}
+
 	const breakdownResult = calculateTipBreakdown(
 		params.amountGrossCents,
 		params.fanCoveredFees ?? false
@@ -68,7 +68,8 @@ export async function createTipCheckout(
 	}
 
 	// 1. Stripe Connect flow
-	if (isStripeConfigured && stripe && artist.stripeAccountId && artist.payoutsEnabled) {
+	const stripe = config.live.payments ? getStripeClient() : null;
+	if (stripe && artist.stripeAccountId && artist.payoutsEnabled) {
 		try {
 			const paymentIntent = await stripe.paymentIntents.create({
 				amount: breakdown.totalChargedCents,
@@ -97,7 +98,10 @@ export async function createTipCheckout(
 		}
 	}
 
-	// 2. Offline / Demo Mock Payment Simulator (ADR 0003)
+	// 2. Offline / Demo Mock Payment Simulator (ADR 0003). Never in production (ADR 0007).
+	if (config.mode === 'production') {
+		return err({ code: 'PAYMENTS_UNAVAILABLE', message: FEATURE_UNAVAILABLE.payments });
+	}
 	const tipId = crypto.randomUUID();
 	const simulatedPaymentId = `mock_pi_${crypto.randomBytes(12).toString('hex')}`;
 

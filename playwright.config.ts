@@ -6,7 +6,10 @@ export default defineConfig({
 	webServer: baseURL ? undefined : {
 		command: 'pnpm preview',
 		port: 4173,
-		reuseExistingServer: !process.env.CI
+		reuseExistingServer: !process.env.CI,
+		// The built server runs in production mode by default (ADR 0007). The e2e suite
+		// exercises the local stand-ins, so it runs the production build in test mode.
+		env: { NODE_ENV: 'test' }
 	},
 	testDir: 'tests/e2e',
 	testMatch: /(.+\.)?(test|spec)\.[jt]s/,

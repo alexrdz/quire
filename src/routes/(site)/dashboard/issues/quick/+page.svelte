@@ -6,6 +6,8 @@
 	import QrCaseDisplay from '$lib/components/dashboard/QrCaseDisplay.svelte';
 	import { optimizeFileInputOnChange } from '$lib/utils/image-optimize';
 
+	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
+
 	let { data, form } = $props();
 
 	const BASE_TIMEZONES = [
@@ -274,11 +276,15 @@
 											<input
 												id="photoFile"
 												type="file"
+												disabled={!data.features.uploads}
 												name="photoFile"
 												accept="image/jpeg,image/png,image/webp,image/avif,image/svg+xml"
 												onchange={optimizeFileInputOnChange}
 												class="form-field-input"
 											/>
+											{#if !data.features.uploads}
+												<FeatureNotice feature="uploads" mode={data.features.mode} />
+											{/if}
 										</Stack>
 
 										<Stack gap="xs">

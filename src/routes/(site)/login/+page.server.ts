@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import { getConfig } from '$lib/server/config';
+import { FEATURE_UNAVAILABLE, featureUnavailableMessage } from '$lib/features';
 import { fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { eq, inArray } from 'drizzle-orm';
 import { normalizeArtistSlug, suggestAlternativeSlugs } from '$domain/theme';
@@ -140,6 +142,10 @@ export const actions: Actions = {
 	},
 
 	signup: async ({ request, url, cookies }) => {
+		const { features, mode } = getConfig();
+		if (!features.email) {
+			return fail(503, { mode: 'signup' as const, error: featureUnavailableMessage('email', mode) });
+		}
 		await seedDatabase();
 		const formData = await request.formData();
 		const nameRaw = String(formData.get('name') || '');
@@ -359,13 +365,12 @@ export const actions: Actions = {
 		const parsedRedirect = safeRedirectPathSchema.safeParse(rawRedirect);
 		const redirectTo = parsedRedirect.success ? parsedRedirect.data : '/me/stubs';
 
-		const hasGoogleKeys = Boolean(
-			process.env.GOOGLE_CLIENT_ID &&
-				process.env.GOOGLE_CLIENT_ID !== 'mock_google_client_id' &&
-				process.env.GOOGLE_CLIENT_SECRET
-		);
+		const { features, live } = getConfig();
+		if (!features.fanSignIn) {
+			return fail(503, { fanSignInError: FEATURE_UNAVAILABLE.fanSignIn });
+		}
 
-		if (hasGoogleKeys) {
+		if (live.fanSignIn) {
 			const res = await auth.api.signInSocial({
 				body: {
 					provider: 'google',
@@ -376,7 +381,10 @@ export const actions: Actions = {
 			if (res?.url) {
 				throw redirect(303, res.url);
 			}
+			return fail(502, { fanSignInError: FEATURE_UNAVAILABLE.fanSignIn });
 		}
+
+		// Stand-in sign-in: development, test and the Demo only (features.fanSignIn is false in production without Google keys).
 
 		// Local dev fallback when Google OAuth keys are not configured yet
 		await seedDatabase();

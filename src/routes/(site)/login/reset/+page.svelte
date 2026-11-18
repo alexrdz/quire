@@ -2,6 +2,8 @@
 	import { enhance } from '$app/forms';
 	import { Cover, Center, Box, Stack, Cluster } from '$lib/components/layout';
 
+	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
+
 	let { data, form } = $props();
 
 	const isConfirmMode = $derived(data.mode === 'confirm');
@@ -102,7 +104,10 @@
 								/>
 							</Stack>
 
-							<button type="submit" class="btn-reset-submit">
+							{#if !data.features.email}
+								<FeatureNotice feature="email" mode={data.features.mode} />
+							{/if}
+							<button type="submit" class="btn-reset-submit" disabled={!data.features.email}>
 								Send Reset Link
 							</button>
 						</form>
