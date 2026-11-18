@@ -31,6 +31,7 @@ Shared vocabulary and key decisions. Use these terms in code, UI copy and docs. 
 | **Studio Launchpad** | The 3-Step onboarding experience shown on `/dashboard` when an Artist has `0` issues (Master Template, First Issue / Busker QR fast-track, Stripe Express). |
 | **Full-Screen Case Display** | Chrome-free, high-contrast phone view of an Issue QR or Permanent Artist QR, built to sit beside a busker's guitar case or merch table. |
 | **Gig Recap** | The dashboard card for the latest Issue: tips, stamps, notes, saves. |
+| **Demo** | A clearly labeled sandbox of Quire with sample Artists, Fans and Issues, for trying the product. Nothing in it is real: no money moves, no email is sent, and nothing carries over to a real account. Never the default; it must be entered on purpose. |
 
 ## Key decisions (and why)
 
@@ -46,7 +47,7 @@ Shared vocabulary and key decisions. Use these terms in code, UI copy and docs. 
 10. **Only Artists reply, one level deep.** Keeps the Wall as notes to the Artist, not a comment section.
 11. **Only city + venue + date are required to publish.** Tired artists and daily buskers have to be able to publish quickly.
 12. **Bookbinder (desktop) and Quick Issue (phone).** Two different jobs: designing the template versus publishing tonight's Issue.
-13. **One login per Artist, email + password (with Resend reset); Google for Fans.** Bandmates shouldn't share a personal Google account, and forgot-password recovery uses Resend (`/login/reset`).
+13. **One login per Artist, email + password (with Resend reset); Google for Fans.** Bandmates shouldn't share a personal Google account, and forgot-password recovery uses Resend (`/login/reset`). Fans without Google will get a passwordless email link after launch; Fans never get passwords.
 14. **Better Auth, with one user table and an account type.** It supports both sign-in methods and works with SvelteKit and Turso via Drizzle.
 15. **Dashboard shows only money and people.** No page views or bounce rates. No email digest. First-time artists with `0` issues see the **3-Step Studio Launchpad** instead of an empty gigs table.
 16. **One house style (the dark glass UI prototype), vanilla CUBE CSS.** Artists change only cover art, WCAG contrast-checked `--accent` (against `--bg-void`), and a type pairing. `--highlight` (mint) and `--support` (pink) stay fixed for the whole platform.
@@ -60,8 +61,11 @@ Shared vocabulary and key decisions. Use these terms in code, UI copy and docs. 
 24. **Changing the payout account needs the password again plus email confirmation via Resend**, because the login is shared.
 25. **Tip buttons are hidden until payouts are enabled via Stripe Connect Express (`accountLinks.create`).** A $2 minimum, a $500 maximum, USD only.
 26. **Editable clean `/a/[slug]` on sign-up (`/login?mode=signup`).** Derived live from band name (no random 3-digit suffix), first-come, first-served with collision suggestions, because it is baked into the Permanent Artist QR sticker.
-27. **Direct media uploads (`src/lib/server/storage/`) via Cloudflare R2 + local `/static/uploads` fallback.** Master Template cover art, Quick Issue photo, and Bookbinder photo/audio blocks accept direct device uploads alongside URLs and `lite-youtube`/Bandcamp embeds.
+27. **Direct media uploads (`src/lib/server/storage/`) via Cloudflare R2 (local `/static/uploads` only in development and the Demo).** Master Template cover art, Quick Issue photo, and Bookbinder photo/audio blocks accept direct device uploads alongside URLs and `lite-youtube`/Bandcamp embeds. Photos are stripped of location and camera data on upload, and SVG files are not accepted.
 28. **Full-Screen Case Display mode for QR codes.** Both Issue QR and Permanent Artist QR open chrome-free at full screen for busker cases and merch tables.
+29. **A public Demo exists, but it is opt-in and always labeled.** Anyone trying Quire must know they are in the Demo, so no one mistakes sample data or a sample login for their real account.
+30. **Production never pretends.** If a service Quire depends on is not set up, Quire tells people it is unavailable instead of quietly falling back to the Demo or to simulated tips, sign-ins or emails. A missing core secret or database takes the whole site offline with an "unavailable" page; a missing integration (payments, email, Fan sign-in, uploads) turns off only that feature, with an honest message, so Fans at a gig can still read tonight's Issue.
+31. **Artists confirm their email before anything goes public or touches money.** They can sign in and build right away, but publishing an Issue, uploading media and connecting payouts wait for email confirmation, because the email controls resets and payout changes.
 
 ## Stack
 

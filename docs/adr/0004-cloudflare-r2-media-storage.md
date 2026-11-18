@@ -7,3 +7,6 @@ We adopt Cloudflare R2 (S3-compatible API) as the media storage solution for Art
 - **Zero Egress Fees:** When hundreds or thousands of fans scan QR codes at a live concert and stream zine images simultaneously, Cloudflare R2 incurs $0.00 in egress bandwidth fees.
 - **S3 Standard:** Using `@aws-sdk/client-s3` prevents vendor lock-in to Netlify infrastructure and allows direct presigned uploads with client-side image resizing/compression (WebP/AVIF).
 - **Development Fallback:** When R2 credentials are unset in local development, Quire saves files locally to `/static/uploads`.
+
+
+> Narrowed by ADR 0007: the local filesystem fallback applies only in development, tests and the Demo deployment.
