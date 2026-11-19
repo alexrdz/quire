@@ -200,6 +200,7 @@ Acceptance: unit tests for username validation, the change flow (password, token
 ## Phase 4: Low and operations
 
 4.1 `.env.example` lists every variable the config module reads, including `DEMO_MODE` and Resend (Stripe variables listed as dormant and optional, ADR 0008); `.env` matches it.
+*Done (P4L-T01).* `.env.example` lists all 22 variables `config.ts` reads (`drizzle.config.ts` reads only `DATABASE_URL` and `DATABASE_AUTH_TOKEN`, and `check-env.ts` reads through `parseConfig`). They are grouped as Mode, Core (required in demo and production), Features and a dormant Stripe group, with empty values only. `NODE_ENV` and `VITEST` are set by the tooling and stay commented out. `tests/unit/server/env-example.test.ts` records the names the code actually reads, across every mode, and fails on a missing or unknown variable. The user's own `.env` and the Netlify settings still need to be checked against it by hand.
 
 4.2 **Demo deployment** (ADR 0007)
 - Second Netlify site on a `demo.` subdomain with its own Turso database, `DEMO_MODE=true`, no Stripe keys, no Resend key. Tip buttons never open Venmo there (ADR 0008).
