@@ -123,6 +123,29 @@ export const load: ServerLoad = async ({ params, cookies, request }) => {
 	};
 };
 
+/**
+ * The Issue whose Wall an action writes to, from the URL slug alone. Unknown and
+ * draft Issues are 404; archived Issues and closed Artists are read-only.
+ */
+async function resolveIssueWall(slug: string | undefined) {
+	const issue = slug
+		? await db.query.issues.findFirst({
+				where: eq(schema.issues.slug, slug),
+				with: { artist: true }
+			})
+		: undefined;
+	if (!issue || issue.status === 'draft') {
+		return { ok: false as const, failure: fail(404, { error: 'Issue not found.' }) };
+	}
+	if (issue.artist.accountStatus === ArtistAccountStatus.Closed) {
+		return { ok: false as const, failure: fail(403, { error: 'This artist has left Quire.' }) };
+	}
+	if (issue.status === 'archived') {
+		return { ok: false as const, failure: fail(403, { error: 'This archived issue is read-only.' }) };
+	}
+	return { ok: true as const, issue };
+}
+
 export const actions: Actions = {
 	googleAuth: async ({ request, params, cookies }) => {
 		const formData = await request.formData();
@@ -170,23 +193,12 @@ export const actions: Actions = {
 			return fail(401, { error: 'Please sign in to leave a note on the Wall.' });
 		}
 
-		const issueRecord = await db.query.issues.findFirst({
-			where: eq(schema.issues.slug, params.slug!),
-			with: { artist: true }
-		});
-		if (issueRecord?.artist.accountStatus === ArtistAccountStatus.Closed) {
-			return fail(403, { error: 'This artist has left Quire.' });
-		}
-		if (issueRecord?.status === 'archived') {
-			return fail(403, { error: 'This archived issue is read-only.' });
-		}
-
+		// The Issue and its Artist come from the URL slug only. Any artistId or
+		// issueId in the form is ignored (PRODUCTION_PLAN 3.2).
 		const formData = await request.formData();
-		const artistId = String(formData.get('artistId') || '');
-		const issueId = formData.get('issueId') ? String(formData.get('issueId')) : null;
 		const body = String(formData.get('body') || '');
 
-		const parseResult = submitNoteSchema.safeParse({ issueId, body });
+		const parseResult = submitNoteSchema.safeParse({ body });
 		if (!parseResult.success) {
 			return fail(400, { error: parseResult.error.issues[0]?.message || 'Validation error' });
 		}
@@ -196,9 +208,12 @@ export const actions: Actions = {
 			return fail(429, { error: noteLimit.message });
 		}
 
+		const wall = await resolveIssueWall(params.slug);
+		if (!wall.ok) return wall.failure;
+
 		const noteResult = await submitWallNote({
-			artistId,
-			issueId,
+			artistId: wall.issue.artistId,
+			issueId: wall.issue.id,
 			fanUserId: session.user.id,
 			body: parseResult.data.body
 		});
@@ -219,17 +234,6 @@ export const actions: Actions = {
 			return fail(401, { error: 'Sign in to flag a note.' });
 		}
 
-		const issueRecord = await db.query.issues.findFirst({
-			where: eq(schema.issues.slug, params.slug!),
-			with: { artist: true }
-		});
-		if (issueRecord?.artist.accountStatus === ArtistAccountStatus.Closed) {
-			return fail(403, { error: 'This artist has left Quire.' });
-		}
-		if (issueRecord?.status === 'archived') {
-			return fail(403, { error: 'This archived issue is read-only.' });
-		}
-
 		const formData = await request.formData();
 		const noteId = String(formData.get('noteId') || '');
 
@@ -243,9 +247,17 @@ export const actions: Actions = {
 			return fail(429, { error: flagLimit.message });
 		}
 
-		const flagResult = await flagWallNote(noteId, session.user.id);
+		const wall = await resolveIssueWall(params.slug);
+		if (!wall.ok) return wall.failure;
+
+		// Only a note on this Issue's Wall can be flagged from this page.
+		const flagResult = await flagWallNote(parseResult.data.noteId, session.user.id, {
+			artistId: wall.issue.artistId,
+			issueId: wall.issue.id
+		});
 		if (!flagResult.ok) {
-			return fail(400, { error: flagResult.error.message });
+			const status = flagResult.error.code === 'NOTE_NOT_FOUND' ? 404 : 400;
+			return fail(status, { error: flagResult.error.message });
 		}
 
 		return { success: true, ...flagResult.value };

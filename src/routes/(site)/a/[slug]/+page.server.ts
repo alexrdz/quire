@@ -76,6 +76,23 @@ export const load: ServerLoad = async ({ params, request }) => {
 	};
 };
 
+/**
+ * The Artist whose General Wall an action writes to, from the URL slug alone.
+ * Unknown Artists are 404; closed Artists are read-only.
+ */
+async function resolveGeneralWall(slug: string | undefined) {
+	const artist = slug
+		? await db.query.artists.findFirst({ where: eq(schema.artists.slug, slug) })
+		: undefined;
+	if (!artist) {
+		return { ok: false as const, failure: fail(404, { error: 'Artist not found.' }) };
+	}
+	if (artist.accountStatus === ArtistAccountStatus.Closed) {
+		return { ok: false as const, failure: fail(403, { error: 'This artist has left Quire.' }) };
+	}
+	return { ok: true as const, artist };
+}
+
 export const actions: Actions = {
 	googleAuth: async ({ request, params, cookies }) => {
 		const callbackURL = `/a/${params.slug}#general-wall`;
@@ -120,15 +137,9 @@ export const actions: Actions = {
 			return fail(401, { error: 'Please sign in to leave a note on the General Wall.' });
 		}
 
-		const artistRecord = await db.query.artists.findFirst({
-			where: eq(schema.artists.slug, params.slug!)
-		});
-		if (artistRecord?.accountStatus === ArtistAccountStatus.Closed) {
-			return fail(403, { error: 'This artist has left Quire.' });
-		}
-
+		// The Artist comes from the URL slug only; any artistId in the form is
+		// ignored (PRODUCTION_PLAN 3.2). General Wall notes have no Issue.
 		const formData = await request.formData();
-		const artistId = String(formData.get('artistId') || '');
 		const body = String(formData.get('body') || '');
 
 		const parseResult = submitNoteSchema.safeParse({ body });
@@ -141,9 +152,12 @@ export const actions: Actions = {
 			return fail(429, { error: noteLimit.message });
 		}
 
+		const wall = await resolveGeneralWall(params.slug);
+		if (!wall.ok) return wall.failure;
+
 		const noteResult = await submitWallNote({
-			artistId,
-			issueId: null, // General Wall
+			artistId: wall.artist.id,
+			issueId: null,
 			fanUserId: session.user.id,
 			body: parseResult.data.body
 		});
@@ -164,13 +178,6 @@ export const actions: Actions = {
 			return fail(401, { error: 'Sign in to flag a note.' });
 		}
 
-		const artistRecord = await db.query.artists.findFirst({
-			where: eq(schema.artists.slug, params.slug!)
-		});
-		if (artistRecord?.accountStatus === ArtistAccountStatus.Closed) {
-			return fail(403, { error: 'This artist has left Quire.' });
-		}
-
 		const formData = await request.formData();
 		const noteId = String(formData.get('noteId') || '');
 
@@ -184,9 +191,17 @@ export const actions: Actions = {
 			return fail(429, { error: flagLimit.message });
 		}
 
-		const flagResult = await flagWallNote(noteId, session.user.id);
+		const wall = await resolveGeneralWall(params.slug);
+		if (!wall.ok) return wall.failure;
+
+		// Only a note on this Artist's General Wall can be flagged from this page.
+		const flagResult = await flagWallNote(parseResult.data.noteId, session.user.id, {
+			artistId: wall.artist.id,
+			issueId: null
+		});
 		if (!flagResult.ok) {
-			return fail(400, { error: flagResult.error.message });
+			const status = flagResult.error.code === 'NOTE_NOT_FOUND' ? 404 : 400;
+			return fail(status, { error: flagResult.error.message });
 		}
 
 		return { success: true, ...flagResult.value };

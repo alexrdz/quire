@@ -181,6 +181,7 @@ Acceptance: unit tests for username validation, the change flow (password, token
 - Replace check-then-insert with insert-on-conflict-do-nothing on `stripePaymentId`.
 
 3.2 **Wall notes**: `submitNote` loads the Issue from the URL slug and uses its `artistId` and `id`; form values for these are ignored. General Wall derives the Artist from its own slug.
+*Done (P3M-T01).* Both pages resolve the Wall from `params.slug` only (`resolveIssueWall`, `resolveGeneralWall`); unknown and draft Issues are 404, archived Issues and closed Artists 403, and no note is written. Both `flagNote` actions pass that Wall to `flagWallNote`, which rejects a note from another Issue, Artist or Wall as `NOTE_NOT_FOUND` (404).
 
 3.3 *Changed: done as part of V.3 for the Venmo username change.* ~~**Payout confirmation**: load only validates and shows the pending change; a POST action consumes the token after the Stripe calls succeed.~~
 
@@ -196,6 +197,7 @@ Acceptance: unit tests for username validation, the change flow (password, token
 - Error tracking service (Sentry or similar) deferred; Netlify function logs are the launch baseline.
 
 3.7 **Transactions**: wrap artist signup (user + artist rows) in a transaction; `flagWallNote` uses a single atomic `UPDATE ... SET flag_count = flag_count + 1` inside the same transaction as the flag insert.
+*Done (P3M-T01).* `flagWallNote` runs the flag insert and one `flag_count = flag_count + 1` UPDATE (auto-hide as a SQL `CASE` on `FLAG_AUTO_HIDE_THRESHOLD`) as one libsql batch, which commits atomically; the existing unique `(note_id, fan_user_id)` index makes a repeat flag roll the batch back as `ALREADY_FLAGGED`. A batch, not `db.transaction`: interactive libsql transactions hold the write lock across round trips, so concurrent flags failed with `SQLITE_BUSY`. Signup: Better Auth creates the user outside our handle, so `createArtistForNewUser` inserts the artist and template page in one batch and, if it fails, deletes the new user with its sessions and accounts (compensating delete).
 
 ## Phase 4: Low and operations
 

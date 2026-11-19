@@ -1,12 +1,13 @@
 import crypto from 'node:crypto';
 import { db, schema } from '$lib/server/db';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 import {
 	screenNoteText,
 	flagNote,
 	hideNote,
 	restoreNote,
 	NoteStatus,
+	FLAG_AUTO_HIDE_THRESHOLD,
 	type NoteEntity
 } from '$domain/wall';
 import {
@@ -108,57 +109,93 @@ function toDomainNote(note: typeof schema.notes.$inferSelect): NoteEntity {
 }
 
 /**
- * Flags a note. Enforces 1 flag per fan and auto-hides at 3 flags (unless flagImmune).
+ * Where a flag was raised: the Issue Wall (`issueId` set) or the Artist's General
+ * Wall (`issueId` null). A note outside that Wall cannot be flagged from it.
+ */
+export interface WallScope {
+	artistId: string;
+	issueId: string | null;
+}
+
+/** SQLite reports a unique index violation with this extended code. */
+function isUniqueViolation(error: unknown): boolean {
+	for (let e: unknown = error; e; e = (e as { cause?: unknown }).cause) {
+		const code = (e as { code?: unknown }).code;
+		const message = (e as { message?: unknown }).message;
+		if (code === 'SQLITE_CONSTRAINT_UNIQUE') return true;
+		if (typeof message === 'string' && message.includes('UNIQUE constraint failed')) return true;
+	}
+	return false;
+}
+
+/**
+ * Flags a note. One flag per Fan, auto-hide at FLAG_AUTO_HIDE_THRESHOLD flags
+ * unless the note is flag-immune (domain rule `flagNote`).
+ *
+ * The flag insert and the counter update run as one libsql batch, which commits
+ * atomically: if the insert hits the unique (note_id, fan_user_id) index, the
+ * batch rolls back and the result is ALREADY_FLAGGED. The counter is one
+ * `flag_count = flag_count + 1` UPDATE, so concurrent flags never overwrite each
+ * other. A batch is used instead of `db.transaction` because an interactive
+ * libsql transaction holds the write lock across round trips and concurrent
+ * flags then fail with SQLITE_BUSY.
  */
 export async function flagWallNote(
 	noteId: string,
-	fanUserId: string
+	fanUserId: string,
+	scope: WallScope
 ): Promise<Result<{ flagCount: number; status: NoteStatus }, DomainError>> {
-	const existingFlag = await db.query.noteFlags.findFirst({
+	// The Wall is required: a flag is only ever raised from a specific Wall, and
+	// a note outside it reads as not found.
+	const note = await db.query.notes.findFirst({
 		where: and(
-			eq(schema.noteFlags.noteId, noteId),
-			eq(schema.noteFlags.fanUserId, fanUserId)
+			eq(schema.notes.id, noteId),
+			eq(schema.notes.artistId, scope.artistId),
+			scope.issueId === null
+				? isNull(schema.notes.issueId)
+				: eq(schema.notes.issueId, scope.issueId)
 		)
 	});
-
-	if (existingFlag) {
-		return err({ code: 'ALREADY_FLAGGED', message: 'You have already flagged this note.' });
-	}
-
-	const note = await db.query.notes.findFirst({
-		where: eq(schema.notes.id, noteId)
-	});
-
 	if (!note) {
 		return err({ code: 'NOTE_NOT_FOUND', message: 'Note does not exist.' });
 	}
 
-	await db.insert(schema.noteFlags).values({
-		id: crypto.randomUUID(),
-		noteId,
-		fanUserId,
-		createdAt: new Date()
-	});
-
-	const flagResult = flagNote(toDomainNote(note));
-	if (!flagResult.ok) {
-		return err(flagResult.error);
+	// The domain rule decides whether this note can be flagged at all.
+	const check = flagNote(toDomainNote(note));
+	if (!check.ok) {
+		return err(check.error);
 	}
 
-	const updated = flagResult.value.note;
+	const nextCount = sql`${schema.notes.flagCount} + 1`;
+	try {
+		const [, updated] = await db.batch([
+			db.insert(schema.noteFlags).values({
+				id: crypto.randomUUID(),
+				noteId,
+				fanUserId,
+				createdAt: new Date()
+			}),
+			db
+				.update(schema.notes)
+				.set({
+					flagCount: nextCount,
+					status: sql`CASE WHEN ${schema.notes.flagImmune} = 0 AND ${nextCount} >= ${FLAG_AUTO_HIDE_THRESHOLD} THEN ${NoteStatus.Hidden} ELSE ${schema.notes.status} END`
+				})
+				.where(eq(schema.notes.id, noteId))
+				.returning({ flagCount: schema.notes.flagCount, status: schema.notes.status })
+		]);
 
-	await db
-		.update(schema.notes)
-		.set({
-			flagCount: updated.flagCount,
-			status: updated.status
-		})
-		.where(eq(schema.notes.id, noteId));
-
-	return ok({
-		flagCount: updated.flagCount,
-		status: updated.status
-	});
+		const row = updated[0];
+		if (!row) {
+			return err({ code: 'NOTE_NOT_FOUND', message: 'Note does not exist.' });
+		}
+		return ok({ flagCount: row.flagCount, status: row.status });
+	} catch (error) {
+		if (isUniqueViolation(error)) {
+			return err({ code: 'ALREADY_FLAGGED', message: 'You have already flagged this note.' });
+		}
+		throw error;
+	}
 }
 
 /**
