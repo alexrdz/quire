@@ -13,7 +13,9 @@ import { consumeRateLimit } from '../services/rate-limit';
 export const EMAIL_CONFIRMATION_REQUIRED = {
 	publish: 'Confirm your email to publish. Check your inbox for the confirmation link, or resend it from the bar at the top of the dashboard.',
 	upload: 'Confirm your email to upload media. You can still paste an image URL or embed in the meantime.',
-	payouts: 'Confirm your email before connecting payouts. Check your inbox for the confirmation link, or resend it from the bar at the top of the dashboard.'
+	payouts: 'Confirm your email before connecting payouts. Check your inbox for the confirmation link, or resend it from the bar at the top of the dashboard.',
+	/** First Venmo username (ADR 0008): the email must be confirmed, because it controls later changes. */
+	venmo: 'Confirm your email before adding your Venmo username. Check your inbox for the confirmation link, or resend it from the bar at the top of the dashboard.'
 } as const;
 
 export type GatedArtistAction = keyof typeof EMAIL_CONFIRMATION_REQUIRED;

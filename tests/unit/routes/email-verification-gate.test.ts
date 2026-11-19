@@ -6,7 +6,8 @@ import type { Config } from '$lib/server/config';
 
 /**
  * Decision 31 / PRODUCTION_PLAN 2.4: an unconfirmed artist can sign in and build,
- * but cannot publish, upload or start Stripe Connect onboarding. All server-side.
+ * but cannot publish, upload or add a first Venmo username (ADR 0008 moved the
+ * Stripe Connect gate there). All server-side.
  */
 const state = vi.hoisted(() => ({ override: null as null | ((base: Config) => Config) }));
 
@@ -38,9 +39,6 @@ const { actions: templateActions } = await import(
 );
 const { actions: settingsActions } = await import(
 	'../../../src/routes/(site)/dashboard/settings/+page.server'
-);
-const { load: confirmPayoutLoad } = await import(
-	'../../../src/routes/(site)/dashboard/settings/confirm-payout/+page.server'
 );
 const { actions: dashboardActions } = await import('../../../src/routes/(site)/dashboard/+page.server');
 const { load: dashboardLayoutLoad } = await import(
@@ -243,49 +241,17 @@ describe('unconfirmed artists', () => {
 		expect(res.data?.error).toBe(EMAIL_CONFIRMATION_REQUIRED.upload);
 	});
 
-	it('cannot start Stripe Connect onboarding', async () => {
+	it('cannot add a first Venmo username', async () => {
 		const artist = await createArtist(false);
-		const url = new URL('http://localhost:5173/dashboard/settings?/requestPayoutChange');
-		const res = await run(settingsActions.requestPayoutChange, {
-			request: post(url.toString(), artist.cookie, { action: 'connect', confirmPassword: PASSWORD }),
+		const url = new URL('http://localhost:5173/dashboard/settings?/saveVenmo');
+		const res = await run(settingsActions.saveVenmo, {
+			request: post(url.toString(), artist.cookie, { venmoUsername: 'gate-band-venmo' }),
 			url
 		});
 		expect(res.status).toBe(403);
-		expect(res.data?.payoutError).toBe(EMAIL_CONFIRMATION_REQUIRED.payouts);
-		const tokens = await db.query.payoutChangeTokens.findMany({
-			where: eq(schema.payoutChangeTokens.artistId, artist.artistId)
-		});
-		expect(tokens).toHaveLength(0);
-	});
-
-	it('cannot use a confirm-payout link for onboarding, and the link is not used up', async () => {
-		const artist = await createArtist(false);
-		const rawToken = crypto.randomBytes(32).toString('hex');
-		const tokenId = crypto.randomUUID();
-		await db.insert(schema.payoutChangeTokens).values({
-			id: tokenId,
-			artistId: artist.artistId,
-			userId: artist.userId,
-			tokenHash: crypto.createHash('sha256').update(rawToken).digest('hex'),
-			action: 'connect',
-			status: 'pending',
-			expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-			createdAt: new Date()
-		});
-		const url = new URL(`http://localhost:5173/dashboard/settings/confirm-payout?token=${rawToken}`);
-		const res = (await confirmPayoutLoad({
-			request: new Request(url, { headers: { cookie: artist.cookie } }),
-			url
-		} as never)) as { status: string; errorCode: string; errorMessage: string };
-		expect(res).toMatchObject({
-			status: 'error',
-			errorCode: 'EMAIL_NOT_CONFIRMED',
-			errorMessage: EMAIL_CONFIRMATION_REQUIRED.payouts
-		});
-		const token = await db.query.payoutChangeTokens.findFirst({
-			where: eq(schema.payoutChangeTokens.id, tokenId)
-		});
-		expect(token?.status).toBe('pending');
+		expect(res.data?.venmoError).toBe(EMAIL_CONFIRMATION_REQUIRED.venmo);
+		const stored = await db.query.artists.findFirst({ where: eq(schema.artists.id, artist.artistId) });
+		expect(stored?.venmoUsername).toBeNull();
 	});
 });
 
@@ -314,14 +280,14 @@ describe('confirmed artists', () => {
 		expect(stored?.status).toBe('published');
 	});
 
-	it('can start Stripe Connect onboarding (confirmation email goes out)', async () => {
+	it('can add a first Venmo username', async () => {
 		const artist = await createArtist(true);
-		const url = new URL('http://localhost:5173/dashboard/settings?/requestPayoutChange');
-		const res = await run(settingsActions.requestPayoutChange, {
-			request: post(url.toString(), artist.cookie, { action: 'connect', confirmPassword: PASSWORD }),
+		const url = new URL('http://localhost:5173/dashboard/settings?/saveVenmo');
+		const res = await run(settingsActions.saveVenmo, {
+			request: post(url.toString(), artist.cookie, { venmoUsername: '@gate-band-venmo' }),
 			url
 		});
-		expect(res).toMatchObject({ payoutConfirmationSent: true });
+		expect(res).toMatchObject({ venmoSaved: true, venmoUsername: 'gate-band-venmo' });
 	});
 });
 

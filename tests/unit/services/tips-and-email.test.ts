@@ -21,7 +21,11 @@ import {
 	handleStripeWebhookEvent,
 	requestPayoutAccountChange
 } from '$lib/server/services/tips';
-import { POST as stripeWebhookPOST } from '../../../src/routes/api/webhooks/stripe/+server';
+import { isHttpError } from '@sveltejs/kit';
+import {
+	_dormantStripeWebhookHandler as stripeWebhookPOST,
+	fallback as stripeWebhookFallback
+} from '../../../src/routes/api/webhooks/stripe/+server';
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -148,7 +152,21 @@ describe('Stripe Connect & Webhook Infrastructure', () => {
 		expect(aboveMax.ok).toBe(false);
 	});
 
-	it('handles Stripe webhook events idempotently via POST /api/webhooks/stripe', async () => {
+	it('answers 404 on /api/webhooks/stripe for every method (Stripe dormant, ADR 0008)', async () => {
+		for (const method of ['POST', 'GET', 'PUT']) {
+			let thrown: unknown;
+			try {
+				await stripeWebhookFallback({
+					request: new Request('http://localhost/api/webhooks/stripe', { method })
+				} as Parameters<typeof stripeWebhookFallback>[0]);
+			} catch (error) {
+				thrown = error;
+			}
+			expect(isHttpError(thrown) && thrown.status, method).toBe(404);
+		}
+	});
+
+	it('keeps the dormant Stripe webhook handler working (unwired, ADR 0008)', async () => {
 		await seedDatabase();
 		const artist = await db.query.artists.findFirst({
 			where: eq(schema.artists.slug, 'the-neon-velvet')

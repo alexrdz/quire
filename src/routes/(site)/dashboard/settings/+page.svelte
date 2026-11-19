@@ -2,138 +2,41 @@
 	import { enhance } from '$app/forms';
 	import { Container, Box, Stack, Cluster, Split } from '$lib/components/layout';
 	import ArtistTopNav from '$lib/components/dashboard/ArtistTopNav.svelte';
-
-	type PayoutActionOption = 'connect' | 'replace' | 'disconnect';
-
 	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
 
 	let { data, form } = $props();
 
 	let generalWallApproveFirst = $state(false);
-	let confirmPassword = $state('');
-	let selectedAction = $state<PayoutActionOption>('connect');
+	let venmoInput = $state('');
+	let changePassword = $state('');
+	let removePassword = $state('');
 
-	const payoutChangesBlocked = $derived(!data.features.payments || !data.features.email);
-	const hasAnyAccount = $derived(Boolean(data.artist.stripeAccountId));
-	const hasLiveAccount = $derived(hasAnyAccount && !data.isSeededDemoAccount);
-
-	const payoutStatusKind = $derived.by(() => {
-		if (!data.artist.stripeAccountId) return 'not_connected' as const;
-		if (data.artist.payoutsEnabled) return 'active' as const;
-		return 'incomplete' as const;
-	});
-
-	const availableActions = $derived.by((): Array<{
-		value: PayoutActionOption;
-		label: string;
-		description: string;
-	}> => {
-		if (!hasAnyAccount) {
-			return [
-				{
-					value: 'connect',
-					label: 'Connect Stripe Express',
-					description:
-						'Create a Stripe Express account and redirect to hosted onboarding after email confirmation.'
-				}
-			];
-		}
-
-		if (data.isSeededDemoAccount) {
-			return [
-				{
-					value: 'connect',
-					label: 'Connect Real Stripe Express Account',
-					description:
-						'Replace the seeded local test ID with a real Stripe Express connected account.'
-				},
-				{
-					value: 'disconnect',
-					label: 'Disconnect Payouts',
-					description:
-						'Clear the connected payout account and hide 1-tap tip buttons across your zines.'
-				}
-			];
-		}
-
-		if (!data.artist.payoutsEnabled) {
-			return [
-				{
-					value: 'connect',
-					label: 'Resume Stripe Express Onboarding',
-					description:
-						'Generate a fresh Stripe Express onboarding link to finish identity and bank verification.'
-				},
-				{
-					value: 'replace',
-					label: 'Replace Connected Account',
-					description:
-						'Create and onboard a brand new Stripe Express account for this band.'
-				},
-				{
-					value: 'disconnect',
-					label: 'Disconnect Payouts',
-					description:
-						'Remove the incomplete Stripe account and hide tip buttons until reconnected.'
-				}
-			];
-		}
-
-		return [
-			{
-				value: 'replace',
-				label: 'Replace Connected Stripe Account',
-				description:
-					'Switch payouts to a new Stripe Express account via hosted onboarding.'
-			},
-			{
-				value: 'disconnect',
-				label: 'Disconnect Payouts',
-				description:
-					'Disconnect your Stripe Express account and hide 1-tap tip buttons across all pages.'
-			}
-		];
-	});
-
-	const actionButtonLabel = $derived.by(() => {
-		if (selectedAction === 'disconnect') {
-			return 'Send Confirmation Email to Disconnect Payouts';
-		}
-		if (selectedAction === 'replace') {
-			return 'Send Confirmation Email to Replace Account';
-		}
-		if (hasLiveAccount && !data.artist.payoutsEnabled) {
-			return 'Send Confirmation Email to Resume Onboarding';
-		}
-		return 'Send Confirmation Email to Connect Stripe';
-	});
+	const venmo = $derived(data.venmo);
+	const hasVenmo = $derived(Boolean(venmo.username));
+	/** First set needs a confirmed email; changes need email to be on. */
+	const saveBlocked = $derived(
+		hasVenmo ? !venmo.canChange : Boolean(venmo.firstSetBlockedMessage)
+	);
 
 	$effect(() => {
 		generalWallApproveFirst = Boolean(data.artist.generalWallApproveFirst);
 	});
 
 	$effect(() => {
-		const allowed = availableActions.map((item) => item.value);
-		const requested =
-			form && 'selectedAction' in form
-				? (form.selectedAction as PayoutActionOption | undefined)
-				: undefined;
-		if (requested && allowed.includes(requested)) {
-			selectedAction = requested;
-		} else if (!allowed.includes(selectedAction)) {
-			selectedAction = allowed[0] ?? 'connect';
+		if (form && 'venmoValue' in form && typeof form.venmoValue === 'string') {
+			venmoInput = form.venmoValue;
+		} else if (form?.venmoSaved || form?.venmoChangeRequested) {
+			venmoInput = '';
 		}
-	});
-
-	$effect(() => {
-		if (form?.payoutConfirmationSent) {
-			confirmPassword = '';
+		if (form?.venmoChangeRequested) {
+			changePassword = '';
+			removePassword = '';
 		}
 	});
 </script>
 
 <svelte:head>
-	<title>Settings & Payouts — {data.artist.displayName} | Quire</title>
+	<title>Settings — {data.artist.displayName} | Quire</title>
 </svelte:head>
 
 <div class="settings-root" style="--accent: {data.artist.accentColor || '#05D9E8'};">
@@ -142,16 +45,16 @@
 	<Container as="main" width="md" padding="md" class="settings-canvas">
 		<Stack gap="lg">
 			<Stack gap="xs">
-				<span class="text-highlight font-mono eyebrow-small">ACCOUNT SAFETY & STRIPE CONNECT</span>
-				<h1 class="settings-title">Settings & Payouts</h1>
+				<span class="text-highlight font-mono eyebrow-small">ACCOUNT SAFETY & VENMO TIPS</span>
+				<h1 class="settings-title">Settings</h1>
 				<p class="text-muted settings-subtitle">
-					Connect your Stripe Express payout account, enforce shared band login security, and configure General Wall moderation rules.
+					Choose where tips go, keep your shared band login safe, and set General Wall moderation rules.
 				</p>
 			</Stack>
 
 			{#if data.verifiedReturn}
 				<Box as="section" variant="subtle" padding="md" radius="md" class="success-box">
-					Band email address verified. Your account is ready for payout security confirmations and password recovery.
+					Band email address verified. You can add your Venmo username and recover your password by email.
 				</Box>
 			{/if}
 
@@ -161,196 +64,195 @@
 				</Box>
 			{/if}
 
-			{#if data.stripeReturnState === 'return'}
-				{#if data.artist.payoutsEnabled}
-					<Box as="section" variant="subtle" padding="md" radius="md" class="success-box">
-						<Stack gap="2xs">
-							<span class="banner-heading">Stripe Connect Express Onboarding Complete</span>
-							<p class="subtext-small">
-								Live status synced with Stripe. Payouts are active and 1-tap tip buttons are enabled across your Cover, Issue pages, and Back Page.
-							</p>
-						</Stack>
-					</Box>
-				{:else}
-					<Box as="section" variant="subtle" padding="md" radius="md" class="warning-box">
-						<Stack gap="2xs">
-							<span class="banner-heading">Returned from Stripe Express Onboarding</span>
-							<p class="subtext-small">
-								Your Stripe account is linked, but payouts are not enabled yet. Complete any remaining verification steps in Stripe Express to activate 1-tap tipping.
-							</p>
-							{#if data.stripeStatus?.requirementsCurrentlyDue.length}
-								<p class="font-mono requirement-list">
-									Requirements due: {data.stripeStatus.requirementsCurrentlyDue.join(', ')}
-								</p>
-							{/if}
-						</Stack>
-					</Box>
-				{/if}
-			{:else if data.stripeReturnState === 'refresh'}
-				<Box as="section" variant="subtle" padding="md" radius="md" class="warning-box">
-					<Stack gap="2xs">
-						<span class="banner-heading">Stripe Onboarding Link Expired</span>
-						<p class="subtext-small">
-							Your Stripe Express onboarding session timed out before finishing. Re-enter your band password below to request a fresh confirmation email and resume onboarding.
-						</p>
-					</Stack>
-				</Box>
-			{/if}
-
-			{#if data.stripeSyncError}
-				<Box as="section" variant="subtle" padding="sm" radius="md" class="warning-box">
-					Unable to sync live status from Stripe: {data.stripeSyncError}
-				</Box>
-			{/if}
-
-			<!-- Stripe Connect Express Section (SPEC §6.4) -->
+			<!-- Venmo tips (ADR 0008) -->
 			<Box as="section" variant="raised" padding="xl" radius="lg" class="settings-card">
 				<Stack gap="lg">
 					<Cluster justify="between" align="center" gap="sm">
 						<Stack gap="2xs">
-							<span class="box-section-title">Stripe Connect (Express Payouts)</span>
+							<span class="box-section-title">Venmo Tips</span>
 							<p class="text-muted subtext-small">
-								Direct bank payouts for 1-tap gig tips (5% platform cut). Tip buttons stay hidden on your Cover, Issue pages, and Back Page until Stripe reports payouts enabled.
+								Tips go straight to your Venmo. Quire never touches the money and takes no cut. Tip buttons appear on your Cover, Issue pages and Back Page once a username is set.
 							</p>
 						</Stack>
-
-						{#if payoutStatusKind === 'active'}
+						{#if hasVenmo}
 							<span class="status-badge status-active">
 								<span class="status-dot" aria-hidden="true"></span>
-								Payouts Active
-							</span>
-						{:else if payoutStatusKind === 'incomplete'}
-							<span class="status-badge status-incomplete">
-								<span class="status-dot" aria-hidden="true"></span>
-								Onboarding Incomplete
+								Tips on
 							</span>
 						{:else}
 							<span class="status-badge status-disabled">
 								<span class="status-dot" aria-hidden="true"></span>
-								Not Connected
+								No Venmo yet
 							</span>
 						{/if}
 					</Cluster>
 
-					{#if data.artist.stripeAccountId}
+					<p class="text-muted subtext-small">
+						Venmo expects a business profile for receiving payments for goods and services. Check Venmo's terms for which profile fits your band.
+					</p>
+
+					{#if venmo.changedReturn === 'changed'}
+						<Box variant="subtle" padding="sm" radius="md" class="success-box">
+							Venmo username changed. Tips now go to <span class="font-mono">@{venmo.username}</span>.
+						</Box>
+					{:else if venmo.changedReturn === 'removed'}
+						<Box variant="subtle" padding="sm" radius="md" class="success-box">
+							Venmo username removed. Tip buttons are hidden until you add one.
+						</Box>
+					{/if}
+
+					{#if hasVenmo && venmo.profileUrl}
 						<Box variant="subtle" padding="md" radius="md" class="subsection-box">
 							<Stack gap="xs">
 								<Cluster justify="between" align="center" gap="sm">
-									<span class="input-label">Connected Stripe Account</span>
-									<span class="font-mono account-id-pill">{data.artist.stripeAccountId}</span>
+									<span class="input-label">Tips go to</span>
+									<span class="font-mono account-id-pill">@{venmo.username}</span>
 								</Cluster>
-
-								{#if data.isSeededDemoAccount}
-									<p class="text-muted subtext-small">
-										This artist profile is currently using a seeded local development account ID. Connect a real Stripe Express account below when Stripe keys are configured.
-									</p>
-								{:else if data.stripeStatus}
-									<Cluster gap="sm" class="capability-row">
-										<span class="capability-chip">
-											Details Submitted: {data.stripeStatus.detailsSubmitted ? 'Yes' : 'No'}
-										</span>
-										<span class="capability-chip">
-											Charges Enabled: {data.stripeStatus.chargesEnabled ? 'Yes' : 'No'}
-										</span>
-										<span class="capability-chip">
-											Payouts Enabled: {data.stripeStatus.payoutsEnabled ? 'Yes' : 'No'}
-										</span>
-									</Cluster>
+								{#if venmo.testLinkOpens}
+									<a href={venmo.profileUrl} target="_blank" rel="noopener noreferrer" class="btn-secondary test-link">
+										Test your link
+									</a>
+									<p class="text-muted subtext-small">Opens your Venmo profile so you can check it is yours.</p>
+								{:else}
+									<Stack gap="3xs">
+										<span class="input-label">Test your link</span>
+										<span class="font-mono venmo-url">{venmo.profileUrl}</span>
+										<p class="text-muted subtext-small">
+											Outside production this link is shown, not opened: sample usernames may belong to real people.
+										</p>
+									</Stack>
 								{/if}
 							</Stack>
 						</Box>
 					{/if}
 
-					{#if !data.features.payments}
-						<FeatureNotice
-							feature="payments"
-							mode={data.features.mode}
-							detail="Payout setup is paused until tips are back. Your existing payout account is unchanged."
-						/>
-					{:else if !data.features.email}
-						<FeatureNotice
-							feature="email"
-							mode={data.features.mode}
-							detail="Payout changes need a confirmation email, so they are paused for now."
-						/>
-					{/if}
-
-					{#if form?.payoutConfirmationSent}
+					{#if form?.venmoSaved}
+						<Box variant="subtle" padding="sm" radius="md" class="success-box">
+							Saved. Tips now go to <span class="font-mono">@{form.venmoUsername}</span>.
+						</Box>
+					{:else if form?.venmoChangeRequested}
 						<Box variant="subtle" padding="md" radius="md" class="success-box">
 							<Stack gap="2xs">
 								<p>
-									Confirmation email sent to <strong>{form.sentToEmail || data.userEmail}</strong>. Click the link in that email within 1 hour to complete your payout change.
+									We sent a confirmation link to <strong>{form.sentToEmail}</strong>.
+									{#if form.pendingUsername}
+										Open it within 1 hour to switch tips to <span class="font-mono">@{form.pendingUsername}</span>.
+									{:else}
+										Open it within 1 hour to remove your Venmo username.
+									{/if}
+									Tips keep going to <span class="font-mono">@{venmo.username}</span> until then.
 								</p>
 								{#if form.emailMode === 'dev_console'}
 									<p class="text-muted subtext-small">
-										Development note: <span class="font-mono">RESEND_API_KEY</span> is not set, so the confirmation URL was logged to the server console.
+										Development note: <span class="font-mono">RESEND_API_KEY</span> is not set, so the email was logged to the server console.
 									</p>
 								{/if}
 							</Stack>
 						</Box>
-					{:else if data.pendingPayoutChange}
+					{:else if venmo.pending}
 						<Box variant="subtle" padding="sm" radius="md" class="info-box">
-							A payout confirmation link (<span class="font-mono">{data.pendingPayoutChange.action}</span>) was sent to <strong>{data.userEmail}</strong> and is awaiting confirmation. Submitting below will supersede that link with a fresh one.
+							{#if venmo.pending.newUsername}
+								A change to <span class="font-mono">@{venmo.pending.newUsername}</span> is waiting for confirmation by email.
+							{:else}
+								Removing your Venmo username is waiting for confirmation by email.
+							{/if}
+							A new request replaces that link.
 						</Box>
 					{/if}
 
-					{#if form?.payoutError}
+					{#if form?.venmoError}
 						<Box variant="subtle" padding="sm" radius="md" class="error-box">
-							{form.payoutError}
+							{form.venmoError}
 						</Box>
 					{/if}
 
-					<form data-stack="gap:md" method="POST" action="?/requestPayoutChange" use:enhance>
-						<Box variant="subtle" padding="md" radius="md" class="subsection-box">
-							<Stack gap="sm">
-								<span class="input-label">Select Payout Action</span>
-								<Stack gap="xs">
-									{#each availableActions as option (option.value)}
-										<label class="action-option {selectedAction === option.value ? 'is-selected' : ''}">
-											<input
-												type="radio"
-												name="action"
-												value={option.value}
-												bind:group={selectedAction}
-											/>
-											<Stack gap="3xs">
-												<span class="action-option-title">{option.label}</span>
-												<span class="text-muted subtext-small">{option.description}</span>
-											</Stack>
-										</label>
-									{/each}
-								</Stack>
-							</Stack>
+					{#if !hasVenmo && venmo.firstSetBlockedMessage}
+						<Box variant="subtle" padding="sm" radius="md" class="warning-box">
+							{venmo.firstSetBlockedMessage}
 						</Box>
+					{:else if hasVenmo && !venmo.canChange}
+						<FeatureNotice
+							feature="email"
+							mode={data.features.mode}
+							detail="Changing or removing your Venmo username needs a confirmation email, so it is paused. Tips keep going to your current username."
+						/>
+					{/if}
 
-						<Stack gap="xs">
-							<label for="confirmPassword" class="input-label">
-								Confirm Shared Band Password (SPEC 6.4 Security Gate)
+					<form data-stack="gap:md" method="POST" action="?/saveVenmo" use:enhance>
+						<Stack gap="3xs">
+							<label for="venmoUsername" class="input-label">
+								{hasVenmo ? 'New Venmo username' : 'Venmo username'}
 							</label>
-							<p class="text-muted subtext-small">
-								Because band logins are shared among bandmates, modifying or disconnecting your payout account requires re-entering your password and confirming via a single-use link sent to <span class="font-mono">{data.userEmail}</span>.
-							</p>
 							<input
-								id="confirmPassword"
-								type="password"
-								name="confirmPassword"
-								bind:value={confirmPassword}
+								id="venmoUsername"
+								name="venmoUsername"
+								bind:value={venmoInput}
 								required
-								autocomplete="current-password"
-								placeholder="Re-enter your account password..."
+								autocomplete="off"
+								autocapitalize="off"
+								spellcheck="false"
+								placeholder="@your-band"
 								class="field-input"
 							/>
-							{#if !data.hasCredentialPassword}
-								<p class="text-muted subtext-small">
-									No email/password credential was found on this user account. Set a password via password reset before modifying payout settings.
-								</p>
-							{/if}
+							<p class="text-muted subtext-small">5 to 30 letters, numbers, hyphens or underscores. A leading @ is fine.</p>
 						</Stack>
 
-						<button type="submit" class="btn-save" disabled={payoutChangesBlocked}>
-							{actionButtonLabel}
+						{#if hasVenmo}
+							<Stack gap="3xs">
+								<label for="venmoChangePassword" class="input-label">Band password</label>
+								<p class="text-muted subtext-small">
+									Logins are shared, so a change needs your password and a link sent to <span class="font-mono">{data.userEmail}</span>.
+								</p>
+								<input
+									id="venmoChangePassword"
+									type="password"
+									name="confirmPassword"
+									bind:value={changePassword}
+									required
+									autocomplete="current-password"
+									class="field-input"
+								/>
+							</Stack>
+						{/if}
+
+						<button type="submit" class="btn-save" disabled={saveBlocked}>
+							{hasVenmo ? 'Send confirmation email' : 'Save'}
 						</button>
 					</form>
+
+					{#if hasVenmo}
+						<form data-stack="gap:sm" method="POST" action="?/removeVenmo" use:enhance>
+							<Box variant="subtle" padding="md" radius="md" class="subsection-box">
+								<Stack gap="sm">
+									<Stack gap="3xs">
+										<span class="input-label">Remove Venmo username</span>
+										<p class="text-muted subtext-small">Hides tip buttons everywhere once you confirm by email.</p>
+									</Stack>
+									<Stack gap="3xs">
+										<label for="venmoRemovePassword" class="input-label">Band password</label>
+										<input
+											id="venmoRemovePassword"
+											type="password"
+											name="confirmPassword"
+											bind:value={removePassword}
+											required
+											autocomplete="current-password"
+											class="field-input"
+										/>
+									</Stack>
+									<button type="submit" class="btn-secondary" disabled={!venmo.canChange}>
+										Send removal email
+									</button>
+								</Stack>
+							</Box>
+						</form>
+					{/if}
+
+					{#if !data.hasCredentialPassword}
+						<p class="text-muted subtext-small">
+							No password is set on this login. Set one with a password reset before changing your Venmo username.
+						</p>
+					{/if}
 				</Stack>
 			</Box>
 
@@ -689,15 +591,7 @@
 		font-size: var(--text-small);
 	}
 
-	.banner-heading {
-		font-weight: var(--weight-bold);
-		font-size: var(--text-ui);
-	}
 
-	.requirement-list {
-		font-size: var(--text-meta);
-		color: #fef08a;
-	}
 
 	.box-section-title {
 		font-weight: var(--weight-bold);
@@ -726,48 +620,21 @@
 		padding-inline: var(--space-2xs);
 	}
 
-	:global(.capability-row) {
-		padding-block-start: var(--space-3xs);
-	}
 
-	.capability-chip {
-		font-size: var(--text-meta);
-		font-family: var(--font-mono);
-		color: #d4d2df;
-		background: rgba(255, 255, 255, 0.05);
-		border: 1px solid var(--glass-border);
-		border-radius: var(--radius-sm);
-		padding-block: var(--space-3xs);
-		padding-inline: var(--space-2xs);
-	}
 
-	.action-option {
-		display: flex;
-		align-items: flex-start;
-		gap: var(--space-xs);
-		padding-block: var(--space-xs);
-		padding-inline: var(--space-s);
-		border-radius: var(--radius-md);
-		border: 1px solid var(--glass-border);
-		background: rgba(0, 0, 0, 0.35);
-		cursor: pointer;
-		transition: border-color 0.15s ease, background-color 0.15s ease;
-	}
 
-	.action-option input[type='radio'] {
-		margin-block-start: var(--space-3xs);
-		accent-color: var(--accent);
-	}
 
-	.action-option.is-selected {
-		border-color: var(--accent);
-		background: rgba(5, 217, 232, 0.08);
-	}
 
-	.action-option-title {
+
+	.venmo-url {
 		font-size: var(--text-small);
-		font-weight: var(--weight-bold);
-		color: #ffffff;
+		overflow-wrap: anywhere;
+		color: #e4e4e7;
+	}
+
+	.test-link {
+		align-self: flex-start;
+		text-decoration: none;
 	}
 
 	.field-input {

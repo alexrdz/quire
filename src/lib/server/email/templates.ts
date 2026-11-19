@@ -236,3 +236,84 @@ ${safeNote ? `<p style="margin:0 0 16px 0;font-size:13px;color:#d4d4d8;">Reviewe
 
 	return { subject, html, text };
 }
+
+/** "@name", or a plain phrase when there is no username. */
+function venmoLabel(username: string | null): string {
+	return username ? `@${username}` : 'no Venmo username';
+}
+
+/**
+ * Asks the account email to confirm a Venmo username change or removal (ADR 0008).
+ * The old username keeps receiving tips until the link is followed.
+ */
+export function buildVenmoChangeConfirmationTemplate(params: {
+	artistName: string;
+	oldUsername: string;
+	newUsername: string | null;
+	confirmationUrl: string;
+}): EmailTemplate {
+	const safeName = escapeHtml(params.artistName);
+	const safeUrl = escapeHtml(params.confirmationUrl);
+	const safeOld = escapeHtml(venmoLabel(params.oldUsername));
+	const safeNew = escapeHtml(venmoLabel(params.newUsername));
+	const removing = params.newUsername === null;
+
+	const subject = removing
+		? 'Confirm removing the Venmo username from your Quire tips'
+		: 'Confirm your new Venmo username for Quire tips';
+	const request = removing
+		? `Someone signed in to your Quire artist account asked to remove ${safeOld}. Tip buttons will stop opening Venmo.`
+		: `Someone signed in to your Quire artist account asked to send tips to ${safeNew} instead of ${safeOld}.`;
+	const html = wrapEmailLayout(
+		removing ? 'Confirm Venmo removal' : 'Confirm Venmo change',
+		`<p style="margin:0 0 16px 0;">Hello ${safeName},</p>
+<p style="margin:0 0 16px 0;">${request}</p>
+<p style="margin:0 0 20px 0;">Nothing changes until you confirm. Tips keep going to ${safeOld} until then. This link works once and expires in 1 hour.</p>
+<p style="margin:0 0 24px 0;">
+  <a href="${safeUrl}" style="display:inline-block;padding:12px 20px;background-color:#FF2A6D;color:#ffffff;font-weight:700;text-decoration:none;border-radius:8px;">Review the change</a>
+</p>
+<p style="margin:0;font-size:13px;color:#a1a1aa;word-break:break-all;">Or open this link directly:<br />${safeUrl}</p>`,
+		'If you and your bandmates did not ask for this, ignore this email and change your band password.'
+	);
+
+	const text = [
+		`Hello ${params.artistName},`,
+		'',
+		removing
+			? `Someone signed in to your Quire artist account asked to remove ${venmoLabel(params.oldUsername)}. Tip buttons will stop opening Venmo.`
+			: `Someone signed in to your Quire artist account asked to send tips to ${venmoLabel(params.newUsername)} instead of ${venmoLabel(params.oldUsername)}.`,
+		'',
+		`Nothing changes until you confirm. Tips keep going to ${venmoLabel(params.oldUsername)} until then. This link works once and expires in 1 hour.`,
+		`Review the change: ${params.confirmationUrl}`,
+		'',
+		'If you and your bandmates did not ask for this, ignore this email and change your band password.'
+	].join('\n');
+
+	return { subject, html, text };
+}
+
+/** Sent after a Venmo username change or removal is applied (ADR 0008). Contains no link. */
+export function buildVenmoChangedNoticeTemplate(params: {
+	artistName: string;
+	newUsername: string | null;
+}): EmailTemplate {
+	const safeName = escapeHtml(params.artistName);
+	const sentence = params.newUsername
+		? `Your Venmo username was changed to @${params.newUsername}.`
+		: 'Your Venmo username was removed. Tip buttons no longer open Venmo.';
+	const warning = "If this wasn't you, reset your password.";
+
+	const subject = params.newUsername
+		? 'Your Quire Venmo username was changed'
+		: 'Your Quire Venmo username was removed';
+	const html = wrapEmailLayout(
+		params.newUsername ? 'Venmo username changed' : 'Venmo username removed',
+		`<p style="margin:0 0 16px 0;">Hello ${safeName},</p>
+<p style="margin:0 0 16px 0;">${escapeHtml(sentence)}</p>
+<p style="margin:0;">${escapeHtml(warning)}</p>`,
+		'You are receiving this because the Venmo username on your Quire artist account changed.'
+	);
+	const text = [`Hello ${params.artistName},`, '', sentence, warning].join('\n');
+
+	return { subject, html, text };
+}

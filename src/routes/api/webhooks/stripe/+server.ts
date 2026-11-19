@@ -1,4 +1,4 @@
-import { json, type RequestHandler } from '@sveltejs/kit';
+import { error, json, type RequestHandler } from '@sveltejs/kit';
 import { z } from 'zod';
 import { verifyStripeWebhookEvent } from '$lib/server/payments/stripe';
 import { handleStripeWebhookEvent } from '$lib/server/services/tips';
@@ -7,7 +7,19 @@ const stripeSignatureHeaderSchema = z
 	.string()
 	.min(1, 'Missing stripe-signature header');
 
-export const POST: RequestHandler = async ({ request }) => {
+/**
+ * Stripe is dormant (ADR 0008): tips go straight to the Artist's Venmo, so no
+ * Stripe event is accepted. Every method on this endpoint is 404.
+ */
+export const fallback: RequestHandler = () => {
+	throw error(404, 'Not found');
+};
+
+/**
+ * The former POST handler, kept compiling but unwired (ADR 0008). To revive
+ * Stripe, export it as `POST` again and restore Stripe in `config.ts`.
+ */
+export const _dormantStripeWebhookHandler: RequestHandler = async ({ request }) => {
 	const headerResult = stripeSignatureHeaderSchema.safeParse(
 		request.headers.get('stripe-signature') ?? ''
 	);

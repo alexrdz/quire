@@ -29,6 +29,13 @@
       "when": 1795027279696,
       "tag": "0003_rate_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1795034317283,
+      "tag": "0004_venmo_tips",
+      "breakpoints": true
     }
   ]
 }

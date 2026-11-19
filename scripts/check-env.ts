@@ -7,7 +7,7 @@
  *
  * Usage: pnpm check:env   (reads process.env, plus .env when present)
  */
-import { parseConfig, type FeatureName } from '../src/lib/server/config';
+import { parseConfig, tipsOpenVenmo, type FeatureName } from '../src/lib/server/config';
 
 try {
 	process.loadEnvFile?.('.env');
@@ -15,8 +15,8 @@ try {
 	// Deploy environments set variables directly.
 }
 
-const FEATURE_KEYS: Record<FeatureName, string> = {
-	payments: 'STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET',
+/** Features whose keys this check reports. Stripe (`payments`) is dormant (ADR 0008) and never required. */
+const FEATURE_KEYS: Partial<Record<FeatureName, string>> = {
 	email: 'RESEND_API_KEY',
 	fanSignIn: 'GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET',
 	uploads: 'R2_ACCOUNT_ID + R2_ACCESS_KEY_ID + R2_SECRET_ACCESS_KEY'
@@ -25,6 +25,9 @@ const FEATURE_KEYS: Record<FeatureName, string> = {
 const config = parseConfig(process.env);
 
 console.log(`[check-env] mode: ${config.mode}`);
+
+console.log('[check-env] payments: Stripe dormant (ADR 0008); STRIPE_* keys are optional and ignored');
+console.log(`[check-env] tips: ${tipsOpenVenmo(config.mode) ? 'open Venmo' : 'simulated (Venmo opens only in production)'}`);
 
 for (const name of Object.keys(FEATURE_KEYS) as FeatureName[]) {
 	const state = config.live[name] ? 'live' : config.features[name] ? 'stand-in' : 'OFF';

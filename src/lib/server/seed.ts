@@ -234,6 +234,25 @@ export async function ensureSchemaTables() {
 			key text NOT NULL,
 			count integer NOT NULL,
 			last_request integer NOT NULL
+		)`,
+		`CREATE TABLE IF NOT EXISTS tip_taps (
+			id text PRIMARY KEY NOT NULL,
+			artist_id text NOT NULL,
+			issue_id text,
+			amount_selected_cents integer NOT NULL,
+			created_at integer NOT NULL,
+			FOREIGN KEY (artist_id) REFERENCES artists(id) ON UPDATE no action ON DELETE cascade,
+			FOREIGN KEY (issue_id) REFERENCES issues(id) ON UPDATE no action ON DELETE set null
+		)`,
+		`CREATE TABLE IF NOT EXISTS venmo_change_tokens (
+			id text PRIMARY KEY NOT NULL,
+			artist_id text NOT NULL,
+			new_username text,
+			token_hash text NOT NULL,
+			expires_at integer NOT NULL,
+			used_at integer,
+			created_at integer NOT NULL,
+			FOREIGN KEY (artist_id) REFERENCES artists(id) ON UPDATE no action ON DELETE cascade
 		)`
 	];
 
@@ -246,6 +265,7 @@ export async function ensureSchemaTables() {
 	await ensureColumnExists('issues', 'archived_at', 'integer');
 	await ensureColumnExists('tips', 'status', "text DEFAULT 'succeeded' NOT NULL");
 	await ensureColumnExists('tips', 'refunded_at', 'integer');
+	await ensureColumnExists('artists', 'venmo_username', 'text');
 
 	const indexStatements = [
 		`CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique ON users (email)`,
@@ -288,13 +308,23 @@ export async function ensureSchemaTables() {
 		`CREATE INDEX IF NOT EXISTS scans_token_hash_idx ON scans (token_hash)`,
 		`CREATE INDEX IF NOT EXISTS scans_issue_scanned_idx ON scans (issue_id, scanned_at)`,
 		`CREATE INDEX IF NOT EXISTS rate_limits_expires_at_idx ON rate_limits (expires_at)`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS auth_rate_limits_key_unique ON auth_rate_limits (key)`
+		`CREATE UNIQUE INDEX IF NOT EXISTS auth_rate_limits_key_unique ON auth_rate_limits (key)`,
+		`CREATE INDEX IF NOT EXISTS tip_taps_artist_issue_idx ON tip_taps (artist_id, issue_id)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS venmo_change_tokens_token_hash_unique ON venmo_change_tokens (token_hash)`,
+		`CREATE INDEX IF NOT EXISTS venmo_change_tokens_artist_idx ON venmo_change_tokens (artist_id)`,
+		`CREATE INDEX IF NOT EXISTS venmo_change_tokens_expires_at_idx ON venmo_change_tokens (expires_at)`
 	];
 
 	for (const stmt of indexStatements) {
 		await client.execute(stmt);
 	}
 }
+
+/**
+ * Venmo username of the sample Artist (development, test and the Demo only).
+ * It may belong to a real person, so the settings page never opens it outside production.
+ */
+export const SAMPLE_VENMO_USERNAME = 'quire-sample-band';
 
 /** The sample Issue whose Stamp Window is kept open so the scan flow can be tried (and e2e-tested) at any time. */
 export const OPEN_WINDOW_SAMPLE_SLUG = 'neon-velvet-brooklyn-2026-10-12';
@@ -431,6 +461,7 @@ export async function seedDatabase() {
 			{ label: 'Tour Tickets', url: 'https://dice.fm' },
 			{ label: 'Vinyl Merch', url: 'https://hellomerch.com' }
 		]),
+		venmoUsername: SAMPLE_VENMO_USERNAME,
 		stripeAccountId: 'acct_demo_neon_velvet',
 		payoutsEnabled: true,
 		verified: true,
@@ -604,6 +635,20 @@ export async function seedDatabase() {
 			}),
 			createdAt: now
 		}
+	]);
+
+	// Tip taps (ADR 0008) across Gig 1, Gig 2, Gig 3 and the General Back Page.
+	// Taps only: a Fan opened Venmo. They never represent money received.
+	const hoursAgo = (hours: number) => new Date(now.getTime() - hours * 60 * 60 * 1000);
+	await db.insert(schema.tipTaps).values([
+		{ id: crypto.randomUUID(), artistId, issueId: issue1Id, amountSelectedCents: 500, createdAt: hoursAgo(30) },
+		{ id: crypto.randomUUID(), artistId, issueId: issue1Id, amountSelectedCents: 1000, createdAt: hoursAgo(29) },
+		{ id: crypto.randomUUID(), artistId, issueId: issue1Id, amountSelectedCents: 300, createdAt: hoursAgo(28) },
+		{ id: crypto.randomUUID(), artistId, issueId: issue2Id, amountSelectedCents: 500, createdAt: hoursAgo(20) },
+		{ id: crypto.randomUUID(), artistId, issueId: issue2Id, amountSelectedCents: 500, createdAt: hoursAgo(19) },
+		{ id: crypto.randomUUID(), artistId, issueId: issue3Id, amountSelectedCents: 1000, createdAt: hoursAgo(6) },
+		{ id: crypto.randomUUID(), artistId, issueId: null, amountSelectedCents: 300, createdAt: hoursAgo(48) },
+		{ id: crypto.randomUUID(), artistId, issueId: null, amountSelectedCents: 500, createdAt: hoursAgo(2) }
 	]);
 
 	// Tips across Gig 1, Gig 2, Gig 3, and General Back Page

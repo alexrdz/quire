@@ -1,31 +1,24 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { Container, Box, Stack, Cluster } from '$lib/components/layout';
 	import ArtistTopNav from '$lib/components/dashboard/ArtistTopNav.svelte';
 
-	let { data } = $props();
+	let { data, form } = $props();
+
+	const errorMessage = $derived(form?.confirmError ?? (data.status === 'error' ? data.errorMessage : null));
+	const errorCode = $derived(form?.errorCode ?? (data.status === 'error' ? data.errorCode : null));
 
 	const headingText = $derived.by(() => {
-		if (data.status === 'disconnected') {
-			return 'Stripe Payouts Disconnected';
-		}
-		if (data.errorCode === 'STRIPE_NOT_CONFIGURED') {
-			return 'Stripe Is Not Configured';
-		}
-		if (data.errorCode === 'TOKEN_EXPIRED') {
-			return 'Confirmation Link Expired';
-		}
-		if (data.errorCode === 'TOKEN_ALREADY_USED') {
-			return 'Confirmation Link Already Used';
-		}
-		if (data.errorCode === 'UNAUTHORIZED') {
-			return 'Account Mismatch';
-		}
-		return 'Unable to Confirm Payout Change';
+		if (errorCode === 'TOKEN_EXPIRED') return 'Confirmation link expired';
+		if (errorCode === 'TOKEN_USED') return 'Confirmation link already used';
+		if (errorCode === 'WRONG_ACCOUNT') return 'Different artist account';
+		if (errorMessage) return 'Unable to confirm this change';
+		return data.status === 'pending' && data.newUsername ? 'Confirm Venmo change' : 'Confirm Venmo removal';
 	});
 </script>
 
 <svelte:head>
-	<title>Confirm Payout Change — {data.artist.displayName} | Quire</title>
+	<title>Confirm Venmo Change | Quire</title>
 </svelte:head>
 
 <div class="confirm-root" style="--accent: {data.artist.accentColor || '#05D9E8'};">
@@ -34,26 +27,35 @@
 	<Container as="main" width="sm" padding="md" class="confirm-canvas">
 		<Box variant="raised" padding="xl" radius="lg" class="confirm-card">
 			<Stack gap="md">
-				<span class="text-highlight font-mono eyebrow-small">SPEC 6.4 PAYOUT CONFIRMATION</span>
+				<span class="text-highlight font-mono eyebrow-small">VENMO TIPS</span>
 				<h1 class="confirm-title">{headingText}</h1>
 
-				{#if data.status === 'disconnected'}
-					<Box variant="subtle" padding="md" radius="md" class="success-box">
-						Your Stripe Express payout account has been disconnected and payouts are now disabled. Tip buttons are hidden on your Cover, Issue pages, and Back Page until you connect a new Stripe Express account.
-					</Box>
-				{:else}
+				{#if errorMessage}
 					<Box variant="subtle" padding="md" radius="md" class="error-box">
-						{data.errorMessage}
+						{errorMessage}
 					</Box>
+				{:else if data.status === 'pending'}
+					<p class="confirm-question">
+						{#if data.newUsername}
+							Change <span class="font-mono">@{data.oldUsername}</span> to
+							<span class="font-mono">@{data.newUsername}</span>?
+						{:else}
+							Remove <span class="font-mono">@{data.oldUsername}</span>? Tip buttons will stop opening Venmo.
+						{/if}
+					</p>
+					<p class="text-muted confirm-note">
+						Tips keep going to <span class="font-mono">@{data.oldUsername}</span> until you confirm. We will email your band address once it is done.
+					</p>
+					<form method="POST" use:enhance>
+						<input type="hidden" name="token" value={data.token} />
+						<button type="submit" class="btn-confirm">
+							{data.newUsername ? `Change to @${data.newUsername}` : 'Remove Venmo username'}
+						</button>
+					</form>
 				{/if}
 
 				<Cluster gap="sm" align="center">
-					<a href="/dashboard/settings" class="btn-back">
-						Back to Settings & Payouts
-					</a>
-					<a href="/dashboard" class="btn-ghost">
-						Studio Overview
-					</a>
+					<a href="/dashboard/settings" class="btn-ghost">Back to Settings</a>
 				</Cluster>
 			</Stack>
 		</Box>
@@ -85,10 +87,14 @@
 		color: #ffffff;
 	}
 
-	:global(.success-box) {
-		border-color: var(--highlight);
-		color: var(--highlight);
-		font-size: var(--text-ui);
+	.confirm-question {
+		font-size: var(--text-body);
+		line-height: var(--leading-body);
+		color: #ffffff;
+	}
+
+	.confirm-note {
+		font-size: var(--text-small);
 		line-height: var(--leading-body);
 	}
 
@@ -99,7 +105,7 @@
 		line-height: var(--leading-body);
 	}
 
-	.btn-back {
+	.btn-confirm {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -111,7 +117,7 @@
 		border: 1px solid rgba(255, 42, 109, 0.5);
 		font-size: var(--text-small);
 		font-weight: var(--weight-bold);
-		text-decoration: none;
+		cursor: pointer;
 	}
 
 	.btn-ghost {

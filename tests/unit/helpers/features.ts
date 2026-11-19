@@ -3,6 +3,7 @@ import type { PublicFeatures } from '$lib/features';
 /** Every feature available, as in development. */
 export const ALL_FEATURES_ON: PublicFeatures = {
 	mode: 'test',
+	tipsOpenVenmo: false,
 	payments: true,
 	email: true,
 	fanSignIn: true,

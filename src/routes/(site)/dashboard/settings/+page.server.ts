@@ -1,33 +1,44 @@
-import crypto from 'node:crypto';
-import { getConfig } from '$lib/server/config';
-import { FEATURE_UNAVAILABLE } from '$lib/features';
+import { getConfig, tipsOpenVenmo } from '$lib/server/config';
+import { featureUnavailableMessage } from '$lib/features';
 import { fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
-import { and, desc, eq, gt } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { ArtistAccountStatus } from '$domain/account';
+import { buildVenmoProfileUrl, parseVenmoUsername } from '$domain/venmo';
 import { db, schema } from '$lib/server/db';
 import { auth, clearSessionCookie, verifyUserCredentialPassword } from '$lib/server/auth';
-import { sendPayoutAccountChangeConfirmationEmail } from '$lib/server/email';
-import {
-	EMAIL_CONFIRMATION_REQUIRED,
-	isEmailConfirmed,
-	resendEmailConfirmation
-} from '$lib/server/email/verification';
+import { isEmailConfirmed, resendEmailConfirmation } from '$lib/server/email/verification';
 import { closeArtistAccount } from '$lib/server/services/account';
 import {
-	inspectConnectedAccountStatus,
-	isStripeConfigured,
-	type StripeExpressAccountSummary
-} from '$lib/server/payments/stripe';
+	EMAIL_CONFIRMATION_REQUIRED,
+	getPendingVenmoChange,
+	requestVenmoChange,
+	setFirstVenmoUsername
+} from '$lib/server/services/venmo';
 import {
 	changeBandEmailSchema,
 	changePasswordSchema,
 	closeArtistAccountSchema
 } from '$schemas/auth';
-import {
-	artistSettingsUpdateSchema,
-	payoutAccountChangeRequestSchema,
-	type PayoutChangeAction
-} from '$lib/schemas/payouts';
+import { artistSettingsUpdateSchema } from '$lib/schemas/payouts';
+import { venmoChangeRequestSchema, venmoRemoveRequestSchema, venmoSetupSchema } from '$lib/schemas/venmo';
+
+/** Status codes for Venmo service errors. */
+const VENMO_ERROR_STATUS: Record<string, number> = {
+	EMAIL_NOT_CONFIRMED: 403,
+	INVALID_PASSWORD: 403,
+	EMAIL_UNAVAILABLE: 503,
+	RATE_LIMITED: 429
+};
+
+async function loadActiveArtist(request: Request) {
+	const session = await auth.api.getSession({ headers: request.headers });
+	if (!session?.user) return null;
+	const artist = await db.query.artists.findFirst({
+		where: eq(schema.artists.userId, session.user.id)
+	});
+	if (!artist || artist.accountStatus === ArtistAccountStatus.Closed) return null;
+	return { user: session.user, artist };
+}
 
 export const load: ServerLoad = async ({ request, url }) => {
 	const session = await auth.api.getSession({
@@ -50,52 +61,13 @@ export const load: ServerLoad = async ({ request, url }) => {
 		throw redirect(303, '/login?closed=1');
 	}
 
-	const stripeParam = url.searchParams.get('stripe');
-	const stripeReturnState =
-		stripeParam === 'return' || stripeParam === 'refresh' ? stripeParam : null;
 	const verifiedReturn = url.searchParams.get('verified') === '1';
 	const emailChangedReturn = url.searchParams.get('emailChanged') === '1';
-	const stripeConfigured = isStripeConfigured();
-	const isSeededDemoAccount = Boolean(artist.stripeAccountId?.startsWith('acct_demo_'));
+	const venmoChangedReturn = url.searchParams.get('venmo');
+	const { features, mode } = getConfig();
 
-	let currentArtist = artist;
-	let stripeStatus: StripeExpressAccountSummary | null = null;
-	let stripeSyncError: string | null = null;
-
-	if (currentArtist.stripeAccountId && !isSeededDemoAccount && stripeConfigured) {
-		const statusResult = await inspectConnectedAccountStatus(currentArtist.stripeAccountId);
-		if (statusResult.ok) {
-			stripeStatus = statusResult.value;
-			if (statusResult.value.payoutsEnabled !== Boolean(currentArtist.payoutsEnabled)) {
-				const now = new Date();
-				await db
-					.update(schema.artists)
-					.set({
-						payoutsEnabled: statusResult.value.payoutsEnabled,
-						updatedAt: now
-					})
-					.where(eq(schema.artists.id, currentArtist.id));
-
-				currentArtist = {
-					...currentArtist,
-					payoutsEnabled: statusResult.value.payoutsEnabled,
-					updatedAt: now
-				};
-			}
-		} else {
-			stripeSyncError = statusResult.error.message;
-		}
-	}
-
-	const now = new Date();
-	const pendingToken = await db.query.payoutChangeTokens.findFirst({
-		where: and(
-			eq(schema.payoutChangeTokens.artistId, currentArtist.id),
-			eq(schema.payoutChangeTokens.status, 'pending'),
-			gt(schema.payoutChangeTokens.expiresAt, now)
-		),
-		orderBy: [desc(schema.payoutChangeTokens.createdAt)]
-	});
+	const parsedVenmo = artist.venmoUsername ? parseVenmoUsername(artist.venmoUsername) : null;
+	const pendingVenmo = await getPendingVenmoChange(artist.id);
 
 	const credentialAccount = await db.query.accounts.findFirst({
 		where: and(
@@ -105,38 +77,28 @@ export const load: ServerLoad = async ({ request, url }) => {
 	});
 
 	return {
-		artist: currentArtist,
+		artist,
 		userEmail: session.user.email,
 		emailVerified: Boolean(session.user.emailVerified),
 		verifiedReturn,
 		emailChangedReturn,
-		stripeConfigured,
-		stripeReturnState,
-		stripeStatus,
-		stripeSyncError,
-		isSeededDemoAccount,
 		hasCredentialPassword: Boolean(credentialAccount?.password),
-		pendingPayoutChange: pendingToken
-			? {
-					action: pendingToken.action,
-					expiresAt: pendingToken.expiresAt.toISOString()
-				}
-			: null
+		venmo: {
+			username: artist.venmoUsername,
+			profileUrl: parsedVenmo?.ok ? buildVenmoProfileUrl(parsedVenmo.value) : null,
+			/** "Test your link" opens Venmo only in production; sample usernames may be real people. */
+			testLinkOpens: tipsOpenVenmo(mode),
+			canChange: features.email,
+			changeBlockedMessage: features.email ? null : featureUnavailableMessage('email', mode),
+			firstSetBlockedMessage: isEmailConfirmed(session.user) ? null : EMAIL_CONFIRMATION_REQUIRED.venmo,
+			pending: pendingVenmo
+				? { newUsername: pendingVenmo.newUsername, expiresAt: pendingVenmo.expiresAt.toISOString() }
+				: null,
+			changedReturn:
+				venmoChangedReturn === 'changed' || venmoChangedReturn === 'removed' ? venmoChangedReturn : null
+		}
 	};
 };
-
-function buildEmailTargetLabel(action: PayoutChangeAction, stripeAccountId: string | null): string {
-	if (action === 'disconnect') {
-		return 'Disconnect Stripe Payout Account';
-	}
-	if (action === 'replace') {
-		return 'Stripe Connect Express (Replace Connected Account)';
-	}
-	const hasLiveAccount = Boolean(stripeAccountId) && !stripeAccountId!.startsWith('acct_demo_');
-	return hasLiveAccount
-		? 'Stripe Connect Express (Resume Onboarding)'
-		: 'Stripe Connect Express (New Onboarding)';
-}
 
 export const actions: Actions = {
 	updateModeration: async ({ request }) => {
@@ -181,126 +143,87 @@ export const actions: Actions = {
 		};
 	},
 
-	requestPayoutChange: async ({ request, url }) => {
-		const { features } = getConfig();
-		if (!features.payments) {
-			return fail(503, { payoutError: FEATURE_UNAVAILABLE.payments });
-		}
-		if (!features.email) {
-			return fail(503, { payoutError: FEATURE_UNAVAILABLE.email });
-		}
-
-		const session = await auth.api.getSession({
-			headers: request.headers
-		});
-		if (!session?.user) {
-			return fail(401, { payoutError: 'Unauthorized' });
-		}
-
-		const artist = await db.query.artists.findFirst({
-			where: eq(schema.artists.userId, session.user.id)
-		});
-		if (!artist) {
-			return fail(401, { payoutError: 'Artist not found' });
-		}
+	/**
+	 * One field plus Save (ADR 0008). With no username yet this sets it (confirmed
+	 * email required). With one set, it starts a change: password plus email link.
+	 */
+	saveVenmo: async ({ request }) => {
+		const active = await loadActiveArtist(request);
+		if (!active) return fail(401, { venmoError: 'Unauthorized' });
+		const { user, artist } = active;
 
 		const formData = await request.formData();
-		const rawAction = String(formData.get('action') ?? 'connect').trim();
-		const rawPassword = String(formData.get('confirmPassword') ?? '');
+		const rawUsername = String(formData.get('venmoUsername') ?? '');
 
-		const parsed = payoutAccountChangeRequestSchema.safeParse({
-			confirmPassword: rawPassword,
-			action: rawAction
+		if (!artist.venmoUsername) {
+			const parsed = venmoSetupSchema.safeParse({ venmoUsername: rawUsername });
+			if (!parsed.success) {
+				return fail(400, { venmoError: parsed.error.issues[0]?.message, venmoValue: rawUsername });
+			}
+			const result = await setFirstVenmoUsername({ artist, user, rawUsername });
+			if (!result.ok) {
+				return fail(VENMO_ERROR_STATUS[result.error.code] ?? 400, {
+					venmoError: result.error.message,
+					venmoValue: rawUsername
+				});
+			}
+			return { venmoSaved: true, venmoUsername: result.value.venmoUsername };
+		}
+
+		const parsed = venmoChangeRequestSchema.safeParse({
+			venmoUsername: rawUsername,
+			confirmPassword: String(formData.get('confirmPassword') ?? '')
 		});
-
 		if (!parsed.success) {
-			return fail(400, {
-				payoutError: parsed.error.issues[0]?.message || 'Invalid payout change request.',
-				selectedAction: rawAction
-			});
+			return fail(400, { venmoError: parsed.error.issues[0]?.message, venmoValue: rawUsername });
 		}
-
-		const { confirmPassword, action } = parsed.data;
-
-		// Decision 31: no Stripe Connect onboarding until the band email is confirmed.
-		if (action !== 'disconnect' && !isEmailConfirmed(session.user)) {
-			return fail(403, {
-				payoutError: EMAIL_CONFIRMATION_REQUIRED.payouts,
-				selectedAction: action
-			});
-		}
-
-		if (action === 'disconnect' && !artist.stripeAccountId && !artist.payoutsEnabled) {
-			return fail(400, {
-				payoutError: 'No Stripe payout account is currently connected.',
-				selectedAction: action
-			});
-		}
-
-		const passwordValid = await verifyUserCredentialPassword(session.user.id, confirmPassword);
-		if (!passwordValid) {
-			return fail(403, {
-				payoutError:
-					'Incorrect password. Please re-enter your shared band password to modify payout settings.',
-				selectedAction: action
-			});
-		}
-
-		const now = new Date();
-		const expiresAt = new Date(now.getTime() + 1000 * 60 * 60); // 1 hour
-		const rawToken = crypto.randomBytes(32).toString('hex');
-		const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-		const tokenId = crypto.randomUUID();
-
-		await db
-			.update(schema.payoutChangeTokens)
-			.set({ status: 'cancelled' })
-			.where(
-				and(
-					eq(schema.payoutChangeTokens.artistId, artist.id),
-					eq(schema.payoutChangeTokens.status, 'pending')
-				)
-			);
-
-		await db.insert(schema.payoutChangeTokens).values({
-			id: tokenId,
-			artistId: artist.id,
-			userId: session.user.id,
-			tokenHash,
-			action,
-			targetStripeAccountId: null,
-			status: 'pending',
-			expiresAt,
-			createdAt: now
+		const result = await requestVenmoChange({
+			artist,
+			user,
+			rawUsername: parsed.data.venmoUsername,
+			password: parsed.data.confirmPassword
 		});
-
-		const origin = url.origin.replace(/\/$/, '');
-		const confirmationUrl = `${origin}/dashboard/settings/confirm-payout?token=${encodeURIComponent(rawToken)}`;
-
-		const emailResult = await sendPayoutAccountChangeConfirmationEmail({
-			to: session.user.email,
-			artistName: artist.displayName,
-			confirmationUrl,
-			newStripeAccountId: buildEmailTargetLabel(action, artist.stripeAccountId)
-		});
-
-		if (!emailResult.ok) {
-			await db
-				.update(schema.payoutChangeTokens)
-				.set({ status: 'cancelled' })
-				.where(eq(schema.payoutChangeTokens.id, tokenId));
-
-			return fail(500, {
-				payoutError: emailResult.error.message,
-				selectedAction: action
+		if (!result.ok) {
+			return fail(VENMO_ERROR_STATUS[result.error.code] ?? 400, {
+				venmoError: result.error.message,
+				venmoValue: rawUsername
 			});
 		}
-
 		return {
-			payoutConfirmationSent: true,
-			payoutAction: action,
-			emailMode: emailResult.value.mode,
-			sentToEmail: session.user.email
+			venmoChangeRequested: true,
+			pendingUsername: result.value.newUsername,
+			sentToEmail: result.value.sentTo,
+			emailMode: result.value.emailMode
+		};
+	},
+
+	/** Removing the username is a change too: password plus email link. */
+	removeVenmo: async ({ request }) => {
+		const active = await loadActiveArtist(request);
+		if (!active) return fail(401, { venmoError: 'Unauthorized' });
+		const { user, artist } = active;
+
+		const formData = await request.formData();
+		const parsed = venmoRemoveRequestSchema.safeParse({
+			confirmPassword: String(formData.get('confirmPassword') ?? '')
+		});
+		if (!parsed.success) {
+			return fail(400, { venmoError: parsed.error.issues[0]?.message });
+		}
+		const result = await requestVenmoChange({
+			artist,
+			user,
+			rawUsername: null,
+			password: parsed.data.confirmPassword
+		});
+		if (!result.ok) {
+			return fail(VENMO_ERROR_STATUS[result.error.code] ?? 400, { venmoError: result.error.message });
+		}
+		return {
+			venmoChangeRequested: true,
+			pendingUsername: null,
+			sentToEmail: result.value.sentTo,
+			emailMode: result.value.emailMode
 		};
 	},
 

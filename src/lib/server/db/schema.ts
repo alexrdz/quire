@@ -135,6 +135,9 @@ export const artists = sqliteTable(
 		typePairing: text('type_pairing').default('sans-serif').notNull(),
 		tipPresetsJson: text('tip_presets_json').default('[3, 5, 10]').notNull(),
 		linksJson: text('links_json').default('[]').notNull(),
+		/** Venmo username tips go to (ADR 0008). Stored without the leading @. NULL = not set up. */
+		venmoUsername: text('venmo_username'),
+		/** Dormant since ADR 0008: kept, never written. */
 		stripeAccountId: text('stripe_account_id'),
 		payoutsEnabled: integer('payouts_enabled', { mode: 'boolean' }).default(false).notNull(),
 		verified: integer('verified', { mode: 'boolean' }).default(false).notNull(),
@@ -216,6 +219,31 @@ export const payoutChangeTokens = sqliteTable(
 	(table) => [
 		index('payout_change_tokens_artist_status_idx').on(table.artistId, table.status),
 		index('payout_change_tokens_expires_at_idx').on(table.expiresAt)
+	]
+);
+
+/**
+ * Pending Venmo username changes (ADR 0008). A change or removal of an existing
+ * username only applies after the Artist follows a single-use, expiring link sent
+ * to the account email. Only the SHA-256 of the token is stored.
+ */
+export const venmoChangeTokens = sqliteTable(
+	'venmo_change_tokens',
+	{
+		id: text('id').primaryKey(),
+		artistId: text('artist_id')
+			.notNull()
+			.references(() => artists.id, { onDelete: 'cascade' }),
+		/** NULL means "remove the username". */
+		newUsername: text('new_username'),
+		tokenHash: text('token_hash').notNull().unique(),
+		expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+		usedAt: integer('used_at', { mode: 'timestamp' }),
+		createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
+	},
+	(table) => [
+		index('venmo_change_tokens_artist_idx').on(table.artistId),
+		index('venmo_change_tokens_expires_at_idx').on(table.expiresAt)
 	]
 );
 
@@ -315,6 +343,26 @@ export const tips = sqliteTable(
 		index('tips_issue_id_idx').on(table.issueId),
 		index('tips_status_idx').on(table.status)
 	]
+);
+
+/**
+ * Tip taps (ADR 0008): a Fan opened Venmo from a tip button. Quire never sees the
+ * payment, so this records intent only and must never be shown as money.
+ * No Fan identity is stored.
+ */
+export const tipTaps = sqliteTable(
+	'tip_taps',
+	{
+		id: text('id').primaryKey(),
+		artistId: text('artist_id')
+			.notNull()
+			.references(() => artists.id, { onDelete: 'cascade' }),
+		/** NULL means the General tip button (Back Page), not an Issue. */
+		issueId: text('issue_id').references(() => issues.id, { onDelete: 'set null' }),
+		amountSelectedCents: integer('amount_selected_cents').notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
+	},
+	(table) => [index('tip_taps_artist_issue_idx').on(table.artistId, table.issueId)]
 );
 
 export const notes = sqliteTable(
@@ -461,11 +509,31 @@ export const artistsRelations = relations(artists, ({ one, many }) => ({
 	issues: many(issues),
 	templatePages: many(templatePages),
 	tips: many(tips),
+	tipTaps: many(tipTaps),
 	notes: many(notes),
 	noteReplies: many(noteReplies),
 	blocks: many(blocks),
 	payoutChangeTokens: many(payoutChangeTokens),
+	venmoChangeTokens: many(venmoChangeTokens),
 	slugPetitions: many(slugPetitions)
+}));
+
+export const venmoChangeTokensRelations = relations(venmoChangeTokens, ({ one }) => ({
+	artist: one(artists, {
+		fields: [venmoChangeTokens.artistId],
+		references: [artists.id]
+	})
+}));
+
+export const tipTapsRelations = relations(tipTaps, ({ one }) => ({
+	artist: one(artists, {
+		fields: [tipTaps.artistId],
+		references: [artists.id]
+	}),
+	issue: one(issues, {
+		fields: [tipTaps.issueId],
+		references: [issues.id]
+	})
 }));
 
 export const slugPetitionsRelations = relations(slugPetitions, ({ one }) => ({
@@ -493,6 +561,7 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
 	}),
 	issuePages: many(issuePages),
 	tips: many(tips),
+	tipTaps: many(tipTaps),
 	notes: many(notes),
 	collections: many(collections),
 	scans: many(scans)
