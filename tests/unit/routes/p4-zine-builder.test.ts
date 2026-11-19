@@ -475,7 +475,8 @@ describe('P4 Quick Issue + Bookbinder + Reader', () => {
 			request: new Request(baseUrl, { headers: { cookie: fixture.cookie } })
 		})) as any;
 		expect(bbData.pages).toHaveLength(3);
-		expect(bbData.issueUrl).toBe(`http://localhost:4173/i/${slug}`);
+		// The configured app URL (local default in test), not the request's localhost:4173.
+		expect(bbData.issueUrl).toBe(`http://localhost:5173/i/${slug}`);
 
 		// Verify Issue Reader load
 		const cookiesMap = new Map<string, string>();
