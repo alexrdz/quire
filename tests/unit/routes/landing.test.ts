@@ -7,8 +7,8 @@ describe('Landing +page.svelte', () => {
 		const res = render(Page);
 		expect(res.html).toBeDefined();
 		expect(res.html).toContain('Quire');
-		expect(res.html).toContain('Your Venmo QR collects money');
-		expect(res.html).toContain('This collects money and people');
+		expect(res.html).toContain('Your Venmo QR collects tips.');
+		expect(res.html).toContain('Quire brings the people too.');
 		expect(res.html).toContain('The Neon Velvet');
 	});
 });

@@ -37,7 +37,7 @@
       items: [
         {
           q: "How do tips work?",
-          a: "Tap a tip amount and pay with Apple Pay, Google Pay or a card. You are charged only at the moment you tap. If a payment fails, nothing is charged and nothing is retried later.",
+          a: "Tap a tip amount and Venmo opens with the amount and a note filled in. You confirm the payment in Venmo. Nothing happens unless you tap, and Quire never sends reminders or follow-ups.",
         },
         {
           q: "What are the tip limits?",
@@ -45,15 +45,15 @@
         },
         {
           q: "Where does my money go?",
-          a: "Directly to the artist through Stripe. Quire keeps a 5% platform fee and Stripe charges its processing fee. By default the artist absorbs both. You can choose to cover the fees so the artist receives the full amount.",
+          a: "Straight to the artist's Venmo. Quire never handles the money and takes no cut. The payment is between you and the artist, under Venmo's terms.",
         },
         {
           q: "Can I get a refund?",
-          a: "Tips go to the artist, so refund requests are handled between you and the artist. If something went wrong with a charge, contact support and we will help.",
+          a: "Tips go straight to the artist in Venmo, so refunds and any problems with a payment are between you and the artist in Venmo. Quire never sees the payment and cannot reverse it.",
         },
         {
           q: "Why do I not see tip buttons on an artist page?",
-          a: "Tip buttons appear only after the artist has finished payout setup with Stripe.",
+          a: "Tip buttons appear only after the artist has added their Venmo username.",
         },
       ],
     },
@@ -69,16 +69,16 @@
           a: "Each Issue has its own QR that opens that gig's Cover. Your Artist QR is permanent and opens your Back Page with a tip button, your links and every Issue.",
         },
         {
-          q: "When do I get paid?",
-          a: "Payouts are handled by Stripe Connect Express to the bank account you connect. Timing follows Stripe's payout schedule for your account.",
+          q: "How do I get paid?",
+          a: "Add your Venmo username in Settings. Fans pay you directly in Venmo, so the money arrives in your Venmo account and Quire takes no cut. Your dashboard counts tip taps, but Quire cannot see which payments went through, so check Venmo for what came in.",
         },
         {
           q: "Can I delete an Issue?",
-          a: "Issues are archived, never deleted. An archived Issue leaves your Back Page, but fans keep their Stubs and tip records.",
+          a: "Issues are archived, never deleted. An archived Issue leaves your Back Page, but fans keep their Stubs.",
         },
         {
           q: "Can bandmates share one login?",
-          a: "Yes. Each artist has one login shared by the band. Changing the payout account requires your password again plus email confirmation.",
+          a: "Yes. Each artist has one login shared by the band. Changing your Venmo username requires your password again plus email confirmation.",
         },
       ],
     },

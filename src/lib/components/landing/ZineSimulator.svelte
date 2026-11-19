@@ -88,8 +88,8 @@
   function submitTip() {
     showTipDrawer = false;
     triggerToast(
-      "Tip Confirmed",
-      `Thank you for sending $${tipAmount} directly to The Neon Velvet!`,
+      "Opens Venmo",
+      `In a real Issue, this opens Venmo to pay $${tipAmount} to The Neon Velvet. Quire takes no cut.`,
     );
   }
 
@@ -571,7 +571,7 @@
         </div>
 
         <button type="button" class="btn-checkout-primary" onclick={submitTip}>
-          Send ${tipAmount} Tip →
+          Tip ${tipAmount} with Venmo →
         </button>
       </Stack>
     {/if}

@@ -36,7 +36,7 @@
 					href="/dashboard/settings"
 					class="app-nav-tab {activeTab === 'settings' ? 'is-active' : ''}"
 				>
-					Settings & Payouts
+					Settings & Venmo
 				</a>
 				<a
 					href="/a/{artist.slug}"

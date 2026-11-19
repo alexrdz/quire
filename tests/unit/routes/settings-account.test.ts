@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { uniqueClientAddress } from '../helpers/client';
+import { recordTipTap } from '$lib/server/services/tip-taps';
 import { afterEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { hashPassword, makeSignature } from 'better-auth/crypto';
@@ -21,8 +22,8 @@ import { db, schema } from '$lib/server/db';
 import { seedDatabase } from '$lib/server/seed';
 import { actions as settingsActions, load as settingsLoad } from '../../../src/routes/(site)/dashboard/settings/+page.server';
 import { actions as loginActions, load as loginLoad } from '../../../src/routes/(site)/login/+page.server';
-import { actions as backPageActions, load as backPageLoad } from '../../../src/routes/(site)/a/[slug]/+page.server';
-import { actions as issueActions, load as issueLoad } from '../../../src/routes/(zine)/i/[slug]/+page.server';
+import { load as backPageLoad } from '../../../src/routes/(site)/a/[slug]/+page.server';
+import { load as issueLoad } from '../../../src/routes/(zine)/i/[slug]/+page.server';
 
 const createdUserIds: string[] = [];
 const createdSessionTokens: string[] = [];
@@ -446,13 +447,17 @@ describe('Item 3: Artist Account Lifecycle, Verification & Handle Petitions', ()
 		expect(backData.isArtistClosed).toBe(true);
 		expect(backData.groupedIssues).toEqual([]);
 
-		const closedBackTip = (await backPageActions.tip({
-			params: { slug: fixture.slug },
-			request: new Request(`http://localhost:4173/a/${fixture.slug}?/tip`, { method: 'POST' }),
-			url: new URL(`http://localhost:4173/a/${fixture.slug}`)
-		} as any)) as any;
-		expect(closedBackTip.status).toBe(403);
-		expect(closedBackTip.data.error).toBe('This artist has left Quire.');
+		// A closed artist gets no tip taps, even with a Venmo username still on file (ADR 0008).
+		await db
+			.update(schema.artists)
+			.set({ venmoUsername: 'velvet-signal' })
+			.where(eq(schema.artists.id, fixture.artistId));
+		const tapContext = { deviceId: `device-${crypto.randomUUID()}`, clientAddress: uniqueClientAddress()() };
+		const closedBackTap = await recordTipTap(
+			{ artistSlug: fixture.slug, issueSlug: null, amountCents: 500 },
+			tapContext
+		);
+		expect(closedBackTap).toEqual({ recorded: false, reason: 'not_found' });
 
 		// Public Issue Reader /i/[slug] stays readable in read-only mode & blocks tipping
 		const issueData = (await (issueLoad as any)({
@@ -463,12 +468,10 @@ describe('Item 3: Artist Account Lifecycle, Verification & Handle Petitions', ()
 		expect(issueData.isArtistClosed).toBe(true);
 		expect(issueData.isReadOnly).toBe(true);
 
-		const closedIssueTip = (await issueActions.tip({
-			params: { slug: issueSlug },
-			request: new Request(`http://localhost:4173/i/${issueSlug}?/tip`, { method: 'POST' }),
-			url: new URL(`http://localhost:4173/i/${issueSlug}`)
-		} as any)) as any;
-		expect(closedIssueTip.status).toBe(403);
-		expect(closedIssueTip.data.error).toBe('This artist has left Quire.');
+		const closedIssueTap = await recordTipTap(
+			{ artistSlug: fixture.slug, issueSlug, amountCents: 500 },
+			tapContext
+		);
+		expect(closedIssueTap).toEqual({ recorded: false, reason: 'not_found' });
 	});
 });
