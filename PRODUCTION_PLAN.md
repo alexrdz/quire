@@ -204,6 +204,7 @@ Acceptance: unit tests for username validation, the change flow (password, token
 4.2 **Demo deployment** (ADR 0007)
 - Second Netlify site on a `demo.` subdomain with its own Turso database, `DEMO_MODE=true`, no Stripe keys, no Resend key. Tip buttons never open Venmo there (ADR 0008).
 - Persistent "You're in the Demo" banner on every page (layout primitive, no inline styles).
+  *Done (P4L-T02).* `DemoBanner` renders in the root layout (so the error page has it too) and as a compact variant in the Full-Screen Case Display, only when `features.mode` is `demo`. It sits in the page flow as a labelled `aside`. Unit tests render each page in every mode. The 360px no-overlap e2e runs against `DEMO_BASE_URL` and is skipped until P4L-T03 adds a local Demo-mode preview. The sign-up link waits for the production URL.
 - Nightly reset via a Netlify scheduled function that re-runs migrations and the seed.
 
 4.3 **Auth guard consolidation** (refactor, last): use `event.locals.user` from `hooks.server.ts`; add a `/dashboard` layout guard; remove per-route `getSession` calls.
