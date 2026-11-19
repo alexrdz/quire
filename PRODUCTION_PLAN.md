@@ -175,12 +175,37 @@ Acceptance: unit tests for username validation, the change flow (password, token
 3.3 *Changed: done as part of V.3 for the Venmo username change.* ~~**Payout confirmation**: load only validates and shows the pending change; a POST action consumes the token after the Stripe calls succeed.~~
 
 3.4 **Deployment target and headers**
+
+**Status (2026-11-19): done on `prod/p3-deploy-observability` (PR into `main`, together with 3.6).**
+- **Adapter and build:**
+  - `@sveltejs/adapter-netlify` ^6.0.4: 7.x needs SvelteKit 3. It runs as one Node function, no edge, no split.
+  - `netlify.toml` runs `pnpm check:env && pnpm build`, publishes `build`, and pins Node 22. `package.json` pins `packageManager: pnpm@9.15.9`.
+  - The same file gives CDN-served static files `nosniff` and the referrer policy, since they never reach the hook.
+- **Headers:**
+  - `hooks.server.ts` wraps `handle`, so every response gets the CSP, `nosniff` and `strict-origin-when-cross-origin`. That includes `/api/auth/*`, the 503 page, the email-off JSON and a crash inside the hook.
+  - The CSP is built at runtime in `src/lib/server/http/security-headers.ts`, because `R2_PUBLIC_URL` is a deploy variable. Config exposes its origin as `mediaOrigin`, independent of the R2 keys.
+  - `kit.csp` (mode `auto`) owns only `script-src`, adding its hydration nonce; the hook keeps it and rewrites every other directive. Scripts never get `'unsafe-inline'`; styles do, for the runtime custom-property attributes.
+- **Allowances beyond the original list:**
+  - `frame-src 'self'` plus `frame-ancestors 'self'` on `/i/*` only, for the Bookbinder's live reader preview. Every other path is `'none'`.
+  - `https://*.bandcamp.com`, which the reader embeds.
+  - `images.unsplash.com` in every mode: the landing page's Zine Simulator uses it in production.
+  - `blob:` for image and media previews.
+  - `ws:`/`wss:` in development for Vite.
+  - `form-action` includes `accounts.google.com`; an e2e test proves Chrome follows the no-JS 303 to Google.
+  - Arbitrary video-file URLs in `video` pages outside R2 are now blocked by `media-src`.
+- **Function bundle:** zipped as Netlify does with zip-it-and-ship-it on linux-x64 dependencies: 25.0 MB zipped, 60 MB unzipped. It holds `@img/sharp-linux-x64` and `sharp-libvips-linux-x64`, plus the musl variants (about 19 MB unzipped, unused on Netlify), and `@libsql/linux-x64-gnu`. That is about half of Netlify's 50 MB zipped limit, which closes the Phase 1 bundle-size note.
 - Replace `adapter-auto` with `@sveltejs/adapter-netlify`; add `netlify.toml` with the build command including `check-env`.
 - Security headers in `hooks.server.ts`: CSP allowing self, YouTube/Vimeo/Bandcamp frames (no Stripe.js; Venmo is a plain link and needs no CSP entry), the R2 public domain; `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `frame-ancestors 'none'` except the Full-Screen Case Display if it is ever embedded.
 
 3.5 **Schema source of truth**: remove runtime DDL (`ensureSchemaTables`) from `seed.ts`; drizzle migrations are the only schema path, run in the Netlify build for both sites.
 
 3.6 **Observability**
+
+**Status (2026-11-19): done with 3.4 (same PR).**
+- `handleError` logs `[error] id=<id> status=<n> <METHOD> <path>` plus the error. The query string is never logged, since it can carry scan keys and confirmation tokens. It returns `{ message: 'Something went wrong.', id }`; a 404 returns `Page not found.` and logs one line with no stack.
+- The id is Netlify's `x-nf-request-id` when it looks like an id, otherwise a random UUID. `handle` sets it on `locals.requestId`, and the new root `+error.svelte` shows it as a reference.
+- `GET /healthz` returns `{ ok, mode, core, db, features }` with `no-store`. `core` is `ok` or `invalid`, `db` is `ok` or `down`, and `features` holds the public flags. It returns 200 when healthy and 503 when the DB query (`select 1`, 3 s timeout) fails or core config is invalid; with invalid core config the DB is never queried.
+- `hooks.server.ts` sends `/healthz` straight to the route, with no auto-seed, no session lookup and no 503 page. No secrets, env values, config issue names or user data are returned.
 - `handleError` hook in `hooks.server.ts`: log with a request id, return a generic message.
 - `/healthz` endpoint: checks DB reachability and reports feature flags (no secrets).
 - Error tracking service (Sentry or similar) deferred; Netlify function logs are the launch baseline.
