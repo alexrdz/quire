@@ -1,5 +1,38 @@
 import { z } from 'zod';
-import { TIP_REVERSAL_STATUSES, TIP_STATUSES } from '$domain/tipping';
+import { MAX_TIP_CENTS, MIN_TIP_CENTS, TIP_REVERSAL_STATUSES, TIP_STATUSES } from '$domain/tipping';
+
+/**
+ * A Tip Tap reported by the tip button (ADR 0008, PRODUCTION_PLAN V.4). Only
+ * slugs come from the client; the server derives artist and Issue ids from them.
+ * `issueSlug` is null for the General tip button on the Back Page.
+ */
+export const TIP_TAP_GENERAL = 'general';
+
+export const tipTapSchema = z.object({
+	artistSlug: z
+		.string()
+		.trim()
+		.toLowerCase()
+		.min(1, 'Artist is required')
+		.max(60)
+		.regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Unknown artist'),
+	issueSlug: z
+		.string()
+		.trim()
+		.toLowerCase()
+		.max(160)
+		.regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Unknown Issue')
+		.nullable()
+		.optional()
+		.transform((value) => (value && value !== TIP_TAP_GENERAL ? value : null)),
+	amountCents: z
+		.number()
+		.int('Amount must be whole cents')
+		.min(MIN_TIP_CENTS, 'Minimum tip is $2.00')
+		.max(MAX_TIP_CENTS, 'Maximum tip is $500.00')
+});
+
+export type TipTapInput = z.infer<typeof tipTapSchema>;
 
 export const tipCurrencySchema = z.literal('usd');
 export const tipStatusSchema = z.enum(TIP_STATUSES);

@@ -32,16 +32,26 @@ export interface RateLimitRule {
 
 /** Every limit Quire enforces, in one place. */
 export const RATE_LIMITS = {
-	/** Tips: per device (signed cookie) and, independently, per IP so crowds on venue Wi-Fi still get through. */
+	/**
+	 * Tip Taps (ADR 0008): per device (signed cookie) and, independently, per IP so
+	 * crowds on venue Wi-Fi still get through. Over the limit the tap is not counted,
+	 * but the Fan still gets Venmo; these messages are never shown as a refusal to pay.
+	 */
 	tipDevice: {
 		max: 10,
 		windowSeconds: HOUR,
-		message: 'You have sent a lot of tips from this device in the last hour. Please try again later.'
+		message: 'Too many tip taps from this device in the last hour; this one was not counted.'
 	},
 	tipIp: {
 		max: 100,
 		windowSeconds: HOUR,
-		message: 'Too many tips from this network in the last hour. Please try again later.'
+		message: 'Too many tip taps from this network in the last hour; this one was not counted.'
+	},
+	/** A double tap on the same tip button counts once (sliding window, see `claimOnceWithin`). */
+	tipTapRepeat: {
+		max: 1,
+		windowSeconds: 3,
+		message: 'That tap was already counted.'
 	},
 	/** Handle petitions (login `petitionSlug`). */
 	petitionIp: {
@@ -218,6 +228,37 @@ export async function consumeRateLimits(
 		last = decision;
 	}
 	return firstDenied ?? last;
+}
+
+/**
+ * Claims `action + subject` for the next `RATE_LIMITS[action].windowSeconds`
+ * seconds, measured from now (a sliding window, unlike `consumeRateLimit`).
+ * Returns false when it was already claimed within that time, so a double tap
+ * across a window boundary is still caught. One atomic statement.
+ */
+export async function claimOnceWithin(
+	action: RateLimitAction,
+	subject: string,
+	now: Date = new Date()
+): Promise<boolean> {
+	const nowMs = now.getTime();
+	const expiresAt = nowMs + RATE_LIMITS[action].windowSeconds * 1000;
+	const key = subjectKey(action, subject);
+	try {
+		const claimed = await db
+			.insert(schema.rateLimits)
+			.values({ key, count: 1, windowStart: nowMs, expiresAt })
+			.onConflictDoUpdate({
+				target: schema.rateLimits.key,
+				set: { count: 1, windowStart: nowMs, expiresAt },
+				setWhere: sql`${schema.rateLimits.expiresAt} <= ${nowMs}`
+			})
+			.returning({ key: schema.rateLimits.key });
+		return claimed.length > 0;
+	} catch (error) {
+		console.error(`[rate-limit] ${action} claim failed; allowing it.`, error);
+		return true;
+	}
 }
 
 /* ------------------------------------------------------------------------- */

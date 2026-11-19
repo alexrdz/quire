@@ -3,6 +3,7 @@ import { redirect, fail, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { db, schema } from '$lib/server/db';
 import { eq, and, desc, isNull } from 'drizzle-orm';
 import { auth } from '$lib/server/auth';
+import { getConfig } from '$lib/server/config';
 import {
 	blockFanFromWalls,
 	deleteWallNote,
@@ -19,11 +20,7 @@ import {
 	replyNoteSchema,
 	unblockFanSchema
 } from '$schemas/wall';
-import {
-	calculateTipReversalCents,
-	summarizeArtistTips,
-	type TipStatus
-} from '$domain/tipping';
+import { countTipTaps } from '$lib/server/services/tip-taps';
 import { ArtistAccountStatus } from '$domain/account';
 import { resendEmailConfirmation } from '$lib/server/email/verification';
 
@@ -44,7 +41,6 @@ export const load: ServerLoad = async ({ request, url }) => {
 			issues: {
 				orderBy: [desc(schema.issues.date)],
 				with: {
-					tips: true,
 					collections: true,
 					notes: true
 				}
@@ -63,86 +59,38 @@ export const load: ServerLoad = async ({ request, url }) => {
 		throw redirect(303, '/login?closed=1');
 	}
 
-	// Calculate stats for latest gig recap using pure domain aggregation
+	// Tip Taps (ADR 0008): counts of tip-button taps only. Quire cannot see Venmo
+	// payments, so nothing here is a dollar amount.
+	const tapCounts = await countTipTaps(artist.id);
+
 	const latestIssue = artist.issues[0] || null;
 	let latestRecap = null;
 
 	if (latestIssue) {
-		const tips = latestIssue.tips || [];
 		const collections = latestIssue.collections || [];
 		const issueNotes = latestIssue.notes || [];
-		const tipSummary = summarizeArtistTips(tips);
-
-		const stampedCount = collections.filter((c) => c.kind === 'stamped').length;
-		const savedCount = collections.filter((c) => c.kind === 'saved').length;
 
 		latestRecap = {
 			issue: latestIssue,
-			totalGrossCents: tipSummary.grossCents,
-			totalFeesCents: tipSummary.feesCents,
-			reversalsCents: tipSummary.reversalsCents,
-			totalNetCents: tipSummary.netCents,
-			tipCount: tipSummary.tipCount,
-			refundCount: tipSummary.refundCount,
-			disputeCount: tipSummary.disputeCount,
-			stampedCount,
-			savedCount,
+			tipTaps: tapCounts.byIssue[latestIssue.id] ?? 0,
+			stampedCount: collections.filter((c) => c.kind === 'stamped').length,
+			savedCount: collections.filter((c) => c.kind === 'saved').length,
 			noteCount: issueNotes.length
 		};
 	}
 
-	// Calculate General (Back Page) row (SPEC.md §6.5)
-	const generalTips = await db.query.tips.findMany({
-		where: and(eq(schema.tips.artistId, artist.id), isNull(schema.tips.issueId))
-	});
+	// General (Back Page) row (SPEC.md §6.5)
 	const generalNotes = await db.query.notes.findMany({
 		where: and(eq(schema.notes.artistId, artist.id), isNull(schema.notes.issueId))
 	});
-
-	const generalTipSummary = summarizeArtistTips(generalTips);
 	const generalRow = {
-		grossCents: generalTipSummary.grossCents,
-		feesCents: generalTipSummary.feesCents,
-		reversalsCents: generalTipSummary.reversalsCents,
-		netCents: generalTipSummary.netCents,
-		tipCount: generalTipSummary.tipCount,
-		refundCount: generalTipSummary.refundCount,
-		disputeCount: generalTipSummary.disputeCount,
+		tipTaps: tapCounts.general,
 		noteCount: generalNotes.length
 	};
 
-	const issuesWithTipSummary = artist.issues.map((issue) => ({
+	const issuesWithTipTaps = artist.issues.map((issue) => ({
 		...issue,
-		tipSummary: summarizeArtistTips(issue.tips || [])
-	}));
-
-	// Individual tip breakdown ledger (SPEC.md §6.5: each tip shows gross, fees, reversals, and net)
-	const allTips = await db.query.tips.findMany({
-		where: eq(schema.tips.artistId, artist.id),
-		orderBy: [desc(schema.tips.createdAt)],
-		with: {
-			issue: {
-				columns: { id: true, city: true, venue: true, date: true, slug: true }
-			}
-		}
-	});
-
-	const tipLedger = allTips.map((tip) => ({
-		id: tip.id,
-		issueId: tip.issueId,
-		sourceLabel: tip.issue
-			? `${tip.issue.city} @ ${tip.issue.venue}`
-			: 'General (Back Page)',
-		issueSlug: tip.issue?.slug ?? null,
-		amountGross: tip.amountGross,
-		feeStripe: tip.feeStripe,
-		feePlatform: tip.feePlatform,
-		reversalCents: calculateTipReversalCents(tip),
-		amountNet: tip.amountNet,
-		fanCoveredFees: tip.fanCoveredFees,
-		status: tip.status as TipStatus,
-		refundedAt: tip.refundedAt,
-		createdAt: tip.createdAt
+		tipTaps: tapCounts.byIssue[issue.id] ?? 0
 	}));
 
 	// Fetch notes across all artist walls for moderation & replies (flagged/pending prioritized)
@@ -161,7 +109,9 @@ export const load: ServerLoad = async ({ request, url }) => {
 	});
 
 	const requestUrl = url ?? new URL(request.url);
-	const origin = requestUrl.origin;
+	// The permanent Artist QR is printed on stickers: build it from the configured
+	// app URL, never from the request's Host header.
+	const origin = getConfig().core.appUrl;
 	const artistBackPageUrl = `${origin}/a/${artist.slug}`;
 	const artistQrSvg = await generateArtistQrSvg(origin, artist.slug);
 	const onboarding = requestUrl.searchParams.get('onboarding') === '1';
@@ -202,9 +152,10 @@ export const load: ServerLoad = async ({ request, url }) => {
 		emailVerified: Boolean(session.user.emailVerified),
 		userEmail: session.user.email,
 		latestRecap,
-		issues: issuesWithTipSummary,
+		issues: issuesWithTipTaps,
 		generalRow,
-		tipLedger,
+		totalTipTaps: tapCounts.total,
+		hasVenmo: Boolean(artist.venmoUsername),
 		pendingNotes: allNotes,
 		blockedFans,
 		artistQrSvg,

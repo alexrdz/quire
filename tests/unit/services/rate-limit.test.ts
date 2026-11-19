@@ -17,7 +17,6 @@ import { seedDatabase } from '$lib/server/seed';
 import { makeSignature } from 'better-auth/crypto';
 import { authSecret } from '$lib/server/auth';
 import { uniqueClientAddress } from '../helpers/client';
-import { actions as backPageActions } from '../../../src/routes/(site)/a/[slug]/+page.server';
 import { actions as issueActions } from '../../../src/routes/(zine)/i/[slug]/+page.server';
 import { actions as loginActions } from '../../../src/routes/(site)/login/+page.server';
 import { GET as scanGET } from '../../../src/routes/scan/[slug]/+server';
@@ -217,30 +216,6 @@ describe('tip limits: device and IP are independent', () => {
 		expect(verifyTipDeviceCookie(forged)).toBeNull();
 		const tampered = cookieJar({ [TIP_DEVICE_COOKIE]: forged });
 		expect(getOrCreateTipDeviceId(tampered as never)).not.toBe('a'.repeat(24));
-	});
-
-	it('the Back Page tip action answers 429 with a plain message once the device limit is hit', async () => {
-		const jar = cookieJar();
-		const getClientAddress = uniqueClientAddress();
-		const tip = () => {
-			const form = new FormData();
-			form.set('artistId', `missing-artist-${crypto.randomUUID()}`);
-			form.set('amountGrossCents', '500');
-			return backPageActions.tip({
-				params: { slug: `no-such-artist-${crypto.randomUUID()}` },
-				request: new Request('http://localhost:5173/a/x?/tip', { method: 'POST', body: form }),
-				url: new URL('http://localhost:5173/a/x'),
-				cookies: jar,
-				getClientAddress
-			} as never) as Promise<{ status: number; data: { error: string } }>;
-		};
-
-		for (let i = 0; i < RATE_LIMITS.tipDevice.max; i++) {
-			expect((await tip()).status).toBe(400); // artist does not exist; nothing charged
-		}
-		const over = await tip();
-		expect(over.status).toBe(429);
-		expect(over.data.error).toBe(RATE_LIMITS.tipDevice.message);
 	});
 });
 
