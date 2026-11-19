@@ -10,11 +10,7 @@ describe('QR Code Generation Service', () => {
 	});
 
 	it('generates an issue scan QR code embedding secret key parameter', async () => {
-		const svg = await generateIssueScanQrSvg(
-			'https://quire.fm',
-			'the-neon-velvet-philly',
-			'philly_secret_key_123'
-		);
+		const svg = await generateIssueScanQrSvg('the-neon-velvet-philly', 'philly_secret_key_123');
 		expect(svg).toContain('<svg');
 		// QR code encodes /scan/the-neon-velvet-philly?k=philly_secret_key_123
 		expect(svg.length).toBeGreaterThan(100);

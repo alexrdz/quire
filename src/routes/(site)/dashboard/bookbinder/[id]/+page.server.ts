@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { db, schema } from '$lib/server/db';
 import { eq, and, asc } from 'drizzle-orm';
 import { auth } from '$lib/server/auth';
-import { generateIssueScanQrSvg } from '$lib/server/services/qr';
+import { buildIssueUrl, generateIssueScanQrSvg } from '$lib/server/services/qr';
 import { uploadFormFile } from '$lib/server/services/storage';
 import { ArtistAccountStatus } from '$domain/account';
 import { calculateStampWindow } from '$domain/stamping';
@@ -298,15 +298,15 @@ export const load: ServerLoad = async ({ params, request }) => {
 		throw error(404, 'Issue not found or unauthorized');
 	}
 
-	const origin = new URL(request.url).origin;
-	const issueQrSvg = await generateIssueScanQrSvg(origin, issue.slug, issue.secretKey);
+	// Printed on stickers: built from the configured app URL, never the request Host.
+	const issueQrSvg = await generateIssueScanQrSvg(issue.slug, issue.secretKey);
 
 	return {
 		artist,
 		issue,
 		pages: issue.issuePages,
 		issueQrSvg,
-		issueUrl: `${origin}/i/${issue.slug}`
+		issueUrl: buildIssueUrl(issue.slug)
 	};
 };
 

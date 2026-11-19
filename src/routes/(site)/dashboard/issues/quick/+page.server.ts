@@ -5,7 +5,7 @@ import { eq, desc, asc } from 'drizzle-orm';
 import { auth } from '$lib/server/auth';
 import { ArtistAccountStatus } from '$domain/account';
 import { calculateStampWindow } from '$domain/stamping';
-import { generateIssueScanQrSvg } from '$lib/server/services/qr';
+import { buildIssueUrl, generateIssueScanQrSvg } from '$lib/server/services/qr';
 import { uploadFormFile } from '$lib/server/services/storage';
 import { mediaUrlSchema, quickIssueSchema } from '$schemas/issue';
 import {
@@ -74,7 +74,7 @@ export const load: ServerLoad = async ({ request }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, url }) => {
+	default: async ({ request }) => {
 		const session = await auth.api.getSession({
 			headers: request.headers
 		});
@@ -223,8 +223,8 @@ export const actions: Actions = {
 			throw redirect(303, `/dashboard/bookbinder/${issueId}`);
 		}
 
-		// Generate physical sticker SVG QR code
-		const qrSvg = await generateIssueScanQrSvg(url.origin, slug, secretKey);
+		// The sticker QR and the shareable link use the configured app URL, not the request Host.
+		const qrSvg = await generateIssueScanQrSvg(slug, secretKey);
 
 		return {
 			success: true,
@@ -235,7 +235,7 @@ export const actions: Actions = {
 			date: parse.data.date,
 			qrSvg,
 			issueUrl: `/i/${slug}`,
-			fullIssueUrl: `${url.origin}/i/${slug}`
+			fullIssueUrl: buildIssueUrl(slug)
 		};
 	}
 };
