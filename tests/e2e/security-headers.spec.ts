@@ -1,5 +1,5 @@
 import { chromium, test, expect, type Page } from '@playwright/test';
-import { E2E_MEDIA_ORIGIN, seedEmbedIssue } from './helpers/db';
+import { E2E_MEDIA_ORIGIN, latestPhotoUrlForCity, seedEmbedIssue } from './helpers/db';
 
 /**
  * PRODUCTION_PLAN 3.4: security headers on real responses from the production
@@ -139,6 +139,25 @@ test.describe('Security headers', () => {
 			.toBe(true);
 
 		expect(await violations()).toEqual([]);
+	});
+
+	test('with only R2_PUBLIC_URL set, uploads still go to local storage, not R2', async ({ page }) => {
+		const city = `Uploadville ${Date.now()}`;
+		await page.goto('/demo');
+		await expect(page).toHaveURL(/\/dashboard/);
+		await page.goto('/dashboard/issues/quick');
+		await page.locator('input[name="city"]').fill(city);
+		await page.locator('input[name="venue"]').fill('The Storage Room');
+		await page.locator('input[name="date"]').fill('2026-11-21');
+		await page.locator('input[name="photoFile"]').setInputFiles({
+			name: 'stage.png',
+			mimeType: 'image/png',
+			buffer: TINY_PNG
+		});
+		await page.locator('button[name="saveMode"][value="published"]').click();
+
+		await expect.poll(() => latestPhotoUrlForCity(city), { timeout: 10000 }).toMatch(/^\/uploads\/.+\.webp$/);
+		expect(await latestPhotoUrlForCity(city)).not.toContain(E2E_MEDIA_ORIGIN);
 	});
 
 	test('the main pages render with no CSP violations', async ({ page }) => {

@@ -79,3 +79,19 @@ export async function seedEmbedIssue(): Promise<string> {
 		db.close();
 	}
 }
+
+/** The stored image URL of the newest photo page on an Issue in `city`, or null. */
+export async function latestPhotoUrlForCity(city: string): Promise<string | null> {
+	const db = client();
+	try {
+		const result = await db.execute({
+			sql: `SELECT p.content_json FROM issue_pages p JOIN issues i ON i.id = p.issue_id
+			      WHERE i.city = ? AND p.kind = 'photo' ORDER BY p.created_at DESC LIMIT 1`,
+			args: [city]
+		});
+		const json = result.rows[0]?.content_json;
+		return typeof json === 'string' ? (JSON.parse(json).imageUrl ?? null) : null;
+	} finally {
+		db.close();
+	}
+}
