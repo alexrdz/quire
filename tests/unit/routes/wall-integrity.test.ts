@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { withSessionModule } from '../helpers/session-event';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { and, eq, inArray } from 'drizzle-orm';
 import { makeSignature } from 'better-auth/crypto';
@@ -10,9 +11,12 @@ import { createArtistId, createFanUserId, createNoteId } from '$domain/types';
 import { flagWallNote } from '$lib/server/services/moderation';
 import { createArtistForNewUser } from '$lib/server/services/account';
 import { uniqueClientAddress } from '../helpers/client';
-import { actions as issueActions } from '../../../src/routes/(zine)/i/[slug]/+page.server';
-import { actions as artistActions } from '../../../src/routes/(site)/a/[slug]/+page.server';
-import { actions as loginActions } from '../../../src/routes/(site)/login/+page.server';
+import * as __route1 from '../../../src/routes/(zine)/i/[slug]/+page.server';
+const { actions: issueActions } = withSessionModule(__route1);
+import * as __route2 from '../../../src/routes/(site)/a/[slug]/+page.server';
+const { actions: artistActions } = withSessionModule(__route2);
+import * as __route3 from '../../../src/routes/(site)/login/+page.server';
+const { actions: loginActions } = withSessionModule(__route3);
 
 /**
  * PRODUCTION_PLAN 3.2 (Wall notes and flags follow the URL, not the form) and

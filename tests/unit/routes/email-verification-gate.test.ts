@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { withSessionModule } from '../helpers/session-event';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { hashPassword, makeSignature } from 'better-auth/crypto';
@@ -28,22 +29,12 @@ const { EMAIL_CONFIRMATION_REQUIRED, formHasFileUpload } = await import(
 	'$lib/server/email/verification'
 );
 const { RATE_LIMITS } = await import('$lib/server/services/rate-limit');
-const { actions: quickActions } = await import(
-	'../../../src/routes/(site)/dashboard/issues/quick/+page.server'
-);
-const { actions: bookbinderActions } = await import(
-	'../../../src/routes/(site)/dashboard/bookbinder/[id]/+page.server'
-);
-const { actions: templateActions } = await import(
-	'../../../src/routes/(site)/dashboard/template/+page.server'
-);
-const { actions: settingsActions } = await import(
-	'../../../src/routes/(site)/dashboard/settings/+page.server'
-);
-const { actions: dashboardActions } = await import('../../../src/routes/(site)/dashboard/+page.server');
-const { load: dashboardLayoutLoad } = await import(
-	'../../../src/routes/(site)/dashboard/+layout.server'
-);
+const { actions: quickActions } = withSessionModule(await import('../../../src/routes/(site)/dashboard/issues/quick/+page.server'));
+const { actions: bookbinderActions } = withSessionModule(await import('../../../src/routes/(site)/dashboard/bookbinder/[id]/+page.server'));
+const { actions: templateActions } = withSessionModule(await import('../../../src/routes/(site)/dashboard/template/+page.server'));
+const { actions: settingsActions } = withSessionModule(await import('../../../src/routes/(site)/dashboard/settings/+page.server'));
+const { actions: dashboardActions } = withSessionModule(await import('../../../src/routes/(site)/dashboard/+page.server'));
+const { load: dashboardLayoutLoad } = withSessionModule(await import('../../../src/routes/(site)/dashboard/+layout.server'));
 
 const { seedDatabase } = await import('$lib/server/seed');
 
@@ -292,12 +283,17 @@ describe('confirmed artists', () => {
 });
 
 describe('confirm-your-email bar', () => {
-	it('the dashboard layout reports the status for unconfirmed artists', async () => {
-		const status = (await dashboardLayoutLoad({
-			locals: { user: { id: 'u', email: 'band@example.com', emailVerified: false } }
+	/** The dashboard layout guards (PRODUCTION_PLAN 4.3), so it runs with a real Artist session. */
+	const layoutFor = async (cookie: string) =>
+		(await dashboardLayoutLoad({
+			request: new Request('http://localhost:5173/dashboard', { headers: { cookie } })
 		} as never)) as { emailConfirmation: Record<string, unknown> };
+
+	it('the dashboard layout reports the status for unconfirmed artists', async () => {
+		const unconfirmed = await createArtist(false);
+		const status = await layoutFor(unconfirmed.cookie);
 		expect(status.emailConfirmation).toMatchObject({
-			email: 'band@example.com',
+			email: unconfirmed.email,
 			confirmed: false,
 			canResend: true,
 			unavailableMessage: null
@@ -310,15 +306,13 @@ describe('confirm-your-email bar', () => {
 			features: { ...base.features, email: false },
 			live: { ...base.live, email: false }
 		});
-		const status = (await dashboardLayoutLoad({
-			locals: { user: { id: 'u', email: 'band@example.com', emailVerified: false } }
-		} as never)) as { emailConfirmation: Record<string, unknown> };
+		const artist = await createArtist(false);
+		const status = await layoutFor(artist.cookie);
 		expect(status.emailConfirmation).toMatchObject({
 			canResend: false,
 			unavailableMessage: "We can't send email right now."
 		});
 
-		const artist = await createArtist(false);
 		const res = await run(dashboardActions.resendVerification, {
 			request: post('http://localhost:5173/dashboard?/resendVerification', artist.cookie, {})
 		});

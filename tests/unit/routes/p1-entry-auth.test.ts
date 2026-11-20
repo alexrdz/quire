@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { withSessionModule } from '../helpers/session-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { eq, like } from 'drizzle-orm';
 import { render } from 'svelte/server';
@@ -9,14 +10,10 @@ import { auth } from '$lib/server/auth';
 import LandingPage from '../../../src/routes/(site)/+page.svelte';
 import LoginPage from '../../../src/routes/(site)/login/+page.svelte';
 import ResetPage from '../../../src/routes/(site)/login/reset/+page.svelte';
-import {
-	actions as loginActions,
-	load as loginLoad
-} from '../../../src/routes/(site)/login/+page.server';
-import {
-	actions as resetActions,
-	load as resetLoad
-} from '../../../src/routes/(site)/login/reset/+page.server';
+import * as __route1 from '../../../src/routes/(site)/login/+page.server';
+const { actions: loginActions, load: loginLoad } = withSessionModule(__route1);
+import * as __route2 from '../../../src/routes/(site)/login/reset/+page.server';
+const { actions: resetActions, load: resetLoad } = withSessionModule(__route2);
 
 const createdUserIds: string[] = [];
 const createdVerificationIds: string[] = [];

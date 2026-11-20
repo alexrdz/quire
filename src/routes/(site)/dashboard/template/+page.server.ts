@@ -1,9 +1,8 @@
 import crypto from 'node:crypto';
-import { fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
+import { fail, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { db, schema } from '$lib/server/db';
 import { eq, asc, and } from 'drizzle-orm';
-import { auth } from '$lib/server/auth';
-import { ArtistAccountStatus } from '$domain/account';
+import { requireArtist, requireArtistAction, isDenied } from '$lib/server/guards';
 import { checkAccentContrast } from '$domain/theme';
 import { artistTemplateSchema, mediaUrlSchema } from '$schemas/issue';
 import { uploadFormFile, type MediaKindFilter } from '$lib/server/services/storage';
@@ -40,26 +39,6 @@ function parsePageContentJson(jsonStr: string): TemplatePageContent {
 	} catch {
 		return {};
 	}
-}
-
-async function requireArtist(headers: Headers) {
-	const session = await auth.api.getSession({ headers });
-	if (!session?.user) {
-		return { ok: false as const, status: 401 as const, error: 'Unauthorized' };
-	}
-
-	const artist = await db.query.artists.findFirst({
-		where: eq(schema.artists.userId, session.user.id)
-	});
-	if (!artist) {
-		return { ok: false as const, status: 401 as const, error: 'Artist not found' };
-	}
-
-	if (artist.accountStatus === ArtistAccountStatus.Closed) {
-		return { ok: false as const, status: 403 as const, error: 'This artist account has been closed.' };
-	}
-
-	return { ok: true as const, artist, emailConfirmed: isEmailConfirmed(session.user) };
 }
 
 function parseTipPreset(raw: FormDataEntryValue | null, fallback: number): number {
@@ -135,26 +114,8 @@ function buildPageContentJson(params: {
 	return JSON.stringify(payload);
 }
 
-export const load: ServerLoad = async ({ request }) => {
-	const session = await auth.api.getSession({
-		headers: request.headers
-	});
-
-	if (!session?.user) {
-		throw redirect(303, '/login?redirect=/dashboard/template');
-	}
-
-	const artist = await db.query.artists.findFirst({
-		where: eq(schema.artists.userId, session.user.id)
-	});
-
-	if (!artist) {
-		throw redirect(303, '/login');
-	}
-
-	if (artist.accountStatus === ArtistAccountStatus.Closed) {
-		throw redirect(303, '/login?closed=1');
-	}
+export const load: ServerLoad = async (event) => {
+	const { artist } = await requireArtist(event);
 
 	const templatePages = await db.query.templatePages.findMany({
 		where: eq(schema.templatePages.artistId, artist.id),
@@ -184,14 +145,15 @@ export const load: ServerLoad = async ({ request }) => {
 };
 
 export const actions: Actions = {
-	saveTemplate: async ({ request }) => {
-		const authResult = await requireArtist(request.headers);
-		if (!authResult.ok) return fail(authResult.status, { error: authResult.error });
+	saveTemplate: async (event) => {
+		const { request } = event;
+		const authResult = await requireArtistAction(event);
+		if (isDenied(authResult)) return authResult;
 		const { artist } = authResult;
 
 		const formData = await request.formData();
 		// Decision 31: uploads wait for a confirmed band email; URLs and embeds still work.
-		if (!authResult.emailConfirmed && formHasFileUpload(formData)) {
+		if (!isEmailConfirmed(authResult.user) && formHasFileUpload(formData)) {
 			return fail(403, { error: EMAIL_CONFIRMATION_REQUIRED.upload });
 		}
 
@@ -271,14 +233,15 @@ export const actions: Actions = {
 		};
 	},
 
-	addTemplatePage: async ({ request }) => {
-		const authResult = await requireArtist(request.headers);
-		if (!authResult.ok) return fail(authResult.status, { error: authResult.error });
+	addTemplatePage: async (event) => {
+		const { request } = event;
+		const authResult = await requireArtistAction(event);
+		if (isDenied(authResult)) return authResult;
 		const { artist } = authResult;
 
 		const formData = await request.formData();
 		// Decision 31: uploads wait for a confirmed band email; URLs and embeds still work.
-		if (!authResult.emailConfirmed && formHasFileUpload(formData)) {
+		if (!isEmailConfirmed(authResult.user) && formHasFileUpload(formData)) {
 			return fail(403, { error: EMAIL_CONFIRMATION_REQUIRED.upload });
 		}
 		const kindResult = templatePageKindSchema.safeParse(
@@ -346,14 +309,15 @@ export const actions: Actions = {
 		return { pageAdded: true };
 	},
 
-	editTemplatePage: async ({ request }) => {
-		const authResult = await requireArtist(request.headers);
-		if (!authResult.ok) return fail(authResult.status, { error: authResult.error });
+	editTemplatePage: async (event) => {
+		const { request } = event;
+		const authResult = await requireArtistAction(event);
+		if (isDenied(authResult)) return authResult;
 		const { artist } = authResult;
 
 		const formData = await request.formData();
 		// Decision 31: uploads wait for a confirmed band email; URLs and embeds still work.
-		if (!authResult.emailConfirmed && formHasFileUpload(formData)) {
+		if (!isEmailConfirmed(authResult.user) && formHasFileUpload(formData)) {
 			return fail(403, { error: EMAIL_CONFIRMATION_REQUIRED.upload });
 		}
 		const pageId = String(formData.get('pageId') || '').trim();
@@ -444,9 +408,10 @@ export const actions: Actions = {
 		return { pageUpdated: true };
 	},
 
-	moveTemplatePage: async ({ request }) => {
-		const authResult = await requireArtist(request.headers);
-		if (!authResult.ok) return fail(authResult.status, { error: authResult.error });
+	moveTemplatePage: async (event) => {
+		const { request } = event;
+		const authResult = await requireArtistAction(event);
+		if (isDenied(authResult)) return authResult;
 		const { artist } = authResult;
 
 		const formData = await request.formData();
@@ -501,9 +466,10 @@ export const actions: Actions = {
 		return { pageMoved: true };
 	},
 
-	deleteTemplatePage: async ({ request }) => {
-		const authResult = await requireArtist(request.headers);
-		if (!authResult.ok) return fail(authResult.status, { error: authResult.error });
+	deleteTemplatePage: async (event) => {
+		const { request } = event;
+		const authResult = await requireArtistAction(event);
+		if (isDenied(authResult)) return authResult;
 		const { artist } = authResult;
 
 		const formData = await request.formData();

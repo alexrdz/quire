@@ -2,10 +2,10 @@ import { getConfig, tipsOpenVenmo } from '$lib/server/config';
 import { featureUnavailableMessage } from '$lib/features';
 import { fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
-import { ArtistAccountStatus } from '$domain/account';
 import { buildVenmoProfileUrl, parseVenmoUsername } from '$domain/venmo';
 import { db, schema } from '$lib/server/db';
 import { auth, clearSessionCookie, verifyUserCredentialPassword } from '$lib/server/auth';
+import { requireArtist, requireArtistAction, isDenied } from '$lib/server/guards';
 import { isEmailConfirmed, resendEmailConfirmation } from '$lib/server/email/verification';
 import { closeArtistAccount } from '$lib/server/services/account';
 import {
@@ -30,36 +30,9 @@ const VENMO_ERROR_STATUS: Record<string, number> = {
 	RATE_LIMITED: 429
 };
 
-async function loadActiveArtist(request: Request) {
-	const session = await auth.api.getSession({ headers: request.headers });
-	if (!session?.user) return null;
-	const artist = await db.query.artists.findFirst({
-		where: eq(schema.artists.userId, session.user.id)
-	});
-	if (!artist || artist.accountStatus === ArtistAccountStatus.Closed) return null;
-	return { user: session.user, artist };
-}
-
-export const load: ServerLoad = async ({ request, url }) => {
-	const session = await auth.api.getSession({
-		headers: request.headers
-	});
-
-	if (!session?.user) {
-		throw redirect(303, '/login?redirect=/dashboard/settings');
-	}
-
-	const artist = await db.query.artists.findFirst({
-		where: eq(schema.artists.userId, session.user.id)
-	});
-
-	if (!artist) {
-		throw redirect(303, '/login');
-	}
-
-	if (artist.accountStatus === ArtistAccountStatus.Closed) {
-		throw redirect(303, '/login?closed=1');
-	}
+export const load: ServerLoad = async (event) => {
+	const { url } = event;
+	const { user, artist } = await requireArtist(event);
 
 	const verifiedReturn = url.searchParams.get('verified') === '1';
 	const emailChangedReturn = url.searchParams.get('emailChanged') === '1';
@@ -71,15 +44,15 @@ export const load: ServerLoad = async ({ request, url }) => {
 
 	const credentialAccount = await db.query.accounts.findFirst({
 		where: and(
-			eq(schema.accounts.userId, session.user.id),
+			eq(schema.accounts.userId, user.id),
 			eq(schema.accounts.providerId, 'credential')
 		)
 	});
 
 	return {
 		artist,
-		userEmail: session.user.email,
-		emailVerified: Boolean(session.user.emailVerified),
+		userEmail: user.email,
+		emailVerified: Boolean(user.emailVerified),
 		verifiedReturn,
 		emailChangedReturn,
 		hasCredentialPassword: Boolean(credentialAccount?.password),
@@ -90,7 +63,7 @@ export const load: ServerLoad = async ({ request, url }) => {
 			testLinkOpens: tipsOpenVenmo(mode),
 			canChange: features.email,
 			changeBlockedMessage: features.email ? null : featureUnavailableMessage('email', mode),
-			firstSetBlockedMessage: isEmailConfirmed(session.user) ? null : EMAIL_CONFIRMATION_REQUIRED.venmo,
+			firstSetBlockedMessage: isEmailConfirmed(user) ? null : EMAIL_CONFIRMATION_REQUIRED.venmo,
 			pending: pendingVenmo
 				? { newUsername: pendingVenmo.newUsername, expiresAt: pendingVenmo.expiresAt.toISOString() }
 				: null,
@@ -101,20 +74,11 @@ export const load: ServerLoad = async ({ request, url }) => {
 };
 
 export const actions: Actions = {
-	updateModeration: async ({ request }) => {
-		const session = await auth.api.getSession({
-			headers: request.headers
-		});
-		if (!session?.user) {
-			return fail(401, { moderationError: 'Unauthorized' });
-		}
-
-		const artist = await db.query.artists.findFirst({
-			where: eq(schema.artists.userId, session.user.id)
-		});
-		if (!artist) {
-			return fail(401, { moderationError: 'Artist not found' });
-		}
+	updateModeration: async (event) => {
+		const { request } = event;
+		const guard = await requireArtistAction(event, 'moderationError');
+		if (isDenied(guard)) return guard;
+		const { user, artist } = guard;
 
 		const formData = await request.formData();
 		const parsed = artistSettingsUpdateSchema
@@ -147,10 +111,11 @@ export const actions: Actions = {
 	 * One field plus Save (ADR 0008). With no username yet this sets it (confirmed
 	 * email required). With one set, it starts a change: password plus email link.
 	 */
-	saveVenmo: async ({ request }) => {
-		const active = await loadActiveArtist(request);
-		if (!active) return fail(401, { venmoError: 'Unauthorized' });
-		const { user, artist } = active;
+	saveVenmo: async (event) => {
+		const { request } = event;
+		const guard = await requireArtistAction(event, 'venmoError');
+		if (isDenied(guard)) return guard;
+		const { user, artist } = guard;
 
 		const formData = await request.formData();
 		const rawUsername = String(formData.get('venmoUsername') ?? '');
@@ -198,10 +163,11 @@ export const actions: Actions = {
 	},
 
 	/** Removing the username is a change too: password plus email link. */
-	removeVenmo: async ({ request }) => {
-		const active = await loadActiveArtist(request);
-		if (!active) return fail(401, { venmoError: 'Unauthorized' });
-		const { user, artist } = active;
+	removeVenmo: async (event) => {
+		const { request } = event;
+		const guard = await requireArtistAction(event, 'venmoError');
+		if (isDenied(guard)) return guard;
+		const { user, artist } = guard;
 
 		const formData = await request.formData();
 		const parsed = venmoRemoveRequestSchema.safeParse({
@@ -227,21 +193,14 @@ export const actions: Actions = {
 		};
 	},
 
-	resendVerification: async ({ request }) => {
-		const session = await auth.api.getSession({ headers: request.headers });
-		if (!session?.user) {
-			return fail(401, { accountError: 'Unauthorized' });
-		}
-
-		const artist = await db.query.artists.findFirst({
-			where: eq(schema.artists.userId, session.user.id)
-		});
-		if (!artist || artist.accountStatus === ArtistAccountStatus.Closed) {
-			return fail(403, { accountError: 'Active artist account required.' });
-		}
+	resendVerification: async (event) => {
+		const { request } = event;
+		const guard = await requireArtistAction(event, 'accountError');
+		if (isDenied(guard)) return guard;
+		const { user, artist } = guard;
 
 		const result = await resendEmailConfirmation({
-			user: session.user,
+			user: user,
 			headers: request.headers,
 			callbackURL: '/dashboard/settings?verified=1',
 			send: (args) => auth.api.sendVerificationEmail(args)
@@ -255,22 +214,15 @@ export const actions: Actions = {
 
 		return {
 			verificationEmailSent: true,
-			sentToEmail: session.user.email
+			sentToEmail: user.email
 		};
 	},
 
-	changeEmail: async ({ request }) => {
-		const session = await auth.api.getSession({ headers: request.headers });
-		if (!session?.user) {
-			return fail(401, { emailError: 'Unauthorized' });
-		}
-
-		const artist = await db.query.artists.findFirst({
-			where: eq(schema.artists.userId, session.user.id)
-		});
-		if (!artist || artist.accountStatus === ArtistAccountStatus.Closed) {
-			return fail(403, { emailError: 'Active artist account required.' });
-		}
+	changeEmail: async (event) => {
+		const { request } = event;
+		const guard = await requireArtistAction(event, 'emailError');
+		if (isDenied(guard)) return guard;
+		const { user, artist } = guard;
 
 		const formData = await request.formData();
 		const newEmailRaw = String(formData.get('newEmail') || '');
@@ -287,14 +239,14 @@ export const actions: Actions = {
 			});
 		}
 
-		if (parsed.data.newEmail === session.user.email.toLowerCase()) {
+		if (parsed.data.newEmail === user.email.toLowerCase()) {
 			return fail(400, {
 				emailError: 'New email matches your current band email.'
 			});
 		}
 
 		const passwordValid = await verifyUserCredentialPassword(
-			session.user.id,
+			user.id,
 			parsed.data.currentPassword
 		);
 		if (!passwordValid) {
@@ -323,18 +275,11 @@ export const actions: Actions = {
 		};
 	},
 
-	changePassword: async ({ request }) => {
-		const session = await auth.api.getSession({ headers: request.headers });
-		if (!session?.user) {
-			return fail(401, { passwordError: 'Unauthorized' });
-		}
-
-		const artist = await db.query.artists.findFirst({
-			where: eq(schema.artists.userId, session.user.id)
-		});
-		if (!artist || artist.accountStatus === ArtistAccountStatus.Closed) {
-			return fail(403, { passwordError: 'Active artist account required.' });
-		}
+	changePassword: async (event) => {
+		const { request } = event;
+		const guard = await requireArtistAction(event, 'passwordError');
+		if (isDenied(guard)) return guard;
+		const { user, artist } = guard;
 
 		const formData = await request.formData();
 		const parsed = changePasswordSchema.safeParse({
@@ -370,18 +315,11 @@ export const actions: Actions = {
 		};
 	},
 
-	closeAccount: async ({ request, cookies }) => {
-		const session = await auth.api.getSession({ headers: request.headers });
-		if (!session?.user) {
-			return fail(401, { closeError: 'Unauthorized' });
-		}
-
-		const artist = await db.query.artists.findFirst({
-			where: eq(schema.artists.userId, session.user.id)
-		});
-		if (!artist || artist.accountStatus === ArtistAccountStatus.Closed) {
-			return fail(403, { closeError: 'Artist account not found or already closed.' });
-		}
+	closeAccount: async (event) => {
+		const { request, cookies } = event;
+		const guard = await requireArtistAction(event, 'closeError');
+		if (isDenied(guard)) return guard;
+		const { user, artist } = guard;
 
 		const formData = await request.formData();
 		const parsed = closeArtistAccountSchema.safeParse({
@@ -397,7 +335,7 @@ export const actions: Actions = {
 
 		const closeResult = await closeArtistAccount({
 			artistId: artist.id,
-			userId: session.user.id,
+			userId: user.id,
 			confirmPassword: parsed.data.confirmPassword
 		});
 

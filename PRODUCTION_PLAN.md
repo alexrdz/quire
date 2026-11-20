@@ -236,6 +236,7 @@ Acceptance: unit tests for username validation, the change flow (password, token
 - Nightly reset via a Netlify scheduled function that re-runs migrations and the seed.
 
 4.3 **Auth guard consolidation** (refactor, last): use `event.locals.user` from `hooks.server.ts`; add a `/dashboard` layout guard; remove per-route `getSession` calls.
+*Done (P4L-T04).* `src/lib/server/guards.ts` adds `requireArtist` (loads; redirects to `/login?redirect=` with the safe-redirect rules), `requireArtistAction` (actions; 401 signed out, 403 without an active Artist), `requireFan`, `requireFanPage` and `optionalUser`, all reading locals only. `auth.api.getSession` is now called only in `hooks.server.ts` (`resolveSessionLocals`). The `/dashboard` layout guard is defense in depth: every dashboard load and action still calls its own guard, because layout loads skip actions and run in parallel. `tests/unit/routes/auth-guards.test.ts` enumerates every exported action and dashboard load.
 
 ## Phase 5: Verification
 

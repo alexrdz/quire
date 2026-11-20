@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { withSessionModule } from '../helpers/session-event';
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -113,7 +114,7 @@ describe('the banner on every page (root layout)', () => {
 
 	it.each(ALL_MODES)('login in %s', async (mode) => {
 		const { default: Login } = await import('../../../src/routes/(site)/login/+page.svelte');
-		const { load } = await import('../../../src/routes/(site)/login/+page.server');
+		const { load } = withSessionModule(await import('../../../src/routes/(site)/login/+page.server'));
 		const data = await load({
 			request: new Request('http://localhost/login'),
 			url: new URL('http://localhost/login')
@@ -124,7 +125,7 @@ describe('the banner on every page (root layout)', () => {
 
 	it.each(ALL_MODES)('Back Page in %s', async (mode) => {
 		const { default: BackPage } = await import('../../../src/routes/(site)/a/[slug]/+page.svelte');
-		const { load } = await import('../../../src/routes/(site)/a/[slug]/+page.server');
+		const { load } = withSessionModule(await import('../../../src/routes/(site)/a/[slug]/+page.server'));
 		const data = await load({
 			params: { slug: 'the-neon-velvet' },
 			request: new Request('http://localhost/a/the-neon-velvet')
@@ -136,7 +137,7 @@ describe('the banner on every page (root layout)', () => {
 
 	it.each(ALL_MODES)('Issue reader in %s', async (mode) => {
 		const { default: IssueReader } = await import('../../../src/routes/(zine)/i/[slug]/+page.svelte');
-		const { load } = await import('../../../src/routes/(zine)/i/[slug]/+page.server');
+		const { load } = withSessionModule(await import('../../../src/routes/(zine)/i/[slug]/+page.server'));
 		const slug = 'neon-velvet-philly-2026-10-15';
 		const data = await load({
 			params: { slug },
@@ -163,7 +164,7 @@ describe('the banner on every page (root layout)', () => {
 		});
 		const cookie = `better-auth.session_token=${token}.${await makeSignature(token, authSecret)}`;
 		const { default: Dashboard } = await import('../../../src/routes/(site)/dashboard/+page.svelte');
-		const { load } = await import('../../../src/routes/(site)/dashboard/+page.server');
+		const { load } = withSessionModule(await import('../../../src/routes/(site)/dashboard/+page.server'));
 		const request = new Request('http://localhost/dashboard', { headers: { cookie } });
 		const data = await (load as (event: never) => Promise<Record<string, unknown>>)({ request, url: new URL(request.url) } as never);
 		const html = inLayout(mode, Dashboard, {

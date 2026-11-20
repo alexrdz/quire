@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { withSessionModule } from '../helpers/session-event';
 import { isHttpError, isRedirect } from '@sveltejs/kit';
 import type { Config, Mode } from '$lib/server/config';
 import { FEATURE_UNAVAILABLE } from '$lib/features';
@@ -148,7 +149,7 @@ describe('1.2 sample Fan sign-in', () => {
 	});
 
 	it('login googleSignIn returns the unavailable message in production', async () => {
-		const { actions } = await import('../../../src/routes/(site)/login/+page.server');
+		const { actions } = withSessionModule(await import('../../../src/routes/(site)/login/+page.server'));
 		const cookies = mockCookies();
 		const result = (await runAction(actions.googleSignIn, {
 			request: postForm('http://localhost/login?/googleSignIn', { redirectTo: '/me/stubs' }),
@@ -161,7 +162,7 @@ describe('1.2 sample Fan sign-in', () => {
 	});
 
 	it('zine googleAuth returns the unavailable message in production', async () => {
-		const { actions } = await import('../../../src/routes/(zine)/i/[slug]/+page.server');
+		const { actions } = withSessionModule(await import('../../../src/routes/(zine)/i/[slug]/+page.server'));
 		const cookies = mockCookies();
 		const result = (await runAction(actions.googleAuth, {
 			request: postForm('http://localhost/i/x?/googleAuth', { targetHash: '#page-wall' }),
@@ -175,7 +176,7 @@ describe('1.2 sample Fan sign-in', () => {
 	});
 
 	it('artist page googleAuth returns the unavailable message in production', async () => {
-		const { actions } = await import('../../../src/routes/(site)/a/[slug]/+page.server');
+		const { actions } = withSessionModule(await import('../../../src/routes/(site)/a/[slug]/+page.server'));
 		const cookies = mockCookies();
 		const result = (await runAction(actions.googleAuth, {
 			request: postForm('http://localhost/a/the-neon-velvet?/googleAuth'),
@@ -190,7 +191,7 @@ describe('1.2 sample Fan sign-in', () => {
 
 	it('still signs in as the sample Fan in test mode', async () => {
 		state.override = inMode('test', { fanSignIn: true });
-		const { actions } = await import('../../../src/routes/(site)/login/+page.server');
+		const { actions } = withSessionModule(await import('../../../src/routes/(site)/login/+page.server'));
 		const cookies = mockCookies();
 		const thrown = await runAction(actions.googleSignIn, {
 			request: postForm('http://localhost/login?/googleSignIn', { redirectTo: '/me/stubs' }),

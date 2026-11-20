@@ -76,19 +76,27 @@ const routeRequest: Handle = async ({ event, resolve }) => {
 		return auth.handler(event.request);
 	}
 
-	try {
-		const sessionData = await auth.api.getSession({
-			headers: event.request.headers
-		});
-		event.locals.session = sessionData?.session ?? null;
-		event.locals.user = sessionData?.user ?? null;
-	} catch {
-		event.locals.session = null;
-		event.locals.user = null;
-	}
+	Object.assign(event.locals, await resolveSessionLocals(event.request));
 
 	return resolve(event);
 };
+
+/**
+ * The one place the Better Auth session is read (PRODUCTION_PLAN 4.3). Routes
+ * read `locals.user` and `locals.session` through `$lib/server/guards`. Exported
+ * so unit tests build locals exactly the way a request does.
+ */
+export async function resolveSessionLocals(
+	request: Request
+): Promise<Pick<App.Locals, 'session' | 'user'>> {
+	const { auth } = await import('$lib/server/auth');
+	try {
+		const sessionData = await auth.api.getSession({ headers: request.headers });
+		return { session: sessionData?.session ?? null, user: sessionData?.user ?? null };
+	} catch {
+		return { session: null, user: null };
+	}
+}
 
 function logFor(event: RequestEvent, error: unknown, status: number) {
 	return logServerError({

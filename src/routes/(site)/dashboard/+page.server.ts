@@ -3,6 +3,7 @@ import { redirect, fail, type Actions, type ServerLoad } from '@sveltejs/kit';
 import { db, schema } from '$lib/server/db';
 import { eq, and, desc, isNull } from 'drizzle-orm';
 import { auth } from '$lib/server/auth';
+import { requireArtist, requireArtistAction, isDenied } from '$lib/server/guards';
 import { getConfig } from '$lib/server/config';
 import {
 	blockFanFromWalls,
@@ -26,17 +27,13 @@ import { resendEmailConfirmation } from '$lib/server/email/verification';
 
 const DEFAULT_SIGNUP_BIO = 'Live digital zines and tour archive on Quire.';
 
-export const load: ServerLoad = async ({ request, url }) => {
-	const session = await auth.api.getSession({
-		headers: request.headers
-	});
-
-	if (!session?.user) {
-		throw redirect(303, '/login?redirect=/dashboard');
-	}
+export const load: ServerLoad = async (event) => {
+	const { request, url } = event;
+	// The /dashboard layout guards too, but a layout guard alone protects nothing (see guards.ts).
+	const { user, artist: guarded } = await requireArtist(event);
 
 	const artist = await db.query.artists.findFirst({
-		where: eq(schema.artists.userId, session.user.id),
+		where: eq(schema.artists.id, guarded.id),
 		with: {
 			issues: {
 				orderBy: [desc(schema.issues.date)],
@@ -149,8 +146,8 @@ export const load: ServerLoad = async ({ request, url }) => {
 
 	return {
 		artist,
-		emailVerified: Boolean(session.user.emailVerified),
-		userEmail: session.user.email,
+		emailVerified: Boolean(user.emailVerified),
+		userEmail: user.email,
 		latestRecap,
 		issues: issuesWithTipTaps,
 		generalRow,
@@ -165,32 +162,18 @@ export const load: ServerLoad = async ({ request, url }) => {
 	};
 };
 
-async function requireArtistContext(request: Request) {
-	const session = await auth.api.getSession({ headers: request.headers });
-	if (!session?.user) {
-		return { errorResponse: fail(401, { error: 'Unauthorized' }) } as const;
-	}
-
-	const artist = await db.query.artists.findFirst({
-		where: eq(schema.artists.userId, session.user.id)
-	});
-	if (!artist || artist.accountStatus === ArtistAccountStatus.Closed) {
-		return { errorResponse: fail(403, { error: 'Active artist account required' }) } as const;
-	}
-
-	return { session, artist } as const;
-}
-
 export const actions: Actions = {
 	/** Resend from the confirm-your-email bar on any dashboard page (PRODUCTION_PLAN 2.4). */
-	resendVerification: async ({ request }) => {
-		const ctx = await requireArtistContext(request);
-		if ('errorResponse' in ctx) {
-			return fail(403, { accountError: 'Sign in as an artist to confirm your email.' });
+	resendVerification: async (event) => {
+		const { request } = event;
+		const ctx = await requireArtistAction(event);
+		if (isDenied(ctx)) {
+			// 401 signed out, 403 for a non-Artist, with the bar's own message.
+			return fail(ctx.status, { accountError: 'Sign in as an artist to confirm your email.' });
 		}
 
 		const result = await resendEmailConfirmation({
-			user: ctx.session.user,
+			user: ctx.user,
 			headers: request.headers,
 			callbackURL: '/dashboard?verified=1',
 			send: (args) => auth.api.sendVerificationEmail(args)
@@ -200,12 +183,13 @@ export const actions: Actions = {
 		}
 		return result.alreadyConfirmed
 			? { alreadyVerified: true }
-			: { verificationEmailSent: true, sentToEmail: ctx.session.user.email };
+			: { verificationEmailSent: true, sentToEmail: ctx.user.email };
 	},
 
-	createDraft: async ({ request }) => {
-		const ctx = await requireArtistContext(request);
-		if ('errorResponse' in ctx) return ctx.errorResponse;
+	createDraft: async (event) => {
+		const { request } = event;
+		const ctx = await requireArtistAction(event);
+		if (isDenied(ctx)) return ctx;
 		const { artist } = ctx;
 
 		const today = new Date().toISOString().slice(0, 10);
@@ -242,9 +226,10 @@ export const actions: Actions = {
 		throw redirect(303, `/dashboard/bookbinder/${issueId}`);
 	},
 
-	reply: async ({ request }) => {
-		const ctx = await requireArtistContext(request);
-		if ('errorResponse' in ctx) return ctx.errorResponse;
+	reply: async (event) => {
+		const { request } = event;
+		const ctx = await requireArtistAction(event);
+		if (isDenied(ctx)) return ctx;
 
 		const formData = await request.formData();
 		const parseResult = replyNoteSchema.safeParse({
@@ -265,9 +250,10 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	deleteReply: async ({ request }) => {
-		const ctx = await requireArtistContext(request);
-		if ('errorResponse' in ctx) return ctx.errorResponse;
+	deleteReply: async (event) => {
+		const { request } = event;
+		const ctx = await requireArtistAction(event);
+		if (isDenied(ctx)) return ctx;
 
 		const formData = await request.formData();
 		const parseResult = noteIdSchema.safeParse({
@@ -283,9 +269,10 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	hide: async ({ request }) => {
-		const ctx = await requireArtistContext(request);
-		if ('errorResponse' in ctx) return ctx.errorResponse;
+	hide: async (event) => {
+		const { request } = event;
+		const ctx = await requireArtistAction(event);
+		if (isDenied(ctx)) return ctx;
 
 		const formData = await request.formData();
 		const parseResult = noteIdSchema.safeParse({
@@ -301,9 +288,10 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	restore: async ({ request }) => {
-		const ctx = await requireArtistContext(request);
-		if ('errorResponse' in ctx) return ctx.errorResponse;
+	restore: async (event) => {
+		const { request } = event;
+		const ctx = await requireArtistAction(event);
+		if (isDenied(ctx)) return ctx;
 
 		const formData = await request.formData();
 		const parseResult = noteIdSchema.safeParse({
@@ -319,9 +307,11 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	delete: async ({ request }) => {
-		const session = await auth.api.getSession({ headers: request.headers });
-		if (!session?.user) return fail(401, { error: 'Unauthorized' });
+	delete: async (event) => {
+		const { request } = event;
+		// Artist-only like every dashboard action; deleteWallNote still checks the note is theirs.
+		const ctx = await requireArtistAction(event);
+		if (isDenied(ctx)) return ctx;
 
 		const formData = await request.formData();
 		const parseResult = noteIdSchema.safeParse({
@@ -331,15 +321,16 @@ export const actions: Actions = {
 			return fail(400, { error: parseResult.error.issues[0]?.message || 'Validation error' });
 		}
 
-		const res = await deleteWallNote(parseResult.data.noteId, session.user.id);
+		const res = await deleteWallNote(parseResult.data.noteId, ctx.user.id);
 		if (!res.ok) return fail(400, { error: res.error.message });
 
 		return { success: true };
 	},
 
-	blockFan: async ({ request }) => {
-		const ctx = await requireArtistContext(request);
-		if ('errorResponse' in ctx) return ctx.errorResponse;
+	blockFan: async (event) => {
+		const { request } = event;
+		const ctx = await requireArtistAction(event);
+		if (isDenied(ctx)) return ctx;
 
 		const formData = await request.formData();
 		const parseResult = blockFanSchema.safeParse({
@@ -355,9 +346,10 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	unblockFan: async ({ request }) => {
-		const ctx = await requireArtistContext(request);
-		if ('errorResponse' in ctx) return ctx.errorResponse;
+	unblockFan: async (event) => {
+		const { request } = event;
+		const ctx = await requireArtistAction(event);
+		if (isDenied(ctx)) return ctx;
 
 		const formData = await request.formData();
 		const parseResult = unblockFanSchema.safeParse({
