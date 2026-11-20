@@ -95,6 +95,28 @@ async function historyTable(client: Client) {
 	return rows.rows.map((r) => ({ hash: String(r.hash), createdAt: Number(r.created_at) }));
 }
 
+async function tableNames(client: Client): Promise<string[]> {
+	const rows = await client.execute(
+		`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`
+	);
+	return rows.rows.map((r) => String(r.name));
+}
+
+async function allRows(client: Client, tables: string[]): Promise<Record<string, Array<Record<string, unknown>>>> {
+	const out: Record<string, Array<Record<string, unknown>>> = {};
+	for (const table of tables) {
+		const rows = await client.execute(`SELECT * FROM \`${table}\` ORDER BY rowid`);
+		out[table] = rows.rows.map((r) => ({ ...r }));
+	}
+	return out;
+}
+
+/** Every table and index, by name, with its SQL. */
+async function objectSql(client: Client): Promise<Record<string, string>> {
+	const rows = await client.execute(`SELECT name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'`);
+	return Object.fromEntries(rows.rows.map((r) => [String(r.name), String(r.sql)]));
+}
+
 describe('the test databases', () => {
 	it('a database built at 0002 matches the 0002 snapshot and not the latest', async () => {
 		const { client } = await databaseAt(2);
@@ -151,6 +173,61 @@ describe('db:baseline on a database at an earlier migration', () => {
 		expect(await postsState(client)).toEqual(postsBefore);
 
 		expect(await baselineDatabase(client, { allowExtra: ['posts'] })).toEqual({ status: 'already-migrated' });
+	});
+
+	it('baseline then migrate write only the history and the 0003/0004 schema: no data row changes', async () => {
+		const { client } = await databaseAt(2, { posts: true });
+		// Production-like data in Quire's tables too.
+		await client.batch(
+			[
+				`INSERT INTO users (id, name, email, created_at, updated_at) VALUES ('u1', 'Artist', 'artist@example.com', 1, 1)`,
+				`INSERT INTO artists (id, user_id, slug, display_name, created_at, updated_at) VALUES ('a1', 'u1', 'band', 'Band', 1, 1)`
+			],
+			'write'
+		);
+		const tablesBefore = await tableNames(client);
+		const rowsBefore = await allRows(client, tablesBefore);
+		const sqlBefore = await objectSql(client);
+
+		await baselineDatabase(client, { allowExtra: ['posts'] });
+		await runMigrations(client);
+
+		// Every row that was there is still there, unchanged; no table gained a row.
+		const rowsAfter = await allRows(client, tablesBefore);
+		for (const table of tablesBefore) {
+			const before = rowsBefore[table]!;
+			const after = rowsAfter[table]!;
+			expect(after.length, table).toBe(before.length);
+			// 0004 adds artists.venmo_username (NULL); every column that existed keeps its value.
+			after.forEach((row, i) => expect(row, table).toMatchObject(before[i]!));
+		}
+		expect(rowsAfter.artists![0]!.venmo_username).toBeNull();
+
+		// Schema changes: exactly what 0003 and 0004 create, plus the ALTER on artists.
+		const sqlAfter = await objectSql(client);
+		const added = Object.keys(sqlAfter).filter((name) => !(name in sqlBefore)).sort();
+		expect(added).toEqual(
+			[
+				MIGRATIONS_TABLE,
+				'auth_rate_limits',
+				'auth_rate_limits_key_unique',
+				'rate_limits',
+				'rate_limits_expires_at_idx',
+				'tip_taps',
+				'tip_taps_artist_issue_idx',
+				'venmo_change_tokens',
+				'venmo_change_tokens_artist_idx',
+				'venmo_change_tokens_expires_at_idx',
+				'venmo_change_tokens_token_hash_unique'
+			].sort()
+		);
+		const changed = Object.keys(sqlBefore).filter((name) => sqlAfter[name] !== sqlBefore[name]);
+		expect(changed).toEqual(['artists']);
+		// The new tables are empty: the migrations wrote no data.
+		for (const table of ['auth_rate_limits', 'rate_limits', 'tip_taps', 'venmo_change_tokens']) {
+			const count = await client.execute(`SELECT count(*) AS n FROM ${table}`);
+			expect(Number(count.rows[0]!.n), table).toBe(0);
+		}
 	});
 
 	it('0002 + posts without --allow-extra: refuses, lists posts, closest is 0002, writes nothing', async () => {
@@ -275,24 +352,40 @@ describe('pnpm db:baseline and pnpm db:migrate on a 0002 database with posts (th
 		return { status: result.status, output: `${result.stdout}${result.stderr}` };
 	}
 
-	it('dry run, then baseline, then migrate: posts untouched throughout', async () => {
+	it('dry run, then without --yes, then with --yes, then migrate: posts untouched throughout', async () => {
 		const { client, url } = await databaseAt(2, { posts: true });
 		const postsBefore = await postsState(client);
+		const host = `database ${url}`;
+		const plan = [
+			'schema matches 0002_schema_catch_up; will record 0000–0002; db:migrate then applies 0003, 0004',
+			`  database:           ${url}`,
+			'  matches:            0002_schema_catch_up',
+			'  will record:        0000_friendly_centennial, 0001_sharp_zaran, 0002_schema_catch_up',
+			'  db:migrate applies: 0003_rate_limits, 0004_venmo_tips',
+			'  ignored, untouched: posts',
+			'  writes:             only the migration history table, __drizzle_migrations'
+		];
 
 		const dry = run('db-baseline.ts', url, ['--dry-run', '--allow-extra', 'posts']);
 		expect(dry.status).toBe(0);
-		expect(dry.output).toContain(
-			'schema matches 0002_schema_catch_up; will record 0000–0002; db:migrate then applies 0003, 0004'
-		);
-		expect(dry.output).toContain('still to apply with pnpm db:migrate: 0003_rate_limits, 0004_venmo_tips');
-		expect(dry.output).toContain('ignored, left untouched (not Quire\'s): posts');
+		expect(dry.output).toContain(host);
+		for (const line of plan) expect(dry.output).toContain(line);
 		expect(dry.output).toContain('dry run: nothing was written');
 		expect(await historyTable(client)).toBeNull();
 
-		const baseline = run('db-baseline.ts', url, ['--allow-extra=posts']);
+		// Without --yes: the same plan, then it stops with nothing written.
+		const unconfirmed = run('db-baseline.ts', url, ['--allow-extra', 'posts']);
+		expect(unconfirmed.status).toBe(1);
+		for (const line of plan) expect(unconfirmed.output).toContain(line);
+		expect(unconfirmed.output).toContain('nothing was written');
+		expect(unconfirmed.output).toContain('--yes');
+		expect(await historyTable(client)).toBeNull();
+
+		const baseline = run('db-baseline.ts', url, ['--allow-extra=posts', '--yes']);
 		expect(baseline.status).toBe(0);
+		for (const line of plan) expect(baseline.output).toContain(line);
 		expect(baseline.output).toContain(
-			'schema matches 0002_schema_catch_up; recorded 0000–0002; db:migrate then applies 0003, 0004'
+			'recorded 3 migrations as applied (0000–0002). Next: pnpm db:migrate, which applies 0003_rate_limits, 0004_venmo_tips.'
 		);
 		expect(await historyTable(client)).toHaveLength(3);
 
@@ -314,7 +407,7 @@ describe('pnpm db:baseline and pnpm db:migrate on a 0002 database with posts (th
 
 	it('rejects unknown and incomplete arguments before opening the database', async () => {
 		const { url } = await databaseAt(2);
-		for (const args of [['--force'], ['--to'], ['--allow-extra', '--dry-run'], ['--dry-run=yes']]) {
+		for (const args of [['--force'], ['--to'], ['--allow-extra', '--dry-run'], ['--dry-run=yes'], ['--yes=1'], ['--dry-run', '--yes']]) {
 			const result = run('db-baseline.ts', url, args);
 			expect(result.status, args.join(' ')).toBe(1);
 			expect(result.output, args.join(' ')).toContain('Usage: pnpm db:baseline');

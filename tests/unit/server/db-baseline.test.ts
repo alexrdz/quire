@@ -182,8 +182,8 @@ describe('db:baseline', () => {
 describe('pnpm db:baseline and pnpm db:migrate (the real scripts)', () => {
 	const ROOT = path.resolve(__dirname, '../../..');
 
-	function run(script: 'db-baseline.ts' | 'db-migrate.ts', url: string) {
-		const result = spawnSync('node', ['--import', 'tsx', path.join('scripts', script)], {
+	function run(script: 'db-baseline.ts' | 'db-migrate.ts', url: string, args: string[] = []) {
+		const result = spawnSync('node', ['--import', 'tsx', path.join('scripts', script), ...args], {
 			cwd: ROOT,
 			encoding: 'utf8',
 			// Test mode keeps a file: URL, so the scripts work on the temp database, never local.db.
@@ -205,9 +205,9 @@ describe('pnpm db:baseline and pnpm db:migrate (the real scripts)', () => {
 		const { url } = await legacyFile();
 		const total = readMigrationFiles({ migrationsFolder: path.join(ROOT, 'drizzle') }).length;
 
-		const baseline = run('db-baseline.ts', url);
-		expect(baseline.output).toContain(`schema matches ${latestSnapshot().tag}; recorded 0000–0004; db:migrate then has nothing to apply`);
-		expect(baseline.output).toContain(`recorded ${total} migrations as applied`);
+		const baseline = run('db-baseline.ts', url, ['--yes']);
+		expect(baseline.output).toContain(`schema matches ${latestSnapshot().tag}; will record 0000–0004; db:migrate then has nothing to apply`);
+		expect(baseline.output).toContain(`recorded ${total} migrations as applied (0000–0004)`);
 		expect(baseline.status).toBe(0);
 
 		const migrate = run('db-migrate.ts', url);
