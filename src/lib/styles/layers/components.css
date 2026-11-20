@@ -646,3 +646,83 @@
 .demo-banner--compact .demo-banner-text {
 	font-size: var(--text-meta);
 }
+
+/* ==========================================================================
+   Issue reader: cut-and-paste on dark (ADR 0009)
+   Only the reader (/i/[slug] and its Bookbinder preview) uses these.
+   ========================================================================== */
+
+/* Dark paper with a photocopy grain and soft mottling, on every reader page. */
+.zine-paper {
+	background-color: var(--zine-paper-dark);
+	background-image:
+		var(--zine-grain),
+		var(--zine-mottle),
+		radial-gradient(ellipse at 50% -10%, rgba(255, 244, 220, 0.06), transparent 65%);
+	background-size: 160px 160px, 420px 420px, auto;
+}
+
+/* Page turn: each page swings in as it is swiped into view and out as it
+   leaves. Scroll-driven, so it is still when a page is snapped and costs no
+   script; browsers without scroll timelines just slide. */
+.zine-page {
+	view-timeline: --zine-page inline;
+}
+
+@supports (animation-timeline: view()) {
+	@media (prefers-reduced-motion: no-preference) {
+		.zine-page > .page-inner {
+			animation: zine-page-turn linear both;
+			animation-timeline: --zine-page;
+			animation-range: cover 0% cover 100%;
+		}
+	}
+
+	/* Reduced motion: no swing, only a fade. */
+	@media (prefers-reduced-motion: reduce) {
+		.zine-page > .page-inner {
+			animation: zine-page-fade linear both;
+			animation-timeline: --zine-page;
+			animation-range: cover 0% cover 100%;
+		}
+	}
+}
+
+@keyframes zine-page-turn {
+	0% {
+		opacity: 0.3;
+		transform: perspective(1400px) rotateY(-30deg) scale(0.94);
+		transform-origin: 0% 50%;
+	}
+	50% {
+		opacity: 1;
+		transform: none;
+		transform-origin: 0% 50%;
+	}
+	100% {
+		opacity: 0.3;
+		transform: perspective(1400px) rotateY(30deg) scale(0.94);
+		transform-origin: 100% 50%;
+	}
+}
+
+@keyframes zine-page-fade {
+	0%,
+	100% {
+		opacity: 0.25;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+
+/* The typewriter face for labels, page numbers and typed notes. */
+.type-face {
+	font-family: var(--font-type);
+	letter-spacing: var(--tracking-normal);
+}
+
+.marker-face {
+	font-family: var(--font-marker);
+}
+

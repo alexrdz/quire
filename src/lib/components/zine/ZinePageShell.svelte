@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { Stack, Cluster } from '$lib/components/layout';
-	import MetaChip from './MetaChip.svelte';
+	import TypeLabel from './TypeLabel.svelte';
 	import { scrollToPage, type PageShell } from './reader';
 
 	interface Props {
@@ -37,11 +37,11 @@
 {#snippet header()}
 	<header class="cover-header">
 		<Cluster align="center" gap="xs">
-			{#each shell.chips as chip}
-				<MetaChip tone={chip.tone}>{chip.label}</MetaChip>
+			{#each shell.chips as chip, i}
+				<TypeLabel position={i} tone={chip.tone ?? 'plain'}>{chip.label}</TypeLabel>
 			{/each}
 		</Cluster>
-		<span class="text-muted font-mono subtext-page">
+		<span class="text-muted type-face subtext-page">
 			Page {shell.pageNumber} of {shell.pageCount}
 		</span>
 	</header>
@@ -61,7 +61,11 @@
 	</footer>
 {/snippet}
 
-<section id={shell.id} class="page {canvasClass} {photoUrl ? 'has-photo-bg' : ''}" style={pageStyle}>
+<section
+	id={shell.id}
+	class="page zine-paper zine-page {canvasClass} {photoUrl ? 'has-photo-bg' : ''}"
+	style={pageStyle}
+>
 	{#if variant === 'wall'}
 		<Stack gap="md" class="page-inner wall-full-stack">
 			{@render header()}
@@ -80,21 +84,17 @@
 </section>
 
 <style>
+	/* Dark paper and grain come from .zine-paper; a photo page keeps the grain over its dimmed photo.
+	   --page-photo is two layers (the dimming gradient, then the photo), so three sizes in all. */
 	.has-photo-bg {
-		background-image: var(--page-photo, none);
-		background-size: cover;
-		background-position: center;
-	}
-
-	.content-page-canvas,
-	.wall-canvas,
-	.endpaper-canvas {
-		background-color: var(--bg-void);
-		background-image: radial-gradient(circle at 50% 0%, rgba(21, 17, 36, 0.9), var(--bg-void) 75%);
+		background-image: var(--zine-grain), var(--page-photo, none);
+		background-size: 160px 160px, cover, cover;
+		background-position: 0 0, center, center;
+		background-repeat: repeat, no-repeat, no-repeat;
 	}
 
 	.subtext-page {
-		font-size: var(--text-body);
+		font-size: var(--text-small);
 	}
 
 	:global(.margin-auto) {

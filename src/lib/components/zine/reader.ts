@@ -1,3 +1,5 @@
+import { pileTilt } from '$domain/photo-pile';
+
 /**
  * Shared, UI-free pieces of the Issue reader (/i/[slug]): the stored page
  * content, the shell every inner page sits in (chips, "Page n of m", footer
@@ -121,10 +123,30 @@ export function endpaperShell(contentCount: number): PageShell {
 	};
 }
 
-/** Scrolls the reader's snap container to the page with this id. */
+/** Scrolls the reader's snap container to the page with this id (instantly under reduced motion). */
 export function scrollToPage(id: string): void {
 	const el = document.getElementById(id);
-	el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+	const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+	el?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest', inline: 'start' });
+}
+
+/* ---------------------------------------------------------------------------
+   Cut-and-paste tilts (ADR 0009)
+   --------------------------------------------------------------------------- */
+
+/** ADR 0009: text never tilts beyond about 2 degrees, so it stays easy to read. */
+export const MAX_TEXT_TILT = 2;
+
+/**
+ * The resting tilt, in degrees, of the scrap at `position` on a page: the
+ * same deterministic sequence as the photo pile, scaled into ±`max`. Every
+ * reader sees the same page and nothing is stored.
+ */
+export function zineTilt(position: number, max: number = MAX_TEXT_TILT): number {
+	const limit = Math.max(0, max);
+	const tilt = Math.round((pileTilt(position) / 6) * limit * 10) / 10;
+	// pileTilt is rounded to 0.1, so scaling can land a hair past the limit.
+	return Math.max(-limit, Math.min(limit, tilt)) || 0;
 }
 
 /* ---------------------------------------------------------------------------

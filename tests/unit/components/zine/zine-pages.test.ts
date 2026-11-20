@@ -34,7 +34,7 @@ describe('Issue reader page components', () => {
 			props: { shell: shell('setlist'), content: { songs: ['Intro'] }, venue: 'The Room' }
 		});
 		expect(body).toContain('id="page-content-0"');
-		expect(body).toMatch(/class="page content-page-canvas\s*[^"]*"/);
+		expect(body).toMatch(/class="page zine-paper zine-page content-page-canvas\s*[^"]*"/);
 		expect(body).toContain('Brooklyn');
 		expect(body).toContain('SETLIST');
 		expect(body).toMatch(/Page 2 of 6/);
