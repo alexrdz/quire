@@ -1,12 +1,16 @@
 import { building } from '$app/environment';
 import type { Handle, HandleServerError, RequestEvent } from '@sveltejs/kit';
-import { getConfig, getPublicFeatures } from '$lib/server/config';
+import { devRemoteDatabaseWarning, getConfig, getPublicFeatures, sampleDataRefusal } from '$lib/server/config';
 import { unavailableResponse } from '$lib/server/http/unavailable';
 import { withSecurityHeaders } from '$lib/server/http/security-headers';
 import { GENERIC_ERROR_MESSAGE, logServerError, requestIdFor } from '$lib/server/http/errors';
 import { featureUnavailableMessage } from '$lib/features';
 
 const startupConfig = getConfig();
+
+// Development against a remote database (B1-T10): say so once, host only.
+const remoteDbWarning = building ? null : devRemoteDatabaseWarning(startupConfig);
+if (remoteDbWarning) console.warn(remoteDbWarning);
 
 if (!building && !startupConfig.core.ok) {
 	console.error(
@@ -27,9 +31,21 @@ const EMAIL_AUTH_PATHS = [
 const HEALTH_PATH = '/healthz';
 
 let seedPromise: Promise<unknown> | null = null;
+let seedRefusalLogged = false;
 
 async function ensureSeed(): Promise<void> {
-	if (building || !getConfig().autoSeed) return;
+	if (building) return;
+	const config = getConfig();
+	if (!config.autoSeed) return;
+	// Never seed a remote database from development; log why once, then never retry.
+	const refusal = sampleDataRefusal(config);
+	if (refusal) {
+		if (!seedRefusalLogged) {
+			seedRefusalLogged = true;
+			console.warn(`[seed] ${refusal}`);
+		}
+		return;
+	}
 	if (!seedPromise) {
 		seedPromise = import('$lib/server/seed')
 			.then(({ seedDatabase }) => seedDatabase())

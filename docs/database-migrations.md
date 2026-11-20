@@ -31,10 +31,22 @@ In development use `pnpm db:migrate:local`, not `pnpm db:migrate`. Without
 `DATABASE_URL` is set. When the dev server finds no schema, its error says the
 same.
 
+Keep `DATABASE_URL=file:local.db` (or leave it empty) for development.
 `pnpm dev` and `pnpm db:migrate:local` both use `DATABASE_URL` from `.env` when
 it is set. If `.env` points it at a remote Turso database (a `libsql://` URL),
-the dev server reads and writes that database, and `db:migrate:local` migrates
-it. For local work, unset it or set it to `file:local.db`.
+possibly production, the dev server reads and writes that database, and
+`db:migrate:local` migrates it. To make that hard to do by accident:
+
+- `pnpm dev` logs one warning at startup naming the remote host (never the token).
+- Development never seeds sample data into a remote database. The first request
+  logs `[seed] Not seeding sample data: DATABASE_URL looks like a remote database ...`
+  instead, and `pnpm db:seed` refuses with the same message.
+- `QUIRE_DEV_REMOTE_DB=true` says you mean to develop against a remote
+  database (a personal Turso dev database, say). It only changes the messages:
+  the warning still shows, and sample data is still never seeded into it.
+
+The Demo is different on purpose: it runs in Demo mode and seeds its own remote
+database.
 
 If you have a `local.db` from before migrations, `pnpm db:migrate:local` stops
 with a baseline hint. For a local database, the simplest fix is
