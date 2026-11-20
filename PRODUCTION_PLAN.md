@@ -269,7 +269,7 @@ Acceptance: unit tests for username validation, the change flow (password, token
     - On the Cover and the Back Page, a $5 preset is a real link to exactly `https://venmo.com/<username>?txn=pay&amount=5.00&note=Tip%20for%20<Artist>%20via%20Quire`, with no venue, city or date.
     - Tapping it navigates there and records a Tip Tap (Issue, or General).
     - No `STRIPE_*` variable is set, `payments` is off, no Demo text shows, and an Artist without a username shows no tip buttons.
-  - **App bug found, not fixed here (reported to the lead):** the custom tip amount never works. `VenmoTipPanel.svelte` binds a `type="number"` input, Svelte gives a number, and `customDollars.trim()` throws, so the custom "Tip with Venmo" link never appears. The e2e is marked `test.fail()` until the fix lands.
+  - **App bug found and fixed in P5V-T02 (#20):** the custom tip amount never worked. `VenmoTipPanel.svelte` bound a `type="number"` input, Svelte gave a number, and `customDollars.trim()` threw, so the custom "Tip with Venmo" link never appeared. The custom-amount e2e now runs as a normal test.
 - Add a git remote and re-run `npx commitshow audit .` for an external score.
 - Deploy Demo first, then production.
 
