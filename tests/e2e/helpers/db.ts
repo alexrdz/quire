@@ -1,3 +1,5 @@
+import os from 'node:os';
+import path from 'node:path';
 import { createClient } from '@libsql/client';
 
 /**
@@ -5,8 +7,16 @@ import { createClient } from '@libsql/client';
  * serves from. Used to reset rate-limit counters (every e2e request comes from
  * the same address) and to add the Issue the CSP spec renders.
  */
-function client() {
-	return createClient({ url: 'file:local.db' });
+function client(url = 'file:local.db') {
+	return createClient({ url });
+}
+
+/**
+ * The file database of a local Demo- or production-mode e2e server
+ * (playwright.config.ts deletes and migrates it on every start).
+ */
+export function previewDatabasePath(name: 'demo' | 'production'): string {
+	return path.join(os.tmpdir(), 'quire-e2e', `${name}.db`);
 }
 
 /** Clears app rate-limit counters so earlier runs on this machine cannot trip a limit. */
@@ -81,8 +91,8 @@ export async function seedEmbedIssue(): Promise<string> {
 }
 
 /** The stored image URL of the newest photo page on an Issue in `city`, or null. */
-export async function latestPhotoUrlForCity(city: string): Promise<string | null> {
-	const db = client();
+export async function latestPhotoUrlForCity(city: string, databaseUrl?: string): Promise<string | null> {
+	const db = client(databaseUrl);
 	try {
 		const result = await db.execute({
 			sql: `SELECT p.content_json FROM issue_pages p JOIN issues i ON i.id = p.issue_id

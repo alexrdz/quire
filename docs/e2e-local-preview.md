@@ -37,10 +37,10 @@ production.
 The flag is honored only when all of these hold:
 
 - `DATABASE_URL` starts with `file:`;
-- `NETLIFY` is unset;
-- `CONTEXT` and `DEPLOY_URL` are unset.
+- `NETLIFY`, `CONTEXT` and `DEPLOY_URL` are unset (Netlify sets them during builds);
+- `SITE_ID` is unset (Netlify sets it during builds and inside functions; it is
+  the only one of the four present at function runtime, and it can't be set by hand).
 
-Netlify sets `NETLIFY`, `CONTEXT` and `DEPLOY_URL` on every build and function.
 A variable that is present but empty still counts as set. If any condition
 fails, the flag is ignored, the server logs why (variable names only, never
 values), and the normal fail-closed rules apply. A Demo or production server

@@ -39,7 +39,9 @@ describe('the guard', () => {
 		['NETLIFY set but empty', { NETLIFY: '' }, 'NETLIFY is set'],
 		['CONTEXT set', { CONTEXT: 'production' }, 'CONTEXT is set'],
 		['CONTEXT set to deploy-preview', { CONTEXT: 'deploy-preview' }, 'CONTEXT is set'],
-		['DEPLOY_URL set', { DEPLOY_URL: 'https://abc--quire.netlify.app' }, 'DEPLOY_URL is set']
+		['DEPLOY_URL set', { DEPLOY_URL: 'https://abc--quire.netlify.app' }, 'DEPLOY_URL is set'],
+		// The one Netlify variable a function sees at runtime.
+		['SITE_ID set (inside a Netlify function)', { SITE_ID: '1d01c0c0-4554-4747-93b8-34ce3448ab95' }, 'SITE_ID is set']
 	])('is ignored with %s', (_label, env, reason) => {
 		const decision = localPreviewFor({ ...LOCAL, ...env });
 		expect(decision.requested).toBe(true);
@@ -83,7 +85,8 @@ describe.each([
 	it.each([
 		['NETLIFY', { NETLIFY: 'true' }],
 		['CONTEXT', { CONTEXT: 'production' }],
-		['DEPLOY_URL', { DEPLOY_URL: 'https://abc--quire.netlify.app' }]
+		['DEPLOY_URL', { DEPLOY_URL: 'https://abc--quire.netlify.app' }],
+		['SITE_ID', { SITE_ID: '1d01c0c0-4554-4747-93b8-34ce3448ab95' }]
 	])('ignored when %s is set: the normal fail-closed rules apply', (_name, env) => {
 		const config = build(env);
 		expect(config.localPreview.honored).toBe(false);
@@ -135,7 +138,7 @@ describe('pnpm check:env (the real script)', () => {
 	function checkEnv(env: Env) {
 		const clean = Object.fromEntries(
 			Object.entries(process.env).filter(
-				([name]) => !['NETLIFY', 'CONTEXT', 'DEPLOY_URL', 'VITEST', 'NODE_ENV', 'DEMO_MODE'].includes(name)
+				([name]) => !['NETLIFY', 'CONTEXT', 'DEPLOY_URL', 'SITE_ID', 'VITEST', 'NODE_ENV', 'DEMO_MODE'].includes(name)
 			)
 		);
 		const result = spawnSync('node', ['--import', 'tsx', path.join('scripts', 'check-env.ts')], {

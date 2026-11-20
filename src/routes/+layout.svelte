@@ -6,6 +6,6 @@
 </script>
 
 <!-- Every page, including the error page, which renders inside this layout. -->
-<DemoBanner mode={data.features?.mode} />
+<DemoBanner mode={data.features?.mode} signupUrl={data.demoSignupUrl ?? null} />
 
 {@render children()}

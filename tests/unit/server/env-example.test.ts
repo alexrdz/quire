@@ -209,7 +209,7 @@ describe('4.1 .env.example matches what the app reads', () => {
 
 	it('leaves tooling-set variables commented out, so copying it never overrides them', () => {
 		const entries = parseEnvExample(exampleText);
-		for (const name of ['NODE_ENV', 'VITEST', 'CONTEXT', 'NETLIFY', 'DEPLOY_URL']) {
+		for (const name of ['NODE_ENV', 'VITEST', 'CONTEXT', 'NETLIFY', 'DEPLOY_URL', 'SITE_ID']) {
 			expect(entries.find((e) => e.name === name)?.commented, name).toBe(true);
 		}
 	});
