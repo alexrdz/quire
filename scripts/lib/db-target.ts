@@ -6,7 +6,7 @@
  * remote Turso URL.
  */
 import { createClient, type Client } from '@libsql/client';
-import { parseConfig, type Env } from '../../src/lib/server/config';
+import { databaseHost, isRemoteDatabaseUrl, parseConfig, type Env } from '../../src/lib/server/config';
 
 export function loadDotEnv(): void {
 	try {
@@ -18,13 +18,23 @@ export function loadDotEnv(): void {
 
 /** Where the URL points, safe to print: host or file path only, never a token or query. */
 export function describeDatabase(url: string): string {
-	if (url.startsWith('file:')) return url;
-	try {
-		const parsed = new URL(url);
-		return `${parsed.protocol}//${parsed.host}`;
-	} catch {
-		return '(unparseable DATABASE_URL)';
-	}
+	return databaseHost(url);
+}
+
+/**
+ * B1-T12: development mode migrates only a `file:` database. `pnpm db:migrate:local`
+ * sets NODE_ENV=development but used to migrate whatever DATABASE_URL was set,
+ * including a remote one such as production. Returns why it must not run, host
+ * only (never the token), or null. QUIRE_DEV_REMOTE_DB does not change this.
+ */
+export function developmentRemoteRefusal(env: Env = process.env): string | null {
+	const { core, mode } = parseConfig(env);
+	if (mode !== 'development' || !isRemoteDatabaseUrl(core.databaseUrl)) return null;
+	return (
+		`development mode migrates only a file: database, and DATABASE_URL is a remote database (${databaseHost(core.databaseUrl)}). ` +
+		'Nothing was migrated. For local work set DATABASE_URL=file:local.db. ' +
+		'A remote database is migrated with `pnpm db:migrate`, which runs in production mode: see docs/database-migrations.md.'
+	);
 }
 
 export function openTargetDatabase(env: Env = process.env): { client: Client; mode: string; label: string } {

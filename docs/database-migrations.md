@@ -11,7 +11,7 @@ only inserts data, and it stops with a migrate hint when the schema is missing
 | Command | What it does |
 |---|---|
 | `pnpm db:generate` | After editing `schema.ts`: writes the next SQL migration and snapshot into `drizzle/`. Commit both. |
-| `pnpm db:migrate:local` | Applies pending migrations in development mode: to `DATABASE_URL`, which defaults to `file:local.db`. |
+| `pnpm db:migrate:local` | Applies pending migrations in development mode, to a `file:` database only: `DATABASE_URL`, which defaults to `file:local.db`. With a remote `DATABASE_URL` it refuses, naming the host, and migrates nothing. |
 | `pnpm db:migrate` | Applies pending migrations to the database for the current mode: `DATABASE_URL` / `DATABASE_AUTH_TOKEN` in the Demo and production. The production Netlify build runs it. |
 | `pnpm db:migrate:preview` | The deploy-preview and branch-deploy build step. It skips unless a separate preview database is opted in (see below). |
 | `pnpm db:baseline [--dry-run \| --yes] [--to <migration>] [--allow-extra <table>,...]` | Run once on a database created before migrations: see [Baselining](#baselining-a-database-created-before-migrations). |
@@ -34,13 +34,16 @@ same.
 Keep `DATABASE_URL=file:local.db` (or leave it empty) for development.
 `pnpm dev` and `pnpm db:migrate:local` both use `DATABASE_URL` from `.env` when
 it is set. If `.env` points it at a remote Turso database (a `libsql://` URL),
-possibly production, the dev server reads and writes that database, and
-`db:migrate:local` migrates it. To make that hard to do by accident:
+possibly production, the dev server reads and writes that database. To make that
+hard to do by accident:
 
 - `pnpm dev` logs one warning at startup naming the remote host (never the token).
 - Development never seeds sample data into a remote database. The first request
   logs `[seed] Not seeding sample data: DATABASE_URL looks like a remote database ...`
   instead, and `pnpm db:seed` refuses with the same message.
+- `pnpm db:migrate:local` refuses a remote database: it names the host (never
+  the token), migrates nothing and exits with an error. A remote database is
+  migrated with `pnpm db:migrate`, which runs in production mode.
 - `QUIRE_DEV_REMOTE_DB=true` says you mean to develop against a remote
   database (a personal Turso dev database, say). It only changes the messages:
   the warning still shows, and sample data is still never seeded into it.
