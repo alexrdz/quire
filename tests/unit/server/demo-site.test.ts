@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 describe('Demo uploads on Netlify', () => {
-	it.each(['NETLIFY', 'CONTEXT', 'DEPLOY_URL'])('%s set means running on Netlify', (name) => {
+	it.each(['NETLIFY', 'CONTEXT', 'DEPLOY_URL', 'SITE_ID'])('%s set means running on Netlify', (name) => {
 		expect(runningOnNetlify({ [name]: 'x' })).toBe(true);
 	});
 
@@ -45,6 +45,12 @@ describe('Demo uploads on Netlify', () => {
 		expect(config.core.ok).toBe(true);
 		expect(config.features.uploads).toBe(false);
 		expect(config.localUploads).toBe('none');
+	});
+
+	it('inside a Netlify function, where SITE_ID is the only Netlify marker: uploads are off', () => {
+		// At function runtime Netlify sets only URL, SITE_NAME and SITE_ID; NETLIFY is build-only.
+		const config = parseConfig({ ...DEMO, URL: 'https://demo.quire.live', SITE_NAME: 'quire-demo', SITE_ID: 'site-id' });
+		expect(config.features.uploads).toBe(false);
 	});
 
 	it('the Demo on Netlify with R2 keys: uploads are live on R2', () => {
@@ -78,7 +84,8 @@ describe('Demo uploads on Netlify', () => {
 		vi.stubEnv('VITEST', '');
 		vi.stubEnv('NODE_ENV', 'production');
 		for (const [name, value] of Object.entries(DEMO)) vi.stubEnv(name, value!);
-		vi.stubEnv('NETLIFY', 'true');
+		// What a Netlify function sees (NETLIFY is set only during builds).
+		vi.stubEnv('SITE_ID', 'site-id');
 		resetConfigForTests();
 
 		const { uploadFormFile, uploadMedia } = await import('$lib/server/services/storage');

@@ -1,6 +1,6 @@
-import os from 'node:os';
 import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
+import { previewDatabasePath } from './tests/e2e/helpers/db';
 
 /**
  * Three local servers on the same production build (`pnpm build` first):
@@ -24,12 +24,12 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL;
 const demoBaseURL = process.env.DEMO_BASE_URL;
 
 const PORTS = { test: 4173, demo: 4174, production: 4175 } as const;
-const PREVIEW_DB_DIR = path.join(os.tmpdir(), 'quire-e2e');
+const PREVIEW_DB_DIR = path.dirname(previewDatabasePath('demo'));
 
 /** A Demo- or production-mode server with the local preview flag and its own fresh file database. */
 function previewServer(name: 'demo' | 'production', modeEnv: Record<string, string>) {
 	const port = PORTS[name];
-	const file = path.join(PREVIEW_DB_DIR, `${name}.db`);
+	const file = previewDatabasePath(name);
 	const quoted = JSON.stringify(file);
 	return {
 		command: [

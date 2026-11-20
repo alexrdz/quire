@@ -44,8 +44,14 @@ const DEV_APP_URL = 'http://localhost:5173';
 const LOCAL_PREVIEW_AUTH_SECRET = 'quire_e2e_local_preview_auth_secret_000000000000';
 const LOCAL_PREVIEW_COOKIE_SECRET = 'quire_e2e_local_preview_cookie_secret_00000000000';
 export const LOCAL_PREVIEW_FLAG = 'QUIRE_E2E_LOCAL_PREVIEW';
-/** Netlify sets these on every build and function; any one of them means "not local". */
-const NETLIFY_MARKERS = ['NETLIFY', 'CONTEXT', 'DEPLOY_URL'] as const;
+/**
+ * Any one of these means "on Netlify, not local". NETLIFY, CONTEXT and
+ * DEPLOY_URL exist only during builds. At function runtime Netlify sets only
+ * URL, SITE_NAME and SITE_ID (docs.netlify.com, Functions, Environment
+ * variables), so SITE_ID is the runtime marker: it is reserved, set on builds
+ * and functions alike, and can't be set or overridden by hand.
+ */
+const NETLIFY_MARKERS = ['NETLIFY', 'CONTEXT', 'DEPLOY_URL', 'SITE_ID'] as const;
 
 /**
  * True when this process runs on Netlify (a build or a function), where the
@@ -238,9 +244,9 @@ function ephemeralSecret(): string {
  * Decides whether the local e2e preview flag applies. All of these must hold,
  * otherwise the flag is ignored and the normal fail-closed rules apply:
  * - DATABASE_URL starts with `file:` (a local file, never a remote database);
- * - NETLIFY, CONTEXT and DEPLOY_URL are all unset (Netlify sets them on every
- *   build and function, so this never runs on a deployed site). A variable that
- *   is present but empty still counts as set.
+ * - NETLIFY, CONTEXT, DEPLOY_URL (Netlify builds) and SITE_ID (Netlify builds
+ *   and functions) are all unset, so this never applies on a deployed site. A
+ *   variable that is present but empty still counts as set.
  */
 export function localPreviewFor(rawEnv: Env): LocalPreview {
 	const requested = rawEnv[LOCAL_PREVIEW_FLAG]?.trim().toLowerCase() === 'true';

@@ -50,8 +50,11 @@ into Netlify in step 3. Don't reuse the production database or its token.
 
 ## 3. Set the environment variables (you, in Netlify)
 
-Site configuration, then **Environment variables**, on the Demo site. Scope each
-one to all contexts. Every name is in `.env.example`.
+Site configuration, then **Environment variables**, on the Demo site. Give each
+one all contexts and, if your plan shows scopes, all scopes: the app and the
+reset run as Netlify functions, which only see variables whose scope includes
+**Functions**. Set them in the UI, not in `netlify.toml`, because functions never
+see `netlify.toml` variables. Every name is in `.env.example`.
 
 | Variable | Value |
 |---|---|
@@ -106,14 +109,17 @@ the database:
 [demo-reset] skipped: mode is production, not demo. The reset only runs on the Demo site; nothing was touched.
 ```
 
-Unit tests prove this (`tests/unit/server/demo-reset.test.ts`). Scheduled
-functions have no public URL; they run only on their schedule or from the
-Netlify UI.
+Unit tests prove this (`tests/unit/server/demo-reset.test.ts`). Netlify's
+documentation says scheduled functions can't be invoked with a URL; they run
+only on their schedule, for published deploys (never Deploy Previews or branch
+deploys), or from **Run now** in the Netlify UI. A run may take at most 30
+seconds; the reset normally takes a second or two.
 
 ### Checking that it ran (you, in Netlify)
 
-On the Demo site: **Logs**, then **Functions**, then `demo-reset`. The function
-shows its schedule and next run. After a run its log has one line:
+On the Demo site, open the **Functions** page (under **Logs**) and select
+`demo-reset`. It carries a **Scheduled** badge and shows the next run time in
+your timezone. After a run its log has one line:
 
 ```
 [demo-reset] done: cleared 21 tables (143 rows), applied 0 of 5 migrations, reseeded in 812 ms.
@@ -125,6 +131,11 @@ again on its next page request.
 
 To run it now, use **Run now** on the same page. On the production site the
 same page should only ever show the `skipped` line.
+
+**Run now** also works on Deploy Previews and branch deploys. On the Demo site
+those use the Demo's database too, unless you scope a separate one to those
+contexts. A manual run there resets the live Demo with the preview's code, so
+use **Run now** only on the published deploy.
 
 ## Uploads
 
@@ -141,8 +152,9 @@ the local e2e Demo use can't work on the Demo site.
   the database rows but not the files, so add an R2 lifecycle rule that deletes
   objects after a day or two.
 
-The rule lives in `config.ts`: uploads count as "on Netlify" when `NETLIFY`,
-`CONTEXT` or `DEPLOY_URL` is set (`runningOnNetlify`).
+The rule lives in `config.ts` (`runningOnNetlify`): uploads count as "on
+Netlify" when `SITE_ID` is set, which Netlify does inside functions, or when
+`NETLIFY`, `CONTEXT` or `DEPLOY_URL` is set, which it does during builds.
 
 ## Deploy order
 
