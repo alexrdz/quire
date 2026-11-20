@@ -607,3 +607,42 @@
 	font-size: var(--text-small);
 	color: var(--highlight);
 }
+
+/* Demo banner (CONTEXT decision 29): in the page flow, never overlaid. Ink on
+   paper is about 19:1, well above AA. */
+.demo-banner {
+	position: relative;
+	z-index: 1;
+	background: var(--paper);
+	color: var(--ink);
+	border-block-end: 3px solid var(--support);
+	text-align: center;
+}
+
+.demo-banner-text {
+	margin-block: 0;
+	font-size: var(--text-small);
+	line-height: var(--leading-snug);
+	max-inline-size: 72ch;
+}
+
+.demo-banner-lead {
+	font-weight: var(--weight-heavy);
+}
+
+.demo-banner-link {
+	color: var(--ink);
+	font-size: var(--text-small);
+	font-weight: var(--weight-bold);
+	text-decoration: underline;
+	text-underline-offset: 0.15em;
+}
+
+.demo-banner--compact {
+	border-block-end-width: 2px;
+	border-radius: var(--radius-md);
+}
+
+.demo-banner--compact .demo-banner-text {
+	font-size: var(--text-meta);
+}

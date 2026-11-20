@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { Cover, Center, Stack, Cluster } from '$lib/components/layout';
+	import DemoBanner from '$lib/components/site/DemoBanner.svelte';
 
 	interface Props {
 		open: boolean;
@@ -77,6 +79,9 @@
 				</Cluster>
 			</button>
 		</Cluster>
+
+		<!-- The overlay hides the page's own Demo banner, so it carries a compact one. -->
+		<DemoBanner mode={page.data.features?.mode} compact />
 
 		<Center max="sm" centerText data-cover-main class="qr-case-stage">
 			<Stack gap="lg" align="center" class="qr-case-content">
