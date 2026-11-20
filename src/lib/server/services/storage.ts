@@ -8,7 +8,7 @@ import { type Result, type DomainError, ok, err } from '$domain/types';
 
 import { allowsStandIn, getConfig } from '$lib/server/config';
 
-import { FEATURE_UNAVAILABLE } from '$lib/features';
+import { featureUnavailableMessage } from '$lib/features';
 
 const r2 = getConfig().integrations.r2;
 
@@ -265,7 +265,7 @@ export async function uploadMedia(
 ): Promise<Result<UploadResult, DomainError>> {
 	const config = getConfig();
 	if (!config.features.uploads) {
-		return err({ code: 'UPLOADS_UNAVAILABLE', message: FEATURE_UNAVAILABLE.uploads });
+		return err({ code: 'UPLOADS_UNAVAILABLE', message: featureUnavailableMessage('uploads', config.mode) });
 	}
 
 	const detectedMime = await detectMediaType(options.buffer);
@@ -317,9 +317,10 @@ export async function uploadMedia(
 		}
 	}
 
-	// 2. Local fallback (/static/uploads/): development, test and the Demo only (ADR 0004, ADR 0007, decision 27)
-	if (!allowsStandIn('uploads', config.mode)) {
-		return err({ code: 'UPLOADS_UNAVAILABLE', message: FEATURE_UNAVAILABLE.uploads });
+	// 2. Local fallback (/static/uploads/): development, test and a local Demo only
+	// (ADR 0004, ADR 0007, decision 27). Never on Netlify, whose disk can't keep files.
+	if (!allowsStandIn('uploads', config.mode) || config.localUploads !== 'local') {
+		return err({ code: 'UPLOADS_UNAVAILABLE', message: featureUnavailableMessage('uploads', config.mode) });
 	}
 	try {
 		const uploadsDir = path.resolve(process.cwd(), 'static/uploads');
@@ -347,8 +348,9 @@ export async function uploadFormFile(
 	file: File,
 	options?: { kind?: MediaKindFilter }
 ): Promise<Result<UploadResult, DomainError>> {
-	if (!getConfig().features.uploads) {
-		return err({ code: 'UPLOADS_UNAVAILABLE', message: FEATURE_UNAVAILABLE.uploads });
+	const config = getConfig();
+	if (!config.features.uploads) {
+		return err({ code: 'UPLOADS_UNAVAILABLE', message: featureUnavailableMessage('uploads', config.mode) });
 	}
 
 	if (!file || typeof file.arrayBuffer !== 'function' || file.size <= 0) {

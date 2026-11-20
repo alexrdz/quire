@@ -3,7 +3,8 @@ import { hashPassword } from 'better-auth/crypto';
 import { client, db, schema } from './db';
 import { assertSchemaMigrated } from './db/schema-check';
 import { eq, and } from 'drizzle-orm';
-import { calculateStampWindow } from '$domain/stamping';
+// Relative, not $domain: the Netlify demo-reset function bundles this file outside Vite.
+import { calculateStampWindow } from '../domain/stamping';
 import { allowsSampleData, getConfig } from './config';
 
 /**

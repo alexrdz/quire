@@ -46,6 +46,15 @@ const LOCAL_PREVIEW_COOKIE_SECRET = 'quire_e2e_local_preview_cookie_secret_00000
 export const LOCAL_PREVIEW_FLAG = 'QUIRE_E2E_LOCAL_PREVIEW';
 /** Netlify sets these on every build and function; any one of them means "not local". */
 const NETLIFY_MARKERS = ['NETLIFY', 'CONTEXT', 'DEPLOY_URL'] as const;
+
+/**
+ * True when this process runs on Netlify (a build or a function), where the
+ * filesystem is read-only and per-invocation. Any one marker is enough; a
+ * marker that is present but empty still counts.
+ */
+export function runningOnNetlify(rawEnv: Env): boolean {
+	return NETLIFY_MARKERS.some((name) => rawEnv[name] !== undefined);
+}
 const DEFAULT_FROM_EMAIL = 'Quire <noreply@quire.live>';
 const DEFAULT_R2_BUCKET = 'quire-media';
 
@@ -136,6 +145,17 @@ export interface Config {
 	 * own, without the R2 keys, so the CSP still allows media already stored there.
 	 */
 	mediaOrigin: string | null;
+	/**
+	 * Origin of PUBLIC_PRODUCTION_URL (the real site, e.g. `https://quire.live`), or
+	 * null. The Demo banner links to its sign-up when set.
+	 */
+	productionUrl: string | null;
+	/**
+	 * Where uploads would go with no R2 keys: `local` (static/uploads, development,
+	 * test and a local Demo), or `none` (production, or any mode on Netlify, whose
+	 * filesystem can't keep files). Ignored when R2 is live.
+	 */
+	localUploads: 'local' | 'none';
 }
 
 const optionalString = z
@@ -169,6 +189,7 @@ const envSchema = z.object({
 	R2_SECRET_ACCESS_KEY: optionalString,
 	R2_BUCKET_NAME: optionalString,
 	R2_PUBLIC_URL: optionalString,
+	PUBLIC_PRODUCTION_URL: optionalString,
 	QUIRE_E2E_LOCAL_PREVIEW: optionalString
 });
 
@@ -365,10 +386,15 @@ export function parseConfig(rawEnv: Env): Config {
 		uploads: Boolean(integrations.r2)
 	};
 
+	// The local upload stand-in writes to static/uploads. On Netlify that disk is
+	// read-only and thrown away after each invocation, so a Demo there without R2
+	// keys has uploads off with the honest message, never a 500 (decision 30).
+	const localUploads = allowsStandIn('uploads', mode) && !runningOnNetlify(rawEnv) ? 'local' : 'none';
+
 	const features = Object.fromEntries(
 		(Object.keys(live) as FeatureName[]).map((name) => [
 			name,
-			live[name] || STAND_IN_MODES[name].includes(mode)
+			live[name] || (STAND_IN_MODES[name].includes(mode) && (name !== 'uploads' || localUploads === 'local'))
 		])
 	) as Record<FeatureName, boolean>;
 
@@ -382,7 +408,9 @@ export function parseConfig(rawEnv: Env): Config {
 		live,
 		fromEmail: env.RESEND_FROM_EMAIL ?? DEFAULT_FROM_EMAIL,
 		autoSeed: mode !== 'production' && env.DISABLE_AUTO_SEED?.toLowerCase() !== 'true',
-		mediaOrigin: originOf(env.R2_PUBLIC_URL)
+		mediaOrigin: originOf(env.R2_PUBLIC_URL),
+		productionUrl: originOf(env.PUBLIC_PRODUCTION_URL),
+		localUploads
 	};
 }
 

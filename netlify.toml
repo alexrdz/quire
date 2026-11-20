@@ -29,6 +29,13 @@
 [context.branch-deploy]
   command = "pnpm check:env && pnpm db:migrate:preview && pnpm build"
 
+# The Demo's nightly reset (netlify/functions/demo-reset.mts, docs/demo-site.md).
+# A scheduled function: it runs only on its schedule, with no public URL. It is
+# deployed on both sites and does nothing unless the site runs in demo mode.
+# It applies pending migrations before reseeding, so it needs the SQL files.
+[functions."demo-reset"]
+  included_files = ["drizzle/**"]
+
 # Static assets come from the CDN and never reach hooks.server.ts, so they get
 # the non-CSP security headers here. Pages and endpoints get the full set
 # (CSP included) from the hook.
