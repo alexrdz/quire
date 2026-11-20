@@ -31,11 +31,11 @@
 
 				<Cluster align="center" gap="xs">
 					<a href="/me/stubs" class="btn-nav-ghost">My Stubs</a>
-					{#if data.session?.user}
+					{#if data.viewer}
 						<form method="POST" action="/logout" class="signout-form">
 							<input type="hidden" name="redirectTo" value="/a/{data.artist.slug}" />
 							<button type="submit" class="btn-nav-ghost">
-								Sign Out ({data.session.user.name})
+								Sign Out ({data.viewer.name})
 							</button>
 						</form>
 					{:else}
@@ -196,7 +196,7 @@
 						<p class="text-muted subtext-small">
 							This artist has left Quire. The General Wall is preserved in read-only mode.
 						</p>
-					{:else if data.session?.user}
+					{:else if data.viewer}
 						<form
 							data-stack="gap:sm"
 							method="POST"
@@ -276,7 +276,7 @@
 										<span class="note-author">{note.author?.name || 'Fan'}</span>
 									</Cluster>
 
-									{#if data.session?.user && !data.isArtistClosed}
+									{#if data.viewer && !data.isArtistClosed}
 										<form method="POST" action="?/flagNote" use:enhance>
 											<input type="hidden" name="noteId" value={note.id} />
 											<button type="submit" class="btn-flag-note">

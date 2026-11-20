@@ -6,7 +6,7 @@ import { groupIssuesByMonth } from '$domain/issue';
 import { db, schema } from '$lib/server/db';
 import { eq, and, desc, isNull, inArray } from 'drizzle-orm';
 import { auth, createSessionForUser } from '$lib/server/auth';
-import { optionalUser, requireFan, isDenied } from '$lib/server/guards';
+import { optionalViewer, requireFan, isDenied } from '$lib/server/guards';
 import { consumeRateLimit } from '$lib/server/services/rate-limit';
 import { submitWallNote, flagWallNote } from '$lib/server/services/moderation';
 import { submitNoteSchema, flagNoteSchema } from '$schemas/wall';
@@ -46,7 +46,7 @@ export const load: ServerLoad = async (event) => {
 		}
 	});
 
-	const session = optionalUser(event);
+	const viewer = optionalViewer(event);
 
 	// Parse tip presets and links
 	let tipPresets = [3, 5, 10];
@@ -72,7 +72,7 @@ export const load: ServerLoad = async (event) => {
 		generalNotes,
 		tipPresets,
 		links,
-		session
+		viewer
 	};
 };
 

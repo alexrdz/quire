@@ -30,7 +30,7 @@ const DEFAULT_SIGNUP_BIO = 'Live digital zines and tour archive on Quire.';
 export const load: ServerLoad = async (event) => {
 	const { request, url } = event;
 	// The /dashboard layout guards too, but a layout guard alone protects nothing (see guards.ts).
-	const { user, artist: guarded } = await requireArtist(event);
+	const { artist: guarded } = await requireArtist(event);
 
 	const artist = await db.query.artists.findFirst({
 		where: eq(schema.artists.id, guarded.id),
@@ -146,8 +146,6 @@ export const load: ServerLoad = async (event) => {
 
 	return {
 		artist,
-		emailVerified: Boolean(user.emailVerified),
-		userEmail: user.email,
 		latestRecap,
 		issues: issuesWithTipTaps,
 		generalRow,

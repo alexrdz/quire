@@ -30,7 +30,7 @@
 			const savedDraft = sessionStorage.getItem(`quire_draft_${data.issue.id}`);
 			if (savedDraft) {
 				noteBody = savedDraft;
-				if (data.session?.user) {
+				if (data.viewer) {
 					sessionStorage.removeItem(`quire_draft_${data.issue.id}`);
 				}
 			}
@@ -213,7 +213,7 @@
 					{#if data.isScanVerified}
 						<span class="meta-chip meta-highlight">● Attended Stamp Eligible</span>
 					{/if}
-					{#if data.session?.user}
+					{#if data.viewer}
 						<a href="/me/stubs" class="btn-nav-ghost">My Stubs</a>
 					{:else}
 						<button type="button" class="btn-nav-primary" onclick={() => openAuthFor('')}>
@@ -598,7 +598,7 @@
 							? 'This artist has left Quire. The Wall is preserved in read-only archive mode.'
 							: 'This issue is archived and preserved in read-only mode.'}
 					</p>
-				{:else if data.session?.user}
+				{:else if data.viewer}
 					<form
 						data-stack="gap:sm"
 						method="POST"
@@ -685,7 +685,7 @@
 									{/if}
 								</Cluster>
 
-								{#if data.session?.user && !data.isReadOnly}
+								{#if data.viewer && !data.isReadOnly}
 									<form method="POST" action="?/flagNote" use:enhance>
 										<input type="hidden" name="noteId" value={note.id} />
 										<button type="submit" class="btn-flag-note">
@@ -777,7 +777,7 @@
 								<p class="text-highlight stub-status-note">
 									● Venue QR Scan Verified! Claim your permanent attendance stub:
 								</p>
-								{#if data.session?.user}
+								{#if data.viewer}
 									<form method="POST" action="?/claimStamp" use:enhance>
 										<input type="hidden" name="issueId" value={data.issue.id} />
 										<button type="submit" class="btn-claim-stamp">
@@ -807,7 +807,7 @@
 											Open My Stubs →
 										</a>
 									</Cluster>
-								{:else if data.session?.user}
+								{:else if data.viewer}
 									<form method="POST" action="?/saveIssue" use:enhance>
 										<input type="hidden" name="issueId" value={data.issue.id} />
 										<button type="submit" class="btn-save-issue">

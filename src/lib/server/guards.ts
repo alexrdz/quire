@@ -128,3 +128,26 @@ export function requireFanPage(event: GuardEvent, fallback = '/me/stubs'): Signe
 	if (!signedIn) throw redirect(303, loginRedirect(event.url, fallback));
 	return signedIn;
 }
+
+/**
+ * What a page may know about the signed-in user (P4L-T05). Loads return this,
+ * never the session record or the full user row: page data is serialized into
+ * the HTML and `__data.json`, and the session token there would undo the
+ * HttpOnly cookie that keeps it from scripts.
+ */
+export interface Viewer {
+	id: string;
+	name: string;
+	image: string | null;
+	accountType: SessionUser['accountType'];
+}
+
+export function toViewer(user: SessionUser): Viewer {
+	return { id: user.id, name: user.name, image: user.image ?? null, accountType: user.accountType };
+}
+
+/** The signed-in user as a Viewer, or null. For public page loads. */
+export function optionalViewer(event: GuardEvent): Viewer | null {
+	const signedIn = optionalUser(event);
+	return signedIn ? toViewer(signedIn.user) : null;
+}

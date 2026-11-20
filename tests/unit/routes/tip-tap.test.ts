@@ -344,7 +344,7 @@ describe('tip buttons on the Back Page', () => {
 			generalNotes: [],
 			tipPresets: [3, 5, 10],
 			links: [],
-			session: null
+			viewer: null
 		};
 	}
 
