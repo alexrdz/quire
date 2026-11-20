@@ -5,7 +5,8 @@
  * file:local.db; development defaults to it; the Demo and production need the
  * remote Turso URL.
  */
-import { createClient, type Client } from '@libsql/client';
+import type { Client } from '@libsql/client';
+import { createAppClient } from '../../src/lib/server/db/file-client';
 import { databaseHost, isRemoteDatabaseUrl, parseConfig, type Env } from '../../src/lib/server/config';
 
 export function loadDotEnv(): void {
@@ -44,7 +45,8 @@ export function openTargetDatabase(env: Env = process.env): { client: Client; mo
 			`DATABASE_URL is missing or not a remote Turso URL for ${mode} mode. For the local file database run with NODE_ENV=development (pnpm db:migrate:local).`
 		);
 	}
-	const client = createClient({
+	// File databases wait for locks instead of failing with SQLITE_BUSY (Q-T01).
+	const client = createAppClient({
 		url: core.databaseUrl,
 		...(core.databaseAuthToken ? { authToken: core.databaseAuthToken } : {})
 	});

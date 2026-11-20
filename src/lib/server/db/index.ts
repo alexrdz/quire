@@ -1,7 +1,9 @@
-import { createClient, type Client } from '@libsql/client';
+import type { Client } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
 import { getConfig } from '../config';
 import * as schema from './schema';
+// A file: database gets a busy timeout before its first query (Q-T01); remote is unchanged.
+import { createAppClient } from './file-client';
 
 const { core } = getConfig();
 
@@ -20,7 +22,7 @@ function unavailable<T extends object>(name: string): T {
 }
 
 export const client: Client = core.ok
-	? createClient({
+	? createAppClient({
 			url: core.databaseUrl,
 			...(core.databaseAuthToken ? { authToken: core.databaseAuthToken } : {})
 		})
