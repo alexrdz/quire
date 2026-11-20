@@ -3,6 +3,7 @@
  * schema is created or changed.
  *
  *   pnpm db:migrate           production build and any local run
+ *   pnpm db:migrate:local     development: only a file: database, never a remote one
  *   pnpm db:migrate:preview   Netlify deploy previews and branch deploys: skips
  *                             unless a separate preview database is opted in
  *                             (PREVIEW_DATABASE_URL), see docs/database-migrations.md
@@ -10,7 +11,7 @@
  * Exits non-zero on failure, so the Netlify build (and the deploy) stops.
  */
 import { migrationPlanFor, runMigrations } from '../src/lib/server/db/migrate';
-import { loadDotEnv, openTargetDatabase } from './lib/db-target';
+import { developmentRemoteRefusal, loadDotEnv, openTargetDatabase } from './lib/db-target';
 
 loadDotEnv();
 
@@ -21,6 +22,13 @@ if (plan.action === 'skip') {
 }
 if (plan.action === 'refuse') {
 	console.error(`[db:migrate] refused: ${plan.reason}`);
+	process.exit(1);
+}
+
+// Development never migrates a remote database (B1-T12), before any connection is opened.
+const devRefusal = developmentRemoteRefusal();
+if (devRefusal) {
+	console.error(`[db:migrate] refused: ${devRefusal}`);
 	process.exit(1);
 }
 
