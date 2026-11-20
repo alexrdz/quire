@@ -23,7 +23,7 @@ import { previewDatabasePath } from './tests/e2e/helpers/db';
 const baseURL = process.env.PLAYWRIGHT_BASE_URL;
 const demoBaseURL = process.env.DEMO_BASE_URL;
 
-const PORTS = { test: 4173, demo: 4174, production: 4175 } as const;
+const PORTS = { test: 4173, demo: 4174, production: 4175, coreMissing: 4176 } as const;
 const PREVIEW_DB_DIR = path.dirname(previewDatabasePath('demo'));
 
 /** A Demo- or production-mode server with the local preview flag and its own fresh file database. */
@@ -66,7 +66,24 @@ const webServers = [
 				}
 			]),
 	...(demoBaseURL ? [] : [previewServer('demo', { DEMO_MODE: 'true' })]),
-	previewServer('production', { NODE_ENV: 'production' })
+	previewServer('production', { NODE_ENV: 'production' }),
+	{
+		// Production with a core key missing (PRODUCTION_PLAN Phase 5): the local-preview
+		// flag and a file database, but no app URL, so core config is invalid and every
+		// request but /healthz gets the 503 page. The database is never opened, so it
+		// needs no migration. Specs reach it at CORE_MISSING_URL (tests/e2e/helpers/production-db.ts).
+		command: `pnpm preview --port ${PORTS.coreMissing} --strictPort`,
+		port: PORTS.coreMissing,
+		reuseExistingServer: !process.env.CI,
+		env: {
+			NODE_ENV: 'production',
+			QUIRE_E2E_LOCAL_PREVIEW: 'true',
+			DATABASE_URL: `file:${path.join(PREVIEW_DB_DIR, 'core-missing.db')}`,
+			// Empty, not omitted: Playwright passes the runner's environment through.
+			BETTER_AUTH_URL: '',
+			PUBLIC_APP_URL: ''
+		}
+	}
 ];
 
 export default defineConfig({
@@ -91,6 +108,8 @@ export default defineConfig({
 		{
 			name: 'production-mode',
 			testDir: 'tests/e2e/production',
+			// One worker: specs share the server's rollback-journal SQLite file, so parallel writes hit SQLITE_BUSY.
+			workers: 1,
 			use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORTS.production}` }
 		}
 	]

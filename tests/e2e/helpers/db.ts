@@ -19,6 +19,16 @@ export function previewDatabasePath(name: 'demo' | 'production'): string {
 	return path.join(os.tmpdir(), 'quire-e2e', `${name}.db`);
 }
 
+/**
+ * A client that waits for the server's writes instead of failing with
+ * SQLITE_BUSY: the server and parallel specs share this file.
+ */
+async function waitingClient(databaseUrl?: string) {
+	const db = client(databaseUrl);
+	await db.execute('PRAGMA busy_timeout = 5000');
+	return db;
+}
+
 /** Clears app rate-limit counters so earlier runs on this machine cannot trip a limit. */
 export async function resetRateLimits(): Promise<void> {
 	const db = client();
@@ -92,7 +102,7 @@ export async function seedEmbedIssue(): Promise<string> {
 
 /** The stored image URL of the newest photo page on an Issue in `city`, or null. */
 export async function latestPhotoUrlForCity(city: string, databaseUrl?: string): Promise<string | null> {
-	const db = client(databaseUrl);
+	const db = await waitingClient(databaseUrl);
 	try {
 		const result = await db.execute({
 			sql: `SELECT p.content_json FROM issue_pages p JOIN issues i ON i.id = p.issue_id
@@ -105,3 +115,15 @@ export async function latestPhotoUrlForCity(city: string, databaseUrl?: string):
 		db.close();
 	}
 }
+
+/** How many Issues exist in `city` (a refused upload must not create one). */
+export async function issueCountForCity(city: string): Promise<number> {
+	const db = await waitingClient();
+	try {
+		const result = await db.execute({ sql: 'SELECT count(*) AS n FROM issues WHERE city = ?', args: [city] });
+		return Number(result.rows[0]?.n ?? 0);
+	} finally {
+		db.close();
+	}
+}
+

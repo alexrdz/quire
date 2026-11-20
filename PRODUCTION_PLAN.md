@@ -251,6 +251,25 @@ Acceptance: unit tests for username validation, the change flow (password, token
 
 - `pnpm check`, `pnpm test`, `pnpm test:e2e`, `pnpm check:sizing` green.
 - New e2e suite run against a production-mode preview: missing core key returns 503; each missing feature key shows its message; `/demo` is 404; GET `/logout` is 405; open-redirect payloads are rejected; malicious uploads are rejected. A tip tap opens a `venmo.com` link with the right username, amount and generic note, and no Stripe key is required.
+
+  **Status (2026-11-20, P5V-T01): done.** Every check above has an e2e that runs in plain `pnpm test:e2e`, with no network (`docs/e2e-local-preview.md`):
+  - *Missing core key*, `production/core-missing.spec.ts`: a fourth server on port 4176 runs production with `BETTER_AUTH_URL` empty. `/`, `/a/x`, `/i/x`, `/login`, `/dashboard`, `/api/auth/session` and `get-session`, the sign-in, tip-tap and logout POSTs all get the static 503 page with `retry-after`, `no-store` and the security headers. `/healthz` reports `core: invalid` with 503. No body names a variable or holds a value.
+  - *Feature messages*, `production/feature-messages.spec.ts` (no Resend, Google or R2 keys):
+    - Sign-up and password reset show the email-off message with the submit button disabled. Their actions and the Better Auth email endpoints answer 503 and create no user.
+    - Fan sign-in shows its off message on `/login`, the Issue and the Back Page. All three Google actions answer 503 with no session (no sample-Fan stand-in), and Better Auth has no Google provider (404).
+    - Every file input on Quick Issue, the Template and the Bookbinder is disabled and shows the uploads-off message.
+  - *`/demo` 404* (already in `production/production-mode.spec.ts`). *GET `/logout` 405 and POST sign-out*: `production/logout-and-redirects.spec.ts`.
+  - *Open redirects*: 21 payloads (the 2.1 list plus encoded, scheme and case variants) go through every redirect param. Each lands on a same-origin fallback or is refused (Better Auth answers 403 `INVALID_CALLBACK_URL`).
+    - Production checks: `/login?redirect=` (signed out through the form, and signed in), the login action's `redirectTo` and `?redirect=`, `/logout`'s query and form, `/demo` (404) and Better Auth's `callbackURL`.
+    - Test-mode checks, for routes the Demo site still serves (`open-redirects.spec.ts`): `/demo` for both roles, the stand-in Google sign-in, and the Issue sign-in `targetHash`.
+  - *Malicious uploads*:
+    - Production (`production/uploads.spec.ts`): all five upload actions answer the uploads-off message (400, never 500) for a valid PNG, SVG, polyglots, wrong MIME, oversize and fake audio. They write nothing: no Issue, page, cover art or file. Pasted URLs still save.
+    - Test mode (`upload-hardening.spec.ts`): the same files go through the real validator and get their own messages. A PNG with an appended script is stored as WebP without the script.
+  - *Venmo tip* (`production/venmo-tip.spec.ts`; venmo.com intercepted):
+    - On the Cover and the Back Page, a $5 preset is a real link to exactly `https://venmo.com/<username>?txn=pay&amount=5.00&note=Tip%20for%20<Artist>%20via%20Quire`, with no venue, city or date.
+    - Tapping it navigates there and records a Tip Tap (Issue, or General).
+    - No `STRIPE_*` variable is set, `payments` is off, no Demo text shows, and an Artist without a username shows no tip buttons.
+  - **App bug found, not fixed here (reported to the lead):** the custom tip amount never works. `VenmoTipPanel.svelte` binds a `type="number"` input, Svelte gives a number, and `customDollars.trim()` throws, so the custom "Tip with Venmo" link never appears. The e2e is marked `test.fail()` until the fix lands.
 - Add a git remote and re-run `npx commitshow audit .` for an external score.
 - Deploy Demo first, then production.
 
