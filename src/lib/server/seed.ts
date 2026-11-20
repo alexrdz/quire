@@ -5,6 +5,7 @@ import { assertSchemaMigrated } from './db/schema-check';
 import { eq, and } from 'drizzle-orm';
 // Relative, not $domain: the Netlify demo-reset function bundles this file outside Vite.
 import { calculateStampWindow } from '../domain/stamping';
+import type { PhotoEntry } from '../domain/photo-pile';
 import { allowsSampleData, getConfig } from './config';
 
 /**
@@ -34,6 +35,65 @@ async function reopenSampleStampWindow(now: Date): Promise<void> {
 		.update(schema.issues)
 		.set({ stampWindowStart: window.start, stampWindowEnd: window.end })
 		.where(eq(schema.issues.slug, OPEN_WINDOW_SAMPLE_SLUG));
+}
+
+/** A sample Unsplash photo (the CSP's img-src allows images.unsplash.com in every mode). */
+function samplePhotoUrl(photoId: string): string {
+	return `https://images.unsplash.com/photo-${photoId}?auto=format&fit=crop&q=80&w=1000`;
+}
+
+/**
+ * The Brooklyn Tour Diary pile: five photos, most captioned so they flip, one
+ * left bare so the pile shows both kinds. The first photo is the one this page
+ * has always had.
+ */
+export const BROOKLYN_TOUR_DIARY_PHOTOS: readonly PhotoEntry[] = [
+	{
+		url: samplePhotoUrl('1598387181032-a3103a2db5b3'),
+		caption: 'Song three. The barricade gave up before we did.'
+	},
+	{
+		url: samplePhotoUrl('1498038432885-c6f3f1b912ee'),
+		caption: 'Velvet Wire ran eleven minutes. Nobody asked us to stop.'
+	},
+	{ url: samplePhotoUrl('1511671782779-c97d3d27a1d4') },
+	{
+		url: samplePhotoUrl('1501386761578-eac5c94b800a'),
+		caption: 'Front row knew every word of Static Bloom. It came out last week.'
+	},
+	{
+		url: samplePhotoUrl('1493225457124-a3eb161ffa5f'),
+		caption: 'The Baby’s crew lent us their fog machine. We used all of it.'
+	}
+];
+
+/** The Philadelphia Tour Diary pile: three captioned photos. */
+export const PHILLY_TOUR_DIARY_PHOTOS: readonly PhotoEntry[] = [
+	{
+		url: samplePhotoUrl('1540039155733-5bb30b53aa14'),
+		caption: 'The balcony shook during the chorus. We felt it through the monitors.'
+	},
+	{
+		url: samplePhotoUrl('1510915361894-db8b60106cb1'),
+		caption: 'Fishtown Rain was not on the setlist. It is now.'
+	},
+	{
+		url: samplePhotoUrl('1459749411175-04bf5292ceea'),
+		caption: 'Lights down for Night Bus to Girard. Cheesesteaks after.'
+	}
+];
+
+/**
+ * Photo page content in the format the Bookbinder saves: `photos` for the pile,
+ * and `imageUrl` mirroring the first photo for readers of the one-photo format.
+ */
+function photoPageContent(input: { title: string; body: string; photos: readonly PhotoEntry[] }) {
+	return {
+		title: input.title,
+		imageUrl: input.photos[0].url,
+		photos: input.photos.map((photo) => ({ ...photo })),
+		body: input.body
+	};
 }
 
 export const SEED_REFUSED_MESSAGE =
@@ -272,12 +332,13 @@ export async function seedDatabase() {
 			issueId: issue1Id,
 			position: 2,
 			kind: 'photo',
-			contentJson: JSON.stringify({
-				title: 'Tour Diary: Brooklyn Kickoff',
-				imageUrl:
-					'https://images.unsplash.com/photo-1598387181032-a3103a2db5b3?auto=format&fit=crop&q=80&w=1000',
-				body: 'Sold out the back room at Baby’s. You animals broke the barricade on song three.'
-			}),
+			contentJson: JSON.stringify(
+				photoPageContent({
+					title: 'Tour Diary: Brooklyn Kickoff',
+					body: 'Sold out the back room at Baby’s. You animals broke the barricade on song three.',
+					photos: BROOKLYN_TOUR_DIARY_PHOTOS
+				})
+			),
 			createdAt: now
 		},
 		{
@@ -294,6 +355,20 @@ export async function seedDatabase() {
 					'Night Bus to Girard'
 				]
 			}),
+			createdAt: now
+		},
+		{
+			id: crypto.randomUUID(),
+			issueId: issue2Id,
+			position: 2,
+			kind: 'photo',
+			contentJson: JSON.stringify(
+				photoPageContent({
+					title: 'Tour Diary: Philly Balcony',
+					body: 'Three frames from Johnny Brenda’s, shot from the side of the stage between songs.',
+					photos: PHILLY_TOUR_DIARY_PHOTOS
+				})
+			),
 			createdAt: now
 		},
 		{
