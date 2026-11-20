@@ -64,6 +64,15 @@ export type PileState =
 
 export type PileEvent = 'toss' | 'restore' | 'flip' | 'restack';
 
+/**
+ * A one-photo pile is a single card: it can flip, but tossing it would only
+ * leave an empty "cleared" stage, so toss (and with it restore and restack)
+ * needs at least two photos.
+ */
+export function pileCanToss(total: number): boolean {
+	return total > 1;
+}
+
 export function createPile(total: number): PileState {
 	const safeTotal = Number.isFinite(total) ? Math.max(0, Math.floor(total)) : 0;
 	return safeTotal === 0
@@ -82,6 +91,7 @@ export function transitionPile(state: PileState, event: PileEvent): Result<PileS
 	switch (state.phase) {
 		case 'stacked': {
 			if (event === 'toss') {
+				if (!pileCanToss(state.total)) return invalid(state, event);
 				const next = state.top + 1;
 				return ok(
 					next >= state.total
