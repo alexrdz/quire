@@ -99,10 +99,6 @@ test('every preset carries the right amount', async ({ page }) => {
 });
 
 test('a custom amount carries the right amount', async ({ page }) => {
-	// Known app bug, reported to the lead in P5V-T01: VenmoTipPanel binds a type="number"
-	// input, so Svelte gives a number and `customDollars.trim()` throws; the custom
-	// "Tip with Venmo" link never appears. Remove test.fail() once it is fixed.
-	test.fail();
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	await interceptVenmo(page);
