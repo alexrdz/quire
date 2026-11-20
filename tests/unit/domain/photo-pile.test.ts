@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	MAX_PHOTOS_PER_PAGE,
 	createPile,
+	pileCanToss,
 	pileTilt,
 	resolvePhotoEntries,
 	transitionPile,
@@ -117,9 +118,44 @@ describe('pile position FSM', () => {
 	it('rejects impossible transitions', () => {
 		expect(transitionPile(createPile(3), 'restore').ok).toBe(false);
 		expect(transitionPile(createPile(3), 'restack').ok).toBe(false);
-		const cleared = run(createPile(1), 'toss');
+		const cleared = run(createPile(2), 'toss', 'toss');
 		expect(transitionPile(cleared, 'toss').ok).toBe(false);
 		expect(transitionPile(cleared, 'flip').ok).toBe(false);
 		expect(transitionPile(createPile(0), 'restore').ok).toBe(false);
+	});
+
+	describe('a one-photo pile', () => {
+		it('starts stacked on its only photo, front side up', () => {
+			expect(createPile(1)).toEqual({ phase: 'stacked', total: 1, top: 0, side: 'front' });
+		});
+
+		it('flips to the caption side and back', () => {
+			expect(run(createPile(1), 'flip')).toEqual({ phase: 'stacked', total: 1, top: 0, side: 'back' });
+			expect(run(createPile(1), 'flip', 'flip')).toEqual({
+				phase: 'stacked',
+				total: 1,
+				top: 0,
+				side: 'front'
+			});
+		});
+
+		it('cannot be tossed into an empty cleared state, from either side', () => {
+			expect(transitionPile(createPile(1), 'toss').ok).toBe(false);
+			expect(transitionPile(run(createPile(1), 'flip'), 'toss').ok).toBe(false);
+		});
+
+		it('has nothing to restore or restack', () => {
+			expect(transitionPile(createPile(1), 'restore').ok).toBe(false);
+			expect(transitionPile(createPile(1), 'restack').ok).toBe(false);
+		});
+	});
+});
+
+describe('pileCanToss', () => {
+	it('needs at least two photos', () => {
+		expect(pileCanToss(0)).toBe(false);
+		expect(pileCanToss(1)).toBe(false);
+		expect(pileCanToss(2)).toBe(true);
+		expect(pileCanToss(12)).toBe(true);
 	});
 });

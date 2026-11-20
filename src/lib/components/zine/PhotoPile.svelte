@@ -3,6 +3,7 @@
 	import { Stack, Cluster, Frame } from '$lib/components/layout';
 	import {
 		createPile,
+		pileCanToss,
 		pileTilt,
 		transitionPile,
 		type PhotoEntry,
@@ -31,6 +32,8 @@
 	let dragStartX = 0;
 	let dragMoved = false;
 
+	/** One photo is a single card: it flips when captioned, but never tosses into an empty stage. */
+	let single = $derived(!pileCanToss(photos.length));
 	let topIndex = $derived(pile.phase === 'stacked' ? pile.top : photos.length);
 	let isBack = $derived(pile.phase === 'stacked' && pile.side === 'back');
 	let topPhoto = $derived(pile.phase === 'stacked' ? photos[pile.top] : undefined);
@@ -42,7 +45,9 @@
 			: `${pad(pile.total)} / ${pad(pile.total)}`
 	);
 	let announcement = $derived(
-		pile.phase === 'stacked'
+		single
+			? `Photo${topPhoto?.caption ? `: ${topPhoto.caption}` : ''}${isBack ? ' (caption side)' : ''}`
+			: pile.phase === 'stacked'
 			? `Photo ${pile.top + 1} of ${pile.total}${topPhoto?.caption ? `: ${topPhoto.caption}` : ''}${isBack ? ' (caption side)' : ''}`
 			: 'End of the pile. Use Restack to view the photos again.'
 	);
@@ -61,7 +66,7 @@
 	}
 
 	function toss(direction?: 1 | -1): void {
-		if (pile.phase !== 'stacked') return;
+		if (pile.phase !== 'stacked' || single) return;
 		tossDirections[pile.top] = direction ?? defaultDirection(pile.top);
 		send('toss');
 	}
@@ -77,7 +82,7 @@
 	}
 
 	function onPointerDown(event: PointerEvent): void {
-		if (pile.phase !== 'stacked') return;
+		if (pile.phase !== 'stacked' || single) return;
 		if (event.pointerType === 'mouse' && event.button !== 0) return;
 		dragging = true;
 		dragMoved = false;
@@ -108,7 +113,7 @@
 		dragMoved = false;
 	}
 
-	/** A tap flips a captioned photo and tosses a photo without a caption. */
+	/** A tap flips a captioned photo and tosses a photo without a caption (a single card stays put). */
 	function onCardClick(): void {
 		if (dragMoved) {
 			dragMoved = false;
@@ -119,6 +124,13 @@
 		} else {
 			toss();
 		}
+	}
+
+	function cardLabel(photo: PhotoEntry, index: number): string {
+		if (single) return 'Photo. Tap to flip and read the caption.';
+		return photo.caption
+			? `Photo ${index + 1} of ${photos.length}. Tap to flip and read the caption, or swipe to toss.`
+			: `Photo ${index + 1} of ${photos.length}. Tap or swipe to toss.`;
 	}
 
 	function cardStyle(index: number): string {
@@ -135,10 +147,37 @@
 	}
 </script>
 
+{#snippet faces(photo: PhotoEntry, i: number)}
+	<Stack as="span" gap="none" class="polaroid-face polaroid-front">
+		<Frame as="span" ratio="1-1" class="polaroid-photo">
+			<img
+				src={photo.url}
+				alt={photo.caption || `${label} photo ${i + 1}`}
+				loading={i < 3 ? 'eager' : 'lazy'}
+				decoding="async"
+				draggable="false"
+			/>
+		</Frame>
+		<span class="polaroid-strip font-mono">
+			<span>{pad(i + 1)}</span>
+			{#if photo.caption}
+				<span class="polaroid-hint">Flip</span>
+			{/if}
+		</span>
+	</Stack>
+	<Stack as="span" gap="xs" align="center" class="polaroid-face polaroid-back">
+		<span class="polaroid-note">{photo.caption}</span>
+		<span class="polaroid-strip font-mono">
+			{single ? pad(1) : `${pad(i + 1)} / ${pad(photos.length)}`}
+		</span>
+	</Stack>
+{/snippet}
+
 <Stack gap="sm" class="photo-pile">
 	<div class="pile-stage" role="group" aria-roledescription="photo pile" aria-label={label}>
 		{#each photos as photo, i (photo.url + i)}
 			{@const state = cardState(i)}
+			{@const interactive = !single || Boolean(photo.caption)}
 			<div
 				class="polaroid"
 				data-state={state}
@@ -146,41 +185,27 @@
 				style={cardStyle(i)}
 				inert={state !== 'top'}
 			>
-				<button
-					type="button"
-					class="polaroid-body"
-					data-side={state === 'top' && isBack ? 'back' : 'front'}
-					aria-label={photo.caption
-						? `Photo ${i + 1} of ${photos.length}. Tap to flip and read the caption, or swipe to toss.`
-						: `Photo ${i + 1} of ${photos.length}. Tap or swipe to toss.`}
-					onpointerdown={onPointerDown}
-					onpointermove={onPointerMove}
-					onpointerup={onPointerUp}
-					onpointercancel={onPointerCancel}
-					onclick={onCardClick}
-				>
-					<Stack as="span" gap="none" class="polaroid-face polaroid-front">
-						<Frame as="span" ratio="1-1" class="polaroid-photo">
-							<img
-								src={photo.url}
-								alt={photo.caption || `${label} photo ${i + 1}`}
-								loading={i < 3 ? 'eager' : 'lazy'}
-								decoding="async"
-								draggable="false"
-							/>
-						</Frame>
-						<span class="polaroid-strip font-mono">
-							<span>{pad(i + 1)}</span>
-							{#if photo.caption}
-								<span class="polaroid-hint">Flip</span>
-							{/if}
-						</span>
-					</Stack>
-					<Stack as="span" gap="xs" align="center" class="polaroid-face polaroid-back">
-						<span class="polaroid-note">{photo.caption}</span>
-						<span class="polaroid-strip font-mono">{pad(i + 1)} / {pad(photos.length)}</span>
-					</Stack>
-				</button>
+				{#if interactive}
+					<button
+						type="button"
+						class="polaroid-body"
+						data-side={state === 'top' && isBack ? 'back' : 'front'}
+						data-single={single ? 'true' : undefined}
+						aria-label={cardLabel(photo, i)}
+						onpointerdown={onPointerDown}
+						onpointermove={onPointerMove}
+						onpointerup={onPointerUp}
+						onpointercancel={onPointerCancel}
+						onclick={onCardClick}
+					>
+						{@render faces(photo, i)}
+					</button>
+				{:else}
+					<!-- A single photo without a caption has nothing to do on tap, so it is not a button. -->
+					<span class="polaroid-body" data-side="front" data-single="true">
+						{@render faces(photo, i)}
+					</span>
+				{/if}
 			</div>
 		{/each}
 		{#if pile.phase === 'cleared'}
@@ -188,20 +213,28 @@
 		{/if}
 	</div>
 
-	<Cluster justify="between" align="center" gap="xs" class="pile-controls">
-		<button type="button" class="pile-btn" onclick={() => send('restore')} disabled={!canRestore}>
-			Back
-		</button>
-		<button type="button" class="pile-btn" onclick={flip} disabled={!canFlip}>Flip</button>
-		<span class="pile-counter font-mono" aria-hidden="true">{counter}</span>
-		{#if pile.phase === 'cleared'}
-			<button type="button" class="pile-btn pile-btn-primary" onclick={() => send('restack')}>
-				Restack
-			</button>
-		{:else}
-			<button type="button" class="pile-btn pile-btn-primary" onclick={() => toss()}>Toss</button>
+	{#if single}
+		{#if canFlip}
+			<Cluster justify="center" align="center" gap="xs" class="pile-controls">
+				<button type="button" class="pile-btn" onclick={flip}>Flip</button>
+			</Cluster>
 		{/if}
-	</Cluster>
+	{:else}
+		<Cluster justify="between" align="center" gap="xs" class="pile-controls">
+			<button type="button" class="pile-btn" onclick={() => send('restore')} disabled={!canRestore}>
+				Back
+			</button>
+			<button type="button" class="pile-btn" onclick={flip} disabled={!canFlip}>Flip</button>
+			<span class="pile-counter font-mono" aria-hidden="true">{counter}</span>
+			{#if pile.phase === 'cleared'}
+				<button type="button" class="pile-btn pile-btn-primary" onclick={() => send('restack')}>
+					Restack
+				</button>
+			{:else}
+				<button type="button" class="pile-btn pile-btn-primary" onclick={() => toss()}>Toss</button>
+			{/if}
+		</Cluster>
+	{/if}
 
 	<p class="visually-hidden" aria-live="polite">{announcement}</p>
 </Stack>
@@ -278,6 +311,15 @@
 
 	.polaroid-body:active {
 		cursor: grabbing;
+	}
+
+	/* A single card never drags: it only flips (button) or sits still (span). */
+	.polaroid-body[data-single='true'] {
+		cursor: pointer;
+	}
+
+	span.polaroid-body[data-single='true'] {
+		cursor: default;
 	}
 
 	.polaroid-body:focus-visible {

@@ -6,9 +6,23 @@ import { expect, type APIRequestContext, type APIResponse, type Page } from '@pl
  * `postAction` sends what an enhanced form sends (the `x-sveltekit-action`
  * header and a same-origin Origin), so the answer is SvelteKit's JSON
  * ({ type: 'failure' | 'redirect' | 'success', status, data | location })
- * instead of a rendered page. Uploads are files in `fields`.
+ * instead of a rendered page. Uploads are files in `fields`; an array sends
+ * the field once per value, as repeated form inputs do.
  */
 export type FieldValue = string | { name: string; mimeType: string; buffer: Buffer };
+
+/** Builds the multipart body; repeated fields need a real FormData. */
+function multipartBody(fields: Record<string, FieldValue | readonly FieldValue[]>) {
+	if (!Object.values(fields).some(Array.isArray)) return fields as Record<string, FieldValue>;
+	const form = new FormData();
+	for (const [name, value] of Object.entries(fields)) {
+		for (const item of (Array.isArray(value) ? value : [value]) as FieldValue[]) {
+			if (typeof item === 'string') form.append(name, item);
+			else form.append(name, new File([new Uint8Array(item.buffer)], item.name, { type: item.mimeType }));
+		}
+	}
+	return form;
+}
 
 export interface ActionResult {
 	httpStatus: number;
@@ -23,11 +37,11 @@ export async function postAction(
 	request: APIRequestContext,
 	baseURL: string,
 	pathAndAction: string,
-	fields: Record<string, FieldValue> = {}
+	fields: Record<string, FieldValue | readonly FieldValue[]> = {}
 ): Promise<ActionResult> {
 	const response: APIResponse = await request.post(pathAndAction, {
 		headers: { origin: baseURL, 'x-sveltekit-action': 'true', accept: 'application/json' },
-		multipart: fields,
+		multipart: multipartBody(fields),
 		maxRedirects: 0
 	});
 	const httpStatus = response.status();

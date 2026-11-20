@@ -333,28 +333,18 @@
 						</Box>
 					{:else if page.kind === 'photo' || page.kind === 'image'}
 						<Stack gap="md">
-							{#if photos.length > 1}
+							{#if photos.length > 0}
+								<!-- One photo is a single polaroid card; its caption lives on the back. -->
 								<PhotoPile
 									{photos}
 									label={parsed.title || `${data.issue.city} photo pile`}
 								/>
-							{:else if photos.length === 1}
-								<Frame ratio="4-3" class="photo-page-frame">
-									<img
-										src={photos[0].url}
-										alt={photos[0].caption || parsed.title || `${data.issue.city} gig photo`}
-										loading="lazy"
-									/>
-								</Frame>
 							{/if}
 							<h2 class="bespoke-heading">
 								{parsed.title || 'From Tonight'}
 							</h2>
 							{#if parsed.body}
 								<p class="bespoke-body-text">{parsed.body}</p>
-							{/if}
-							{#if photos.length === 1 && photos[0].caption}
-								<p class="bespoke-body-text">{photos[0].caption}</p>
 							{/if}
 						</Stack>
 					{:else if page.kind === 'audio'}
@@ -1064,12 +1054,6 @@
 
 	.audio-duration-label {
 		font-size: var(--text-meta);
-	}
-
-	:global(.photo-page-frame) {
-		border-radius: var(--radius-lg);
-		border: 1px solid var(--glass-border);
-		background: rgba(0, 0, 0, 0.35);
 	}
 
 	:global(.video-frame) {

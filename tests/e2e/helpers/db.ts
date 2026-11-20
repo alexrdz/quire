@@ -127,3 +127,18 @@ export async function issueCountForCity(city: string): Promise<number> {
 	}
 }
 
+
+/** The newest Issue in `city`, as `{ id, slug }`, or null (Quick Issue answers with neither in plain JSON). */
+export async function issueForCity(city: string): Promise<{ id: string; slug: string } | null> {
+	const db = await waitingClient();
+	try {
+		const result = await db.execute({
+			sql: 'SELECT id, slug FROM issues WHERE city = ? ORDER BY created_at DESC LIMIT 1',
+			args: [city]
+		});
+		const row = result.rows[0];
+		return row ? { id: String(row.id), slug: String(row.slug) } : null;
+	} finally {
+		db.close();
+	}
+}
