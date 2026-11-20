@@ -226,3 +226,80 @@ export async function submitSlugPetition(input: {
 
 	return ok({ petitionId, existingArtistClosed });
 }
+
+/**
+ * Creates the Artist rows for a user Better Auth has just created (PRODUCTION_PLAN 3.7).
+ *
+ * Better Auth inserts the user, credential account and session through its own
+ * adapter calls, outside any transaction we can join. So signup is atomic by
+ * compensation: the artist and its first template page go in one libsql batch
+ * (all or nothing), and if that batch fails the new user is deleted with its
+ * sessions and accounts in a second batch. Either both the user and the artist
+ * exist, or neither does.
+ */
+export async function createArtistForNewUser(input: {
+	userId: string;
+	slug: string;
+	displayName: string;
+}): Promise<Result<{ artistId: string }, DomainError>> {
+	const artistId = crypto.randomUUID();
+	const now = new Date();
+
+	try {
+		await db.batch([
+			db.insert(schema.artists).values({
+				id: artistId,
+				userId: input.userId,
+				slug: input.slug,
+				displayName: input.displayName,
+				bio: 'Live digital zines and tour archive on Quire.',
+				accentColor: '#05D9E8',
+				typePairing: 'sans-serif',
+				tipPresetsJson: '[3, 5, 10]',
+				linksJson: '[]',
+				payoutsEnabled: false,
+				verified: false,
+				generalWallApproveFirst: false,
+				accountStatus: ArtistAccountStatus.Active,
+				createdAt: now,
+				updatedAt: now
+			}),
+			db.insert(schema.templatePages).values({
+				id: crypto.randomUUID(),
+				artistId,
+				position: 1,
+				kind: 'text',
+				contentJson: JSON.stringify({
+					title: `About ${input.displayName}`,
+					body: 'Thanks for coming out to the show. Sign the Wall and grab your attendance stub on the Endpaper.'
+				}),
+				createdAt: now
+			})
+		]);
+	} catch (error) {
+		await discardNewUser(input.userId);
+		return err({
+			code: 'ARTIST_CREATE_FAILED',
+			message: error instanceof Error ? error.message : 'Could not create the artist.'
+		});
+	}
+
+	return ok({ artistId });
+}
+
+/**
+ * Removes a just-created user whose Artist could not be created. The child rows
+ * are deleted explicitly so this does not depend on PRAGMA foreign_keys.
+ */
+async function discardNewUser(userId: string): Promise<void> {
+	try {
+		await db.batch([
+			db.delete(schema.sessions).where(eq(schema.sessions.userId, userId)),
+			db.delete(schema.accounts).where(eq(schema.accounts.userId, userId)),
+			db.delete(schema.users).where(eq(schema.users.id, userId))
+		]);
+	} catch (error) {
+		// Logged by id only. The orphan has no Artist and cannot reach the dashboard.
+		console.error(`Signup rollback failed for user ${userId}`, error);
+	}
+}

@@ -50,13 +50,13 @@ describe('Moderation & Wall Notes Service', () => {
 		expect(dupReplyRes.ok).toBe(false);
 
 		// 3. Flag note
-		const flagRes = await flagWallNote(noteId, fan.id);
+		const flagRes = await flagWallNote(noteId, fan.id, { artistId: artist.id, issueId: null });
 		expect(flagRes.ok).toBe(true);
 		if (!flagRes.ok) return;
 		expect(flagRes.value.flagCount).toBe(1);
 
 		// Disallow duplicate flag from same fan
-		const dupFlagRes = await flagWallNote(noteId, fan.id);
+		const dupFlagRes = await flagWallNote(noteId, fan.id, { artistId: artist.id, issueId: null });
 		expect(dupFlagRes.ok).toBe(false);
 
 		// 4. Delete note cascades to delete reply

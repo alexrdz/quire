@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import { allowsStandIn, getConfig } from '$lib/server/config';
 import { FEATURE_UNAVAILABLE, featureUnavailableMessage } from '$lib/features';
 import { fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
@@ -13,7 +12,7 @@ import {
 } from '$schemas/auth';
 import { auth, createSessionForUser } from '$lib/server/auth';
 import { db, schema } from '$lib/server/db';
-import { submitSlugPetition } from '$lib/server/services/account';
+import { createArtistForNewUser, submitSlugPetition } from '$lib/server/services/account';
 import { consumeRateLimit, consumeRateLimits } from '$lib/server/services/rate-limit';
 
 function resolveRedirectTarget(rawRedirect: string | null | undefined): {
@@ -274,42 +273,15 @@ export const actions: Actions = {
 			});
 		}
 
-		const artistId = crypto.randomUUID();
-		const now = new Date();
-
-		try {
-			await db.insert(schema.artists).values({
-				id: artistId,
-				userId,
-				slug: cleanSlug,
-				displayName: parsed.data.name,
-				bio: 'Live digital zines and tour archive on Quire.',
-				accentColor: '#05D9E8',
-				typePairing: 'sans-serif',
-				tipPresetsJson: '[3, 5, 10]',
-				linksJson: '[]',
-				payoutsEnabled: false,
-				verified: false,
-				generalWallApproveFirst: false,
-				accountStatus: ArtistAccountStatus.Active,
-				createdAt: now,
-				updatedAt: now
-			});
-
-			await db.insert(schema.templatePages).values({
-				id: crypto.randomUUID(),
-				artistId,
-				position: 1,
-				kind: 'text',
-				contentJson: JSON.stringify({
-					title: `About ${parsed.data.name}`,
-					body: 'Thanks for coming out to the show. Sign the Wall and grab your attendance stub on the Endpaper.'
-				}),
-				createdAt: now
-			});
-		} catch {
-			// Roll back user if artist slug raced between check and insert
-			await db.delete(schema.users).where(eq(schema.users.id, userId));
+		// User and Artist rows are all or nothing: if the Artist cannot be created
+		// (for example the handle was claimed since the check above), the new user
+		// is deleted again (PRODUCTION_PLAN 3.7).
+		const created = await createArtistForNewUser({
+			userId,
+			slug: cleanSlug,
+			displayName: parsed.data.name
+		});
+		if (!created.ok) {
 			const slugSuggestions = await getAvailableSlugSuggestions(cleanSlug);
 			return fail(409, {
 				mode: 'signup' as const,
