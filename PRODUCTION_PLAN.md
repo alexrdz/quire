@@ -249,6 +249,12 @@ Acceptance: unit tests for username validation, the change flow (password, token
 
 ## Phase 5: Verification
 
+**Status (2026-11-20): done, internal report. Report: `docs/PRE-LAUNCH-AUDIT.md` (P5V-T03).**
+- Gate on `main` `f570969` (with P5V-T01), fresh clone and fresh database: `pnpm check` 0 errors, `pnpm test` 622, `pnpm check:sizing` and `pnpm build` pass, `pnpm test:e2e` 88 passed and 1 known failure. The known failure is the custom-tip test in `production/venmo-tip.spec.ts`: P5V-T02 fixed the bug, so its `test.fail()` now reports "Expected to fail, but passed". It clears when B1-T01 removes the marker. Not a finding.
+- Every `PRODUCTION_AUDIT.md` finding is fixed or not applicable (with the reason); none is open.
+- External score: not run (pending the user's decision on the public commit.show entry). If it is approved, it runs as a separate follow-up task.
+- Left for the user: deploy the Demo per `docs/demo-site.md`, then production; baseline any existing database first per `docs/database-migrations.md`.
+
 - `pnpm check`, `pnpm test`, `pnpm test:e2e`, `pnpm check:sizing` green.
 - New e2e suite run against a production-mode preview: missing core key returns 503; each missing feature key shows its message; `/demo` is 404; GET `/logout` is 405; open-redirect payloads are rejected; malicious uploads are rejected. A tip tap opens a `venmo.com` link with the right username, amount and generic note, and no Stripe key is required.
 
