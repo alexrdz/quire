@@ -25,7 +25,7 @@ export const DEV_SCHEMA_MISSING_HINT =
 	'Run `pnpm db:migrate:local` to create or update the schema (not `pnpm db:migrate`, which runs in production mode). ' +
 	'It migrates the database DATABASE_URL names, default file:local.db; if DATABASE_URL in .env points at a remote (libsql://) database, ' +
 	'the dev server is using that one: point it back at file:local.db, or read docs/database-migrations.md first. ' +
-	'A database created before migrations needs `NODE_ENV=development pnpm db:baseline` once first.';
+	'A database created before migrations needs `NODE_ENV=development pnpm db:baseline --yes` once first (try `--dry-run` before it).';
 
 /** The hint for this mode; development gets the local commands. */
 export function schemaMissingHint(mode: Mode | undefined = currentMode()): string {
