@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { Box, Cluster, Stack } from '$lib/components/layout';
-	import { buildVenmoPayUrl, parseVenmoUsername, tipNote } from '$domain/venmo';
+	import { buildVenmoPayUrl, parseTipDollars, parseVenmoUsername, tipNote } from '$domain/venmo';
 	import { MAX_TIP_CENTS, MIN_TIP_CENTS } from '$domain/tipping';
-	import { demoVenmoMessage } from './tip-taps';
+	import { CUSTOM_HINT, CUSTOM_HINT_INVALID, demoVenmoMessage } from './tip-taps';
 
 	/**
 	 * Venmo tip buttons (ADR 0008, PRODUCTION_PLAN V.4).
@@ -55,13 +55,12 @@
 			.filter((cents) => cents >= MIN_TIP_CENTS && cents <= MAX_TIP_CENTS)
 	);
 
-	let customDollars = $state('');
-	const customCents = $derived.by(() => {
-		const value = Number(customDollars);
-		if (!customDollars.trim() || !Number.isFinite(value)) return null;
-		const cents = Math.round(value * 100);
-		return cents >= MIN_TIP_CENTS && cents <= MAX_TIP_CENTS ? cents : null;
-	});
+	// A type="number" input binds a number, or null when the field is empty or
+	// not a number. parseTipDollars handles both and never throws.
+	let customDollars = $state<number | null>(null);
+	const customCents = $derived(parseTipDollars(customDollars));
+	/** Something typed that isn't a usable amount: say why the button is off. */
+	const customInvalid = $derived(customDollars !== null && customCents === null);
 
 	let message = $state<string | null>(null);
 	let lastTap: { cents: number; at: number } | null = null;
@@ -158,13 +157,18 @@
 						inputmode="decimal"
 						min="2"
 						max="500"
-						step="1"
+						step="0.01"
 						placeholder="20"
+						aria-describedby="{id}-custom-hint"
+						aria-invalid={customInvalid}
 						bind:value={customDollars}
 					/>
+					<p id="{id}-custom-hint" class="venmo-tip-hint" data-testid="venmo-custom-hint" aria-live="polite">
+						{customInvalid ? CUSTOM_HINT_INVALID : CUSTOM_HINT}
+					</p>
 				</Stack>
 				{#if customCents === null}
-					<span class="venmo-tip-go" aria-disabled="true">Tip with Venmo</span>
+					<span class="venmo-tip-go" aria-disabled="true" data-testid="venmo-custom-disabled">Tip with Venmo</span>
 				{:else if opensVenmo}
 					<a
 						class="venmo-tip-go"

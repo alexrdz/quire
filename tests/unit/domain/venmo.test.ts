@@ -3,6 +3,7 @@ import {
 	buildVenmoPayUrl,
 	buildVenmoProfileUrl,
 	formatVenmoAmount,
+	parseTipDollars,
 	parseVenmoUsername,
 	tipNote,
 	type VenmoUsername
@@ -106,5 +107,66 @@ describe('tipNote', () => {
 
 	it('falls back when the name is empty', () => {
 		expect(tipNote('   ')).toBe('Tip for the artist via Quire');
+	});
+});
+
+/**
+ * P5V-T02: the custom tip field is type="number", so Svelte binds a number, or
+ * null when it is empty or not a number. The parse must take either and never throw.
+ */
+describe('parseTipDollars (custom tip amount)', () => {
+	it.each([
+		[20, 2000],
+		[12.5, 1250],
+		[2, 200],
+		[500, 50000],
+		[12.05, 1205],
+		[0.5 + 4.5, 500],
+		['20', 2000],
+		['12.5', 1250],
+		['12.50', 1250],
+		[' 7.25 ', 725]
+	])('accepts %j as %i cents', (input, cents) => {
+		expect(parseTipDollars(input)).toBe(cents);
+	});
+
+	it.each([
+		[500.01, 'above $500'],
+		[1.99, 'below $2'],
+		[0, 'zero'],
+		[-5, 'negative'],
+		[12.345, 'more than two decimal places'],
+		['12.345', 'more than two decimal places'],
+		[Number.NaN, 'NaN'],
+		[Number.POSITIVE_INFINITY, 'infinite'],
+		[1e21, 'exponent form'],
+		['', 'empty'],
+		['   ', 'blank'],
+		['e', 'not a number'],
+		['1e2', 'exponent notation'],
+		['12,50', 'comma decimal'],
+		['$20', 'currency sign'],
+		['.', 'a lone point'],
+		[null, 'what Svelte binds for an empty or invalid number field'],
+		[undefined, 'undefined']
+	])('gives no amount for %j (%s), without throwing', (input: unknown, _reason: string) => {
+		expect(() => parseTipDollars(input)).not.toThrow();
+		expect(parseTipDollars(input)).toBeNull();
+	});
+
+	it('every whole-cent amount from $2 to $500 round-trips exactly', () => {
+		for (let cents = 200; cents <= 50000; cents += 1) {
+			const asNumber = Number((cents / 100).toFixed(2));
+			expect(parseTipDollars(asNumber), String(asNumber)).toBe(cents);
+		}
+	});
+
+	it('a custom amount builds the same link format as a preset', () => {
+		const user = username('quire-sample-band');
+		const note = tipNote('The Neon Velvet');
+		const custom = buildVenmoPayUrl({ username: user, amountCents: parseTipDollars(12.5)!, note });
+		expect(custom).toBe('https://venmo.com/quire-sample-band?txn=pay&amount=12.50&note=Tip%20for%20The%20Neon%20Velvet%20via%20Quire');
+		const preset = buildVenmoPayUrl({ username: user, amountCents: 1000, note });
+		expect(preset.replace('amount=10.00', 'amount=12.50')).toBe(custom);
 	});
 });

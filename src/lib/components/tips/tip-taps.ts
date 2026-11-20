@@ -6,6 +6,11 @@
  */
 export const CHECK_VENMO = 'Check Venmo for what came in.';
 
+/** Under the custom amount field while it is empty or valid. */
+export const CUSTOM_HINT = 'Dollars and cents, for example 12.50.';
+/** Under the custom amount field when what was typed is not a usable amount. */
+export const CUSTOM_HINT_INVALID = 'Enter an amount from $2 to $500, with at most two decimal places.';
+
 /** "1 tip tap" / "14 tip taps". */
 export function formatTipTaps(taps: number): string {
 	return `${taps} tip ${taps === 1 ? 'tap' : 'taps'}`;
