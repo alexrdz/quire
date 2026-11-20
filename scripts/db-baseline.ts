@@ -4,10 +4,14 @@
  * before its first migrating deploy. Steps: docs/database-migrations.md.
  *
  *   pnpm db:baseline --dry-run                 print the plan, write nothing
- *   pnpm db:baseline                           record up to the newest matching migration
+ *   pnpm db:baseline                           print the plan, write nothing, ask for --yes
+ *   pnpm db:baseline --yes                     print the plan, then record it
  *   pnpm db:baseline --to 0002_schema_catch_up  require a match with that migration
  *   pnpm db:baseline --allow-extra posts       ignore tables that are in no Quire migration
  *
+ * The only write is the migration history (`__drizzle_migrations`), and only
+ * with --yes. It may be a production database, so the plan and the target
+ * host are always printed first.
  * Refuses, printing the differences against the closest migration, unless the
  * live tables and columns match one exactly. Never runs migration SQL, never
  * touches data and never drops anything.
@@ -15,11 +19,12 @@
 import { baselineDatabase, formatDiff, quireTableNames, tagRange, type BaselineOptions } from '../src/lib/server/db/baseline';
 import { loadDotEnv, openTargetDatabase } from './lib/db-target';
 
-const USAGE = 'Usage: pnpm db:baseline [--dry-run] [--to <migration>] [--allow-extra <table>[,<table>...]]';
+const USAGE = 'Usage: pnpm db:baseline [--dry-run | --yes] [--to <migration>] [--allow-extra <table>[,<table>...]]';
 
 /** Parses the flags. `--to x` and `--to=x` both work; `--allow-extra` may repeat. */
-function parseBaselineArgs(argv: string[]): { options: BaselineOptions; error?: string } {
+function parseBaselineArgs(argv: string[]): { options: BaselineOptions; yes: boolean; error?: string } {
 	const options: BaselineOptions = {};
+	let yes = false;
 	const allowExtra: string[] = [];
 	for (let i = 0; i < argv.length; i++) {
 		const arg = argv[i]!;
@@ -27,24 +32,27 @@ function parseBaselineArgs(argv: string[]): { options: BaselineOptions; error?: 
 		const value = () => inline ?? argv[++i];
 		if (flag === '--dry-run' && inline === undefined) {
 			options.dryRun = true;
+		} else if (flag === '--yes' && inline === undefined) {
+			yes = true;
 		} else if (flag === '--to') {
 			const to = value();
-			if (!to || to.startsWith('--')) return { options, error: `--to needs a migration. ${USAGE}` };
+			if (!to || to.startsWith('--')) return { options, yes, error: `--to needs a migration. ${USAGE}` };
 			options.to = to;
 		} else if (flag === '--allow-extra') {
 			const tables = value();
-			if (!tables || tables.startsWith('--')) return { options, error: `--allow-extra needs a table name. ${USAGE}` };
+			if (!tables || tables.startsWith('--')) return { options, yes, error: `--allow-extra needs a table name. ${USAGE}` };
 			allowExtra.push(...tables.split(',').map((name) => name.trim()).filter(Boolean));
 		} else {
-			return { options, error: `Unknown argument ${arg}. ${USAGE}` };
+			return { options, yes, error: `Unknown argument ${arg}. ${USAGE}` };
 		}
 	}
 	if (allowExtra.length > 0) options.allowExtra = allowExtra;
-	return { options };
+	if (yes && options.dryRun) return { options, yes, error: `--dry-run and --yes don't go together. ${USAGE}` };
+	return { options, yes };
 }
 
 async function main(): Promise<void> {
-	const { options, error } = parseBaselineArgs(process.argv.slice(2));
+	const { options, yes, error } = parseBaselineArgs(process.argv.slice(2));
 	if (error) {
 		console.error(`[db:baseline] ${error}`);
 		process.exitCode = 1;
@@ -56,28 +64,47 @@ async function main(): Promise<void> {
 	try {
 		target = openTargetDatabase();
 		console.log(`[db:baseline] ${target.mode} mode; database ${target.label}${options.dryRun ? ' (dry run)' : ''}`);
-		const result = await baselineDatabase(target.client, options);
+		// Always plan first; record only after printing it, and only with --yes.
+		const result = await baselineDatabase(target.client, { ...options, dryRun: true });
 		switch (result.status) {
 			case 'baselined':
+				// Never reached: the plan is always a dry run.
+				break;
 			case 'would-baseline': {
-				const dry = result.status === 'would-baseline';
 				const pending =
 					result.pendingTags.length > 0
 						? `db:migrate then applies ${result.pendingTags.map((tag) => tag.slice(0, 4)).join(', ')}`
 						: 'db:migrate then has nothing to apply';
 				console.log(
-					`[db:baseline] schema matches ${result.matched}; ${dry ? 'will record' : 'recorded'} ${tagRange(result.recordedTags)}; ${pending}`
+					`[db:baseline] schema matches ${result.matched}; will record ${tagRange(result.recordedTags)}; ${pending}`
 				);
-				if (result.pendingTags.length > 0) {
-					console.log(`[db:baseline] still to apply with pnpm db:migrate: ${result.pendingTags.join(', ')}`);
+				console.log('[db:baseline] plan:');
+				console.log(`  database:           ${target.label}`);
+				console.log(`  matches:            ${result.matched}`);
+				console.log(`  will record:        ${result.recordedTags.join(', ')}`);
+				console.log(`  db:migrate applies: ${result.pendingTags.length > 0 ? result.pendingTags.join(', ') : '(nothing)'}`);
+				console.log(`  ignored, untouched: ${result.ignoredTables.length > 0 ? result.ignoredTables.join(', ') : '(none)'}`);
+				console.log('  writes:             only the migration history table, __drizzle_migrations');
+
+				if (options.dryRun) {
+					console.log(`[db:baseline] dry run: nothing was written. To record it: the same command with --yes instead of --dry-run.`);
+					break;
 				}
-				if (result.ignoredTables.length > 0) {
-					console.log(`[db:baseline] ignored, left untouched (not Quire's): ${result.ignoredTables.join(', ')}`);
+				if (!yes) {
+					console.error('[db:baseline] nothing was written. Check the plan and the database above, then run the same command with --yes to record it.');
+					process.exitCode = 1;
+					break;
+				}
+
+				const recorded = await baselineDatabase(target.client, { ...options, dryRun: false });
+				if (recorded.status !== 'baselined' || recorded.matched !== result.matched) {
+					// The database changed between the plan and the write.
+					console.error(`[db:baseline] refused: the database changed since the plan (${recorded.status}). Run it again.`);
+					process.exitCode = 1;
+					break;
 				}
 				console.log(
-					dry
-						? `[db:baseline] dry run: nothing was written. Run again without --dry-run to record ${result.recordedTags.length} migrations.`
-						: `[db:baseline] recorded ${result.recordedTags.length} migrations as applied. Next: pnpm db:migrate${result.pendingTags.length > 0 ? '' : ' (it should report "up to date")'}.`
+					`[db:baseline] recorded ${recorded.recordedTags.length} migrations as applied (${tagRange(recorded.recordedTags)}). Next: pnpm db:migrate${recorded.pendingTags.length > 0 ? `, which applies ${recorded.pendingTags.join(', ')}` : ' (it should report "up to date")'}.`
 				);
 				break;
 			}

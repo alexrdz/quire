@@ -14,7 +14,7 @@ only inserts data, and it stops with a migrate hint when the schema is missing
 | `pnpm db:migrate:local` | Applies pending migrations in development mode: to `DATABASE_URL`, which defaults to `file:local.db`. |
 | `pnpm db:migrate` | Applies pending migrations to the database for the current mode: `DATABASE_URL` / `DATABASE_AUTH_TOKEN` in the Demo and production. The production Netlify build runs it. |
 | `pnpm db:migrate:preview` | The deploy-preview and branch-deploy build step. It skips unless a separate preview database is opted in (see below). |
-| `pnpm db:baseline [--dry-run] [--to <migration>] [--allow-extra <table>,...]` | Run once on a database created before migrations: see [Baselining](#baselining-a-database-created-before-migrations). |
+| `pnpm db:baseline [--dry-run \| --yes] [--to <migration>] [--allow-extra <table>,...]` | Run once on a database created before migrations: see [Baselining](#baselining-a-database-created-before-migrations). |
 
 `drizzle-kit push` is no longer a script: it changes the schema without recording
 a migration, which is exactly what this rule removes.
@@ -39,8 +39,8 @@ it. For local work, unset it or set it to `file:local.db`.
 If you have a `local.db` from before migrations, `pnpm db:migrate:local` stops
 with a baseline hint. For a local database, the simplest fix is
 `rm local.db && pnpm db:migrate:local`. To keep its data, run
-`NODE_ENV=development pnpm db:baseline` instead (the same flags as below), then
-`pnpm db:migrate:local`.
+`NODE_ENV=development pnpm db:baseline --dry-run` and then the same with `--yes`
+instead (the same flags as below), then `pnpm db:migrate:local`.
 
 Tests build their database the same way. Vitest's global setup
 (`tests/setup/migrate-test-db.ts`) and the test-mode Playwright web server
@@ -112,7 +112,8 @@ change matches `0004_venmo_tips`, and `db:migrate` then has nothing to apply.
 
 | Flag | Effect |
 |---|---|
-| `--dry-run` | Prints the plan and writes nothing. |
+| `--dry-run` | Prints the plan and the target host, and writes nothing. |
+| `--yes` | Records the plan. Without it (and without `--dry-run`), baseline prints the plan and the host, writes nothing and exits with an error, so nothing is recorded on a database you haven't checked. |
 | `--to <migration>` | Requires a match with that migration (tag such as `0002_schema_catch_up`, or just `0002`) instead of the newest match. It still has to match exactly. |
 | `--allow-extra <table>[,<table>]` | Ignores the named tables, which must be in no Quire migration. Without it, any such table makes baseline refuse. |
 
@@ -130,7 +131,12 @@ first production deploy after this change merges. If a deploy runs first, it
 fails at `db:migrate` with the hint above. Nothing changes in the database, the
 previous deploy stays live, and you can baseline and then redeploy.
 
-### Steps (production and Demo, one database at a time)
+### Steps (production first, then the Demo, one database at a time)
+
+Do these in order. `db:baseline` writes only the migration history table
+(`__drizzle_migrations`), and only when you pass `--yes`. `db:migrate` then
+creates what `0003` and `0004` add. Neither writes or deletes any data row, and
+neither touches a table that isn't Quire's, such as `posts`.
 
 You need a checkout of this repository at the commit being deployed, with
 `pnpm install` done, plus the database's URL and a token. Get them from Netlify
@@ -138,59 +144,70 @@ You need a checkout of this repository at the commit being deployed, with
 `DATABASE_AUTH_TOKEN`) or from Turso (`turso db show <name> --url` and
 `turso db tokens create <name>`).
 
-1. Back up the database:
+1. **Back up the database** first. A Turso branch is a full copy you can point
+   the site at if anything goes wrong:
+   ```sh
+   turso db create <name>-pre-baseline --from-db <name>
+   ```
+   A local dump as well, if you like:
    ```sh
    turso db shell <name> .dump > quire-<name>-backup.sql
    ```
-2. Put the values in your shell, typed at hidden prompts so they stay out of
+2. **Put the values in your shell**, typed at hidden prompts so they stay out of
    your shell history and out of any file:
    ```sh
    read -r  -p 'DATABASE_URL: ' DATABASE_URL && export DATABASE_URL
    read -rs -p 'DATABASE_AUTH_TOKEN: ' DATABASE_AUTH_TOKEN && echo && export DATABASE_AUTH_TOKEN
    ```
-3. Check first, without writing anything:
-   ```sh
-   pnpm db:baseline --dry-run
-   ```
-   The first line shows which database it's connected to (host only). Confirm it
-   is the one you mean. The output names the migration the database matches and
-   what `db:migrate` will apply afterwards. For a database from before the rate
-   limits, with another app's `posts` table, it looks like this:
-   ```
-   [db:baseline] refused: the schema does not match any migration; closest is 0002_schema_catch_up. Nothing was recorded.
-   + table posts (in the database, not in the migrations)
-   [db:baseline] posts is in no Quire migration. If it belongs to something else, add --allow-extra posts to leave it untouched.
-   ```
-   If the only `+` lines are tables you know aren't Quire's, add them:
+3. **Dry run.** It prints the plan and the target host, and writes nothing:
    ```sh
    pnpm db:baseline --dry-run --allow-extra posts
    ```
+   For the production database (old DDL from before the rate limits, plus a
+   `posts` table that isn't Quire's), the output is:
    ```
+   [db:baseline] production mode; database libsql://<name>-<org>.turso.io (dry run)
    [db:baseline] schema matches 0002_schema_catch_up; will record 0000–0002; db:migrate then applies 0003, 0004
-   [db:baseline] still to apply with pnpm db:migrate: 0003_rate_limits, 0004_venmo_tips
-   [db:baseline] ignored, left untouched (not Quire's): posts
-   [db:baseline] dry run: nothing was written. Run again without --dry-run to record 3 migrations.
+   [db:baseline] plan:
+     database:           libsql://<name>-<org>.turso.io
+     matches:            0002_schema_catch_up
+     will record:        0000_friendly_centennial, 0001_sharp_zaran, 0002_schema_catch_up
+     db:migrate applies: 0003_rate_limits, 0004_venmo_tips
+     ignored, untouched: posts
+     writes:             only the migration history table, __drizzle_migrations
+   [db:baseline] dry run: nothing was written. To record it: the same command with --yes instead of --dry-run.
    ```
-   A database that already has the Venmo tables shows
-   `schema matches 0004_venmo_tips; will record 0000–0004; db:migrate then has nothing to apply`.
-   Any other `-`, `+` or `~` line: see [If baseline refuses](#if-baseline-refuses).
-4. Record the migrations, with the same flags but without `--dry-run`:
+   Check that the host is the database you mean, and that the plan says what you
+   expect. Stop if it shows anything else. Without `--allow-extra posts` the
+   dry run refuses and lists `+ table posts`. Any other `-`, `+` or `~` line:
+   see [If baseline refuses](#if-baseline-refuses). A database that already has
+   the Venmo tables matches `0004_venmo_tips`, and `db:migrate` then has nothing
+   to apply.
+4. **Record the history:**
    ```sh
-   pnpm db:baseline --allow-extra posts
+   pnpm db:baseline --allow-extra posts --yes
    ```
-   Expected: `schema matches 0002_schema_catch_up; recorded 0000–0002; ...` and
-   `recorded 3 migrations as applied. Next: pnpm db:migrate.`
-5. Apply the rest:
+   It prints the same plan again, then:
+   `recorded 3 migrations as applied (0000–0002). Next: pnpm db:migrate, which applies 0003_rate_limits, 0004_venmo_tips.`
+   Without `--yes` it prints the plan, writes nothing and exits with an error.
+5. **Apply the rest:**
    ```sh
    pnpm db:migrate
    ```
    Expected: `applied 2 of 5 migrations` (or `up to date (5 migrations)` for a
    database that matched `0004`). Running it again prints `up to date`. The next
-   production deploy's `db:migrate` would also apply them. Running it here first
-   means the deploy finds nothing to do.
-6. Clear the values: `unset DATABASE_URL DATABASE_AUTH_TOKEN`. Then repeat from
-   step 1 for the other database (the Demo after production, or the other way
-   round).
+   production deploy runs `db:migrate` too and finds nothing to do.
+6. **Check the site:** open `https://<domain>/healthz` (for the Demo,
+   `https://demo.<domain>/healthz`). It should return `"ok": true` and
+   `"db": "ok"`. If the deploy that failed at `db:migrate` is still the latest,
+   trigger a new deploy in Netlify first.
+7. **Clear the values:** `unset DATABASE_URL DATABASE_AUTH_TOKEN`. Then repeat
+   from step 1 for the Demo database, or recreate it empty (its data is sample
+   data, see below).
+
+If something looks wrong after step 4 or 5, point the site's `DATABASE_URL` at
+the `<name>-pre-baseline` branch from step 1. That restores the database as it
+was before you started.
 
 Running `pnpm db:baseline` again on a baselined database does nothing:
 `this database already has a migration history`.
