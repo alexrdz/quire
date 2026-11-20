@@ -192,10 +192,12 @@ test.describe('Security headers', () => {
 	test('the Google sign-in redirect is not blocked by form-action', async ({ browserName, baseURL }) => {
 		test.skip(browserName !== 'chromium', 'Chrome is the browser that applies form-action to redirects.');
 		// Playwright can't intercept a redirect that follows a fulfilled response, so
-		// this browser resolves accounts.google.com to this machine: the request is
-		// made (proof that form-action allowed it) and then fails locally.
+		// this browser can't resolve accounts.google.com: the request is made (proof
+		// that form-action allowed it) and then fails at DNS, without leaving the machine.
+		// --no-proxy-server: an HTTP(S)_PROXY in the environment would otherwise
+		// resolve the host itself and ignore the rule.
 		const browser = await chromium.launch({
-			args: ['--host-resolver-rules=MAP accounts.google.com 127.0.0.1']
+			args: ['--no-proxy-server', '--host-resolver-rules=MAP accounts.google.com ~NOTFOUND']
 		});
 		// No JavaScript: a native form POST, the case where Chrome applies
 		// form-action to the 303 that sends the Fan on to Google.
@@ -220,10 +222,16 @@ test.describe('Security headers', () => {
 		);
 
 		await page.goto('/login?role=fan');
-		await page.locator('form[action="?/googleSignIn"] button[type="submit"]').click();
+		// Not awaited: the redirected navigation never settles under Playwright's
+		// interception, and the issued request is the proof this test needs.
+		const submitting = page
+			.locator('form[action="?/googleSignIn"] button[type="submit"]')
+			.click()
+			.catch(() => undefined);
 
 		await expect.poll(() => googleRequests).toEqual([googleUrl]);
 		expect(consoleViolations).toEqual([]);
 		await browser.close();
+		await submitting;
 	});
 });

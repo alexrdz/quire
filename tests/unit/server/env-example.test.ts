@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseConfig, type Env } from '$lib/server/config';
+import { migrationPlanFor } from '$lib/server/db/migrate';
 
 /**
  * PRODUCTION_PLAN 4.1: .env.example lists every environment variable the app
@@ -64,9 +65,23 @@ const SCENARIOS: Env[] = [
 	{ ...FULL, NODE_ENV: 'production', BETTER_AUTH_URL: undefined, PUBLIC_APP_URL: 'https://quire.example' }
 ];
 
+/** Netlify contexts the migration script handles (scripts/db-migrate.ts, PRODUCTION_PLAN 3.5). */
+const MIGRATION_SCENARIOS: Env[] = [
+	{},
+	{ CONTEXT: 'production' },
+	{ CONTEXT: 'deploy-preview' },
+	{ CONTEXT: 'branch-deploy', PREVIEW_DATABASE_URL: 'libsql://preview.turso.io', DATABASE_URL: 'libsql://preview.turso.io' },
+	{ CONTEXT: 'deploy-preview', PREVIEW_DATABASE_URL: 'libsql://preview.turso.io', DATABASE_URL: 'libsql://prod.turso.io' }
+];
+
 function configKeys(): Set<string> {
 	const seen = new Set<string>();
 	for (const scenario of SCENARIOS) parseConfig(recordingEnv({ ...scenario }, seen));
+	// db-migrate.ts reads the database through parseConfig, plus the plan's own keys.
+	for (const scenario of MIGRATION_SCENARIOS) {
+		migrationPlanFor(recordingEnv({ ...scenario }, seen));
+		migrationPlanFor(recordingEnv({ ...scenario }, seen), { preview: true });
+	}
 	return seen;
 }
 
@@ -144,7 +159,7 @@ describe('4.1 .env.example matches what the app reads', () => {
 		}
 	});
 
-	it('lists every variable config.ts, check-env.ts and drizzle.config.ts read, and nothing else', async () => {
+	it('lists every variable config.ts, check-env.ts, db-migrate.ts and drizzle.config.ts read, and nothing else', async () => {
 		const drizzleKeys = await drizzleConfigKeys();
 		expect([...drizzleKeys].sort()).toEqual(['DATABASE_AUTH_TOKEN', 'DATABASE_URL']);
 		const read = new Set([...configKeys(), ...drizzleKeys]);
@@ -190,7 +205,7 @@ describe('4.1 .env.example matches what the app reads', () => {
 
 	it('leaves tooling-set variables commented out, so copying it never overrides them', () => {
 		const entries = parseEnvExample(exampleText);
-		for (const name of ['NODE_ENV', 'VITEST']) {
+		for (const name of ['NODE_ENV', 'VITEST', 'CONTEXT']) {
 			expect(entries.find((e) => e.name === name)?.commented, name).toBe(true);
 		}
 	});

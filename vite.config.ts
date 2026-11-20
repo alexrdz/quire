@@ -8,6 +8,8 @@ export default defineConfig({
 	},
 	test: {
 		include: ['src/**/*.{test,spec}.{js,ts}', 'tests/unit/**/*.{test,spec}.{js,ts}'],
+		// The test database is created by the drizzle migrations (PRODUCTION_PLAN 3.5).
+		globalSetup: ['tests/setup/migrate-test-db.ts'],
 		fileParallelism: false
 	}
 });
