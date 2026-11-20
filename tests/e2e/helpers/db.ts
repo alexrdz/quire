@@ -170,3 +170,21 @@ export async function addLegacyQuickPhotoPage(issueId: string, page: { title: st
 		db.close();
 	}
 }
+
+/**
+ * Z-T06: removes a Fan's stamp or save for an Issue, so the Endpaper's Claim and
+ * Save flows can be run on the seeded sample data. Waits for the server's writes.
+ */
+export async function clearCollectionFor(email: string, issueSlug: string): Promise<void> {
+	const db = await waitingClient();
+	try {
+		await db.execute({
+			sql: `DELETE FROM collections
+			      WHERE fan_user_id = (SELECT id FROM users WHERE email = ?)
+			        AND issue_id = (SELECT id FROM issues WHERE slug = ?)`,
+			args: [email, issueSlug]
+		});
+	} finally {
+		db.close();
+	}
+}
