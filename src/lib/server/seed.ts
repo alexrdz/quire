@@ -6,7 +6,7 @@ import { eq, and } from 'drizzle-orm';
 // Relative, not $domain: the Netlify demo-reset function bundles this file outside Vite.
 import { calculateStampWindow } from '../domain/stamping';
 import type { PhotoEntry } from '../domain/photo-pile';
-import { allowsSampleData, getConfig } from './config';
+import { allowsSampleData, getConfig, sampleDataRefusal } from './config';
 
 /**
  * Venmo username of the sample Artist (development, test and the Demo only).
@@ -102,11 +102,16 @@ export const SEED_REFUSED_MESSAGE =
 /**
  * Loads the sample Artist, Fan and Issues. Development, test and the Demo only:
  * throws in production so sample accounts with known passwords never reach a real database.
+ * In development it also throws for a remote DATABASE_URL (see `sampleDataRefusal`).
  */
 export async function seedDatabase() {
-	if (!allowsSampleData(getConfig().mode)) {
+	const config = getConfig();
+	if (!allowsSampleData(config.mode)) {
 		throw new Error(SEED_REFUSED_MESSAGE);
 	}
+	// Development seeds only a file: database, never a remote one (B1-T10).
+	const refusal = sampleDataRefusal(config);
+	if (refusal) throw new Error(refusal);
 
 	// Seeding only inserts data: the schema comes from `pnpm db:migrate` (PRODUCTION_PLAN 3.5).
 	await assertSchemaMigrated(client);

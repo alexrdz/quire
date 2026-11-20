@@ -88,6 +88,35 @@ export function allowsSampleData(mode: Mode): boolean {
 	return SAMPLE_DATA_MODES.includes(mode);
 }
 
+/** A Turso/libsql URL that is not a local file. */
+export function isRemoteDatabaseUrl(url: string | undefined | null): boolean {
+	return Boolean(url && /^(libsql|https?|wss?):\/\//.test(url));
+}
+
+/** Where a database URL points, safe to log: scheme and host only, never a token, path or query. */
+export function databaseHost(url: string): string {
+	if (url.startsWith('file:')) return url;
+	try {
+		const parsed = new URL(url);
+		return `${parsed.protocol}//${parsed.host}`;
+	} catch {
+		return '(unparseable DATABASE_URL)';
+	}
+}
+
+export const DEV_REMOTE_DB_FLAG = 'QUIRE_DEV_REMOTE_DB';
+
+/**
+ * B1-T10: development mode with a remote DATABASE_URL. `.env` once pointed at the
+ * production Turso database, so `pnpm dev` would have seeded sample data into it.
+ */
+export interface DevRemoteDatabase {
+	/** Scheme and host, safe to log. */
+	host: string;
+	/** QUIRE_DEV_REMOTE_DB=true: the developer means to use it. Sample data is still never seeded. */
+	acknowledged: boolean;
+}
+
 export interface CoreConfig {
 	ok: boolean;
 	/** Names of the variables that are missing or invalid. Never their values. */
@@ -147,6 +176,11 @@ export interface Config {
 	/** Sample data is loaded on first request in development and the Demo unless disabled. */
 	autoSeed: boolean;
 	/**
+	 * Development against a remote database, or null. Sample data is never seeded
+	 * into it (`sampleDataRefusal`), and the dev server warns at startup.
+	 */
+	devRemoteDatabase: DevRemoteDatabase | null;
+	/**
 	 * Origin of R2_PUBLIC_URL (e.g. `https://media.quire.live`), or null. Read on its
 	 * own, without the R2 keys, so the CSP still allows media already stored there.
 	 */
@@ -196,7 +230,8 @@ const envSchema = z.object({
 	R2_BUCKET_NAME: optionalString,
 	R2_PUBLIC_URL: optionalString,
 	PUBLIC_PRODUCTION_URL: optionalString,
-	QUIRE_E2E_LOCAL_PREVIEW: optionalString
+	QUIRE_E2E_LOCAL_PREVIEW: optionalString,
+	QUIRE_DEV_REMOTE_DB: optionalString
 });
 
 type ParsedEnv = z.infer<typeof envSchema>;
@@ -319,7 +354,7 @@ function parseCore(env: ParsedEnv, mode: Mode, localPreview: LocalPreview): Core
 	}
 
 	const databaseUrl = env.DATABASE_URL;
-	const remoteDb = Boolean(databaseUrl && /^(libsql|https?|wss?):\/\//.test(databaseUrl));
+	const remoteDb = isRemoteDatabaseUrl(databaseUrl);
 	if (!remoteDb) issues.push('DATABASE_URL');
 	if (!env.DATABASE_AUTH_TOKEN) issues.push('DATABASE_AUTH_TOKEN');
 
@@ -382,6 +417,7 @@ export function parseConfig(rawEnv: Env): Config {
 	const mode = resolveMode(rawEnv);
 	const integrations = parseIntegrations(env);
 	const localPreview = localPreviewFor(rawEnv);
+	const core = parseCore(env, mode, localPreview);
 
 	const live: Record<FeatureName, boolean> = {
 		// Stripe is dormant (ADR 0008): never live, whatever keys are set. Tips go to Venmo.
@@ -408,16 +444,43 @@ export function parseConfig(rawEnv: Env): Config {
 		mode,
 		localPreview,
 		isDeployed: mode === 'demo' || mode === 'production',
-		core: parseCore(env, mode, localPreview),
+		core,
 		integrations,
 		features,
 		live,
 		fromEmail: env.RESEND_FROM_EMAIL ?? DEFAULT_FROM_EMAIL,
 		autoSeed: mode !== 'production' && env.DISABLE_AUTO_SEED?.toLowerCase() !== 'true',
+		devRemoteDatabase: devRemoteDatabaseFor(mode, core.databaseUrl, env.QUIRE_DEV_REMOTE_DB),
 		mediaOrigin: originOf(env.R2_PUBLIC_URL),
 		productionUrl: originOf(env.PUBLIC_PRODUCTION_URL),
 		localUploads
 	};
+}
+
+function devRemoteDatabaseFor(mode: Mode, databaseUrl: string, flag: string | undefined): DevRemoteDatabase | null {
+	if (mode !== 'development' || !isRemoteDatabaseUrl(databaseUrl)) return null;
+	return { host: databaseHost(databaseUrl), acknowledged: flag?.toLowerCase() === 'true' };
+}
+
+/**
+ * Why sample data must not be seeded into this database, or null when it may be.
+ * Development seeds only a `file:` database, whatever QUIRE_DEV_REMOTE_DB says.
+ * The Demo seeds its own remote database on purpose, so it is not refused here;
+ * production never seeds (`allowsSampleData`).
+ */
+export function sampleDataRefusal(config: Pick<Config, 'devRemoteDatabase'>): string | null {
+	const remote = config.devRemoteDatabase;
+	if (!remote) return null;
+	return remote.acknowledged
+		? `Not seeding sample data: DATABASE_URL is a remote database (${remote.host}). ${DEV_REMOTE_DB_FLAG}=true lets development use it, but sample data is only ever seeded into a file: database.`
+		: `Not seeding sample data: DATABASE_URL looks like a remote database (${remote.host}), possibly production. For local work use DATABASE_URL=file:local.db. Set ${DEV_REMOTE_DB_FLAG}=true only if you really mean to develop against a remote database; sample data is still never seeded into it.`;
+}
+
+/** The one-line startup warning for development against a remote database, or null. Host only, never the token. */
+export function devRemoteDatabaseWarning(config: Pick<Config, 'devRemoteDatabase'>): string | null {
+	const remote = config.devRemoteDatabase;
+	if (!remote) return null;
+	return `[config] Development mode is using a remote database: ${remote.host}. Reads and writes go to it, not to local.db.${remote.acknowledged ? ` (${DEV_REMOTE_DB_FLAG}=true)` : ` For local work set DATABASE_URL=file:local.db.`}`;
 }
 
 let envFileLoaded = false;
