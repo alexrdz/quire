@@ -10,7 +10,8 @@ import {
 	diffLiveSchema,
 	formatDiff,
 	isEmptyDiff,
-	latestSnapshot
+	latestSnapshot,
+	migrationSnapshots
 } from '$lib/server/db/baseline';
 import { LEGACY_DB_HINT, runMigrations } from '$lib/server/db/migrate';
 import { MIGRATIONS_TABLE } from '$lib/server/db/schema-check';
@@ -79,7 +80,13 @@ describe('db:baseline', () => {
 
 		const result = await baselineDatabase(legacy);
 		const migrations = readMigrationFiles({ migrationsFolder: path.resolve('drizzle') });
-		expect(result).toEqual({ status: 'baselined', recorded: migrations.length, latest: latestSnapshot().tag });
+		expect(result).toEqual({
+			status: 'baselined',
+			matched: latestSnapshot().tag,
+			recordedTags: migrationSnapshots().map(({ tag }) => tag),
+			pendingTags: [],
+			ignoredTables: []
+		});
 
 		// The same rows drizzle's migrator writes.
 		expect(await migrationRows(legacy)).toEqual(
@@ -199,6 +206,7 @@ describe('pnpm db:baseline and pnpm db:migrate (the real scripts)', () => {
 		const total = readMigrationFiles({ migrationsFolder: path.join(ROOT, 'drizzle') }).length;
 
 		const baseline = run('db-baseline.ts', url);
+		expect(baseline.output).toContain(`schema matches ${latestSnapshot().tag}; recorded 0000–0004; db:migrate then has nothing to apply`);
 		expect(baseline.output).toContain(`recorded ${total} migrations as applied`);
 		expect(baseline.status).toBe(0);
 
@@ -213,7 +221,7 @@ describe('pnpm db:baseline and pnpm db:migrate (the real scripts)', () => {
 
 		const baseline = run('db-baseline.ts', url);
 		expect(baseline.status).toBe(1);
-		expect(baseline.output).toContain('refused: the schema does not match');
+		expect(baseline.output).toContain('refused: the schema does not match any migration; closest is 0004_venmo_tips');
 		expect(baseline.output).toContain('- column artists.venmo_username (missing from the database)');
 
 		const migrate = run('db-migrate.ts', url);

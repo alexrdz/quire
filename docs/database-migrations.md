@@ -3,18 +3,18 @@
 Drizzle migrations are the only way Quire's schema is created or changed
 (PRODUCTION_PLAN 3.5). The SQL lives in `drizzle/`, generated from
 `src/lib/server/db/schema.ts`. Nothing at runtime writes DDL: `seedDatabase()`
-only inserts data, and it stops with a `pnpm db:migrate` hint when the schema is
-missing.
+only inserts data, and it stops with a migrate hint when the schema is missing
+(`pnpm db:migrate:local` in development, `pnpm db:migrate` elsewhere).
 
 ## Commands
 
 | Command | What it does |
 |---|---|
 | `pnpm db:generate` | After editing `schema.ts`: writes the next SQL migration and snapshot into `drizzle/`. Commit both. |
-| `pnpm db:migrate:local` | Applies pending migrations to the local `file:local.db` (development mode). |
+| `pnpm db:migrate:local` | Applies pending migrations in development mode: to `DATABASE_URL`, which defaults to `file:local.db`. |
 | `pnpm db:migrate` | Applies pending migrations to the database for the current mode: `DATABASE_URL` / `DATABASE_AUTH_TOKEN` in the Demo and production. The production Netlify build runs it. |
 | `pnpm db:migrate:preview` | The deploy-preview and branch-deploy build step. It skips unless a separate preview database is opted in (see below). |
-| `pnpm db:baseline [--dry-run]` | Run once on a database created before migrations: see [Baselining](#baselining-a-database-created-before-migrations). |
+| `pnpm db:baseline [--dry-run] [--to <migration>] [--allow-extra <table>,...]` | Run once on a database created before migrations: see [Baselining](#baselining-a-database-created-before-migrations). |
 
 `drizzle-kit push` is no longer a script: it changes the schema without recording
 a migration, which is exactly what this rule removes.
@@ -26,10 +26,21 @@ pnpm db:migrate:local   # creates or updates local.db
 pnpm dev                # the sample data loads on the first request
 ```
 
+In development use `pnpm db:migrate:local`, not `pnpm db:migrate`. Without
+`NODE_ENV`, `pnpm db:migrate` runs in production mode, against whatever
+`DATABASE_URL` is set. When the dev server finds no schema, its error says the
+same.
+
+`pnpm dev` and `pnpm db:migrate:local` both use `DATABASE_URL` from `.env` when
+it is set. If `.env` points it at a remote Turso database (a `libsql://` URL),
+the dev server reads and writes that database, and `db:migrate:local` migrates
+it. For local work, unset it or set it to `file:local.db`.
+
 If you have a `local.db` from before migrations, `pnpm db:migrate:local` stops
 with a baseline hint. For a local database, the simplest fix is
 `rm local.db && pnpm db:migrate:local`. To keep its data, run
-`NODE_ENV=development pnpm db:baseline` instead.
+`NODE_ENV=development pnpm db:baseline` instead (the same flags as below), then
+`pnpm db:migrate:local`.
 
 Tests build their database the same way. Vitest's global setup
 (`tests/setup/migrate-test-db.ts`) and the test-mode Playwright web server
@@ -77,8 +88,8 @@ never migrates one database while running against another. Never set
 ## Baselining a database created before migrations
 
 The Demo database, the production database and older dev databases were created
-by the old runtime DDL (`ensureSchemaTables` in `seed.ts`). They have every table
-but no `__drizzle_migrations` rows. `db:migrate` on such a database stops with
+by the old runtime DDL (`ensureSchemaTables` in `seed.ts`). They have the tables
+of whichever version of that DDL built them, but no `__drizzle_migrations` rows. `db:migrate` on such a database stops with
 this message instead of trying to create the tables again:
 
 ```
@@ -86,10 +97,32 @@ This database has tables but no migration history: it was created by the old run
 ```
 
 `pnpm db:baseline` compares the live tables and columns (name, type, NOT NULL,
-primary key) with the latest migration snapshot. If they match, it records every
-migration as applied, writing the same rows drizzle's migrator writes, without
-running any migration SQL or touching data. If they don't match, it refuses,
-prints the differences and records nothing.
+primary key) with the snapshot drizzle-kit saved for each migration
+(`drizzle/meta/NNNN_snapshot.json`). It finds the newest migration the database
+matches exactly. It then records that migration and every earlier one as
+applied, writing the same rows drizzle's migrator writes, without running any
+migration SQL or touching data. `pnpm db:migrate` then applies the later
+migrations. If no migration matches, it refuses, prints the differences against
+the closest one and records nothing. Indexes are not compared.
+
+A database the old DDL built before `0003_rate_limits` matches
+`0002_schema_catch_up`. Baseline records `0000`–`0002`, and `db:migrate` adds
+`0003` (rate limits) and `0004` (Venmo tips). A database built after the Venmo
+change matches `0004_venmo_tips`, and `db:migrate` then has nothing to apply.
+
+| Flag | Effect |
+|---|---|
+| `--dry-run` | Prints the plan and writes nothing. |
+| `--to <migration>` | Requires a match with that migration (tag such as `0002_schema_catch_up`, or just `0002`) instead of the newest match. It still has to match exactly. |
+| `--allow-extra <table>[,<table>]` | Ignores the named tables, which must be in no Quire migration. Without it, any such table makes baseline refuse. |
+
+**Tables that aren't Quire's.** A database can hold tables Quire never created,
+such as a `posts` table from another app. Baseline never drops, changes or reads
+them. By default it refuses and lists them as `+ table posts`, so nothing
+unexpected is ignored silently. If the table belongs to something else, pass
+`--allow-extra posts`. Baseline then ignores it, and so does `db:migrate`, since
+no migration touches it. `--allow-extra` refuses a table that is Quire's (one a
+migration creates), because ignoring it would hide a half-built schema.
 
 **When:** once per pre-existing database. Do it for the production database and
 for the Demo database before the first deploy that runs `db:migrate`, which is the
@@ -119,20 +152,42 @@ You need a checkout of this repository at the commit being deployed, with
    ```sh
    pnpm db:baseline --dry-run
    ```
-   Expected output:
-   `schema matches 0004_venmo_tips; would record 5 migrations. Run again without --dry-run to record them.`
    The first line shows which database it's connected to (host only). Confirm it
-   is the one you mean.
-4. Record the migrations:
-   ```sh
-   pnpm db:baseline
+   is the one you mean. The output names the migration the database matches and
+   what `db:migrate` will apply afterwards. For a database from before the rate
+   limits, with another app's `posts` table, it looks like this:
    ```
-   Expected: `recorded 5 migrations as applied. Next: pnpm db:migrate ...`
-5. Confirm that migrations now have nothing to do:
+   [db:baseline] refused: the schema does not match any migration; closest is 0002_schema_catch_up. Nothing was recorded.
+   + table posts (in the database, not in the migrations)
+   [db:baseline] posts is in no Quire migration. If it belongs to something else, add --allow-extra posts to leave it untouched.
+   ```
+   If the only `+` lines are tables you know aren't Quire's, add them:
+   ```sh
+   pnpm db:baseline --dry-run --allow-extra posts
+   ```
+   ```
+   [db:baseline] schema matches 0002_schema_catch_up; will record 0000–0002; db:migrate then applies 0003, 0004
+   [db:baseline] still to apply with pnpm db:migrate: 0003_rate_limits, 0004_venmo_tips
+   [db:baseline] ignored, left untouched (not Quire's): posts
+   [db:baseline] dry run: nothing was written. Run again without --dry-run to record 3 migrations.
+   ```
+   A database that already has the Venmo tables shows
+   `schema matches 0004_venmo_tips; will record 0000–0004; db:migrate then has nothing to apply`.
+   Any other `-`, `+` or `~` line: see [If baseline refuses](#if-baseline-refuses).
+4. Record the migrations, with the same flags but without `--dry-run`:
+   ```sh
+   pnpm db:baseline --allow-extra posts
+   ```
+   Expected: `schema matches 0002_schema_catch_up; recorded 0000–0002; ...` and
+   `recorded 3 migrations as applied. Next: pnpm db:migrate.`
+5. Apply the rest:
    ```sh
    pnpm db:migrate
    ```
-   Expected: `up to date (5 migrations)`
+   Expected: `applied 2 of 5 migrations` (or `up to date (5 migrations)` for a
+   database that matched `0004`). Running it again prints `up to date`. The next
+   production deploy's `db:migrate` would also apply them. Running it here first
+   means the deploy finds nothing to do.
 6. Clear the values: `unset DATABASE_URL DATABASE_AUTH_TOKEN`. Then repeat from
    step 1 for the other database (the Demo after production, or the other way
    round).
@@ -142,10 +197,13 @@ Running `pnpm db:baseline` again on a baselined database does nothing:
 
 ### If baseline refuses
 
-Lines starting with `-` are tables or columns the migrations expect but the
-database lacks. Lines with `+` are in the database but not in the migrations.
-Lines with `~` are columns whose type, NOT NULL or primary key differ. Don't
-work around it by inserting `__drizzle_migrations` rows by hand. Instead:
+The diff is against the closest migration (or the one `--to` named). Lines
+starting with `-` are tables or columns that migration expects but the database
+lacks. Lines with `+` are in the database but not in that migration. Lines with
+`~` are columns whose type, NOT NULL or primary key differ. A `+ table` that
+isn't Quire's can be passed to `--allow-extra` (above). For anything else, don't
+work around it by inserting `__drizzle_migrations` rows by hand, and don't use
+`--to` to pick a migration that doesn't match. Instead:
 
 - **The Demo database:** its data is sample data. Create a fresh empty database
   (or empty this one), point the Demo site at it, and let the deploy run

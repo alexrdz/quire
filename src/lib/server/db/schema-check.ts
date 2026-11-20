@@ -7,11 +7,38 @@ import type { Client } from '@libsql/client';
 import { is } from 'drizzle-orm';
 import { getTableConfig, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import * as schema from './schema';
+// Relative, not $lib: the Netlify demo-reset function bundles this file outside Vite.
+import { getConfig } from '../config';
+import type { Mode } from '../../features';
 
 export const MIGRATIONS_TABLE = '__drizzle_migrations';
 
 export const SCHEMA_MISSING_HINT =
 	'Run `pnpm db:migrate` to create the schema. A database created before migrations (by the old runtime DDL) needs `pnpm db:baseline` once first: see docs/database-migrations.md.';
+
+/**
+ * Development (B1-T08): `pnpm db:migrate` runs in production mode against whatever
+ * DATABASE_URL is set, so a dev user must use `db:migrate:local`. And `.env` may
+ * point DATABASE_URL at a remote database, which the dev server then uses.
+ */
+export const DEV_SCHEMA_MISSING_HINT =
+	'Run `pnpm db:migrate:local` to create or update the schema (not `pnpm db:migrate`, which runs in production mode). ' +
+	'It migrates the database DATABASE_URL names, default file:local.db; if DATABASE_URL in .env points at a remote (libsql://) database, ' +
+	'the dev server is using that one: point it back at file:local.db, or read docs/database-migrations.md first. ' +
+	'A database created before migrations needs `NODE_ENV=development pnpm db:baseline` once first.';
+
+/** The hint for this mode; development gets the local commands. */
+export function schemaMissingHint(mode: Mode | undefined = currentMode()): string {
+	return mode === 'development' ? DEV_SCHEMA_MISSING_HINT : SCHEMA_MISSING_HINT;
+}
+
+function currentMode(): Mode | undefined {
+	try {
+		return getConfig().mode;
+	} catch {
+		return undefined;
+	}
+}
 
 /** Every table `schema.ts` defines, by its SQL name. */
 export function schemaTableNames(): string[] {
@@ -40,16 +67,16 @@ export async function hasMigrationHistory(client: Client): Promise<boolean> {
 }
 
 /**
- * Throws with the `db:migrate` hint unless every schema table exists and the
+ * Throws with the mode's migrate hint unless every schema table exists and the
  * database has a migration history.
  */
 export async function assertSchemaMigrated(client: Client): Promise<void> {
 	const live = new Set(await liveTableNames(client));
 	const missing = schemaTableNames().filter((name) => !live.has(name));
 	if (missing.length > 0) {
-		throw new Error(`Database schema is missing (${missing.length} tables, e.g. ${missing.slice(0, 3).join(', ')}). ${SCHEMA_MISSING_HINT}`);
+		throw new Error(`Database schema is missing (${missing.length} tables, e.g. ${missing.slice(0, 3).join(', ')}). ${schemaMissingHint()}`);
 	}
 	if (!(await hasMigrationHistory(client))) {
-		throw new Error(`Database has tables but no migration history. ${SCHEMA_MISSING_HINT}`);
+		throw new Error(`Database has tables but no migration history. ${schemaMissingHint()}`);
 	}
 }
