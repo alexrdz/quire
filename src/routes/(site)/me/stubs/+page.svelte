@@ -19,7 +19,7 @@
 				</Cluster>
 
 				<Cluster align="center" gap="xs">
-					<span class="text-muted user-status">Signed in as {data.user.name}</span>
+					<span class="text-muted user-status">Signed in as {data.viewer.name}</span>
 					<form method="POST" action="/logout" class="signout-form">
 						<button type="submit" class="btn-signout-link">Sign Out</button>
 					</form>

@@ -5,7 +5,7 @@ import { ArtistAccountStatus } from '$domain/account';
 import { db, schema } from '$lib/server/db';
 import { eq, and, asc, desc } from 'drizzle-orm';
 import { auth, createSessionForUser } from '$lib/server/auth';
-import { optionalUser, requireFan, isDenied } from '$lib/server/guards';
+import { optionalViewer, requireFan, isDenied } from '$lib/server/guards';
 import { consumeRateLimit } from '$lib/server/services/rate-limit';
 import {
 	submitWallNote,
@@ -70,8 +70,7 @@ export const load: ServerLoad = async (event) => {
 		wasThere: stampedFanIds.has(n.fanUserId)
 	}));
 
-	// Check authentication session
-	const session = optionalUser(event);
+	const viewer = optionalViewer(event);
 
 	// Check attendance scan token cookie
 	const scanToken = cookies.get(`quire_scan_${slug}`);
@@ -85,10 +84,10 @@ export const load: ServerLoad = async (event) => {
 
 	// Check collection state if logged in
 	let collectionStatus: 'none' | 'saved' | 'stamped' = 'none';
-	if (session?.user) {
+	if (viewer) {
 		const entry = await db.query.collections.findFirst({
 			where: and(
-				eq(schema.collections.fanUserId, session.user.id),
+				eq(schema.collections.fanUserId, viewer.id),
 				eq(schema.collections.issueId, issue.id)
 			)
 		});
@@ -117,7 +116,7 @@ export const load: ServerLoad = async (event) => {
 		templatePages,
 		notes,
 		tipPresets,
-		session,
+		viewer,
 		isScanVerified,
 		collectionStatus
 	};

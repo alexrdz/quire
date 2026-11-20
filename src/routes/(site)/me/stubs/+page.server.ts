@@ -1,7 +1,7 @@
 import { type ServerLoad } from '@sveltejs/kit';
 import { db, schema } from '$lib/server/db';
 import { eq, desc } from 'drizzle-orm';
-import { requireFanPage } from '$lib/server/guards';
+import { requireFanPage, toViewer } from '$lib/server/guards';
 
 export const load: ServerLoad = async (event) => {
 	const { user } = requireFanPage(event);
@@ -22,7 +22,7 @@ export const load: ServerLoad = async (event) => {
 	const saved = collectionEntries.filter((entry) => entry.kind === 'saved');
 
 	return {
-		user: user,
+		viewer: toViewer(user),
 		stamped,
 		saved
 	};
