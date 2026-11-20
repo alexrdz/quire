@@ -471,6 +471,16 @@ export function tipsOpenVenmo(mode: Mode): boolean {
 	return mode === 'production';
 }
 
+/**
+ * The Demo banner's link to the real site's sign-up page, from
+ * PUBLIC_PRODUCTION_URL. Empty outside the Demo or when it is unset, so the
+ * banner shows no link.
+ */
+export function demoBannerData(mode: Mode | undefined): { demoSignupUrl?: string } {
+	const origin = mode === 'demo' ? getConfig().productionUrl : null;
+	return origin ? { demoSignupUrl: `${origin}/login?mode=signup` } : {};
+}
+
 export function getPublicFeatures(): PublicFeatures {
 	const { features, mode } = getConfig();
 	return { ...features, mode, tipsOpenVenmo: tipsOpenVenmo(mode) };

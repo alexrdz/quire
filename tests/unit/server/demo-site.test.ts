@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'svelte/server';
-import { parseConfig, resetConfigForTests, runningOnNetlify, type Env } from '$lib/server/config';
+import { demoBannerData, parseConfig, resetConfigForTests, runningOnNetlify, type Env } from '$lib/server/config';
 import { featureUnavailableMessage, FEATURE_UNAVAILABLE } from '$lib/features';
-import { demoSignupUrl, DEMO_SIGNUP_LABEL } from '$lib/components/site/demo-banner';
+import { DEMO_SIGNUP_LABEL } from '$lib/components/site/demo-banner';
 import { featuresWith } from '../helpers/features';
 import { load as rootLayoutLoad } from '../../../src/routes/+layout.server';
 import InRootLayout from '../helpers/InRootLayout.svelte';
@@ -97,8 +97,7 @@ describe('the Demo banner sign-up link (PUBLIC_PRODUCTION_URL)', () => {
 		expect(parseConfig({ ...DEMO, PUBLIC_PRODUCTION_URL: 'https://quire.live/some/path' }).productionUrl).toBe('https://quire.live');
 		expect(parseConfig({ ...DEMO, PUBLIC_PRODUCTION_URL: 'not a url' }).productionUrl).toBeNull();
 		expect(parseConfig(DEMO).productionUrl).toBeNull();
-		expect(demoSignupUrl('https://quire.live')).toBe('https://quire.live/login?mode=signup');
-		expect(demoSignupUrl(null)).toBeNull();
+		expect(demoBannerData(undefined)).toEqual({});
 	});
 
 	async function layoutData(mode: 'demo' | 'production' | 'test') {
