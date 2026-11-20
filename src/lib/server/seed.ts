@@ -79,7 +79,7 @@ export const PHILLY_TOUR_DIARY_PHOTOS: readonly PhotoEntry[] = [
 	},
 	{
 		url: samplePhotoUrl('1459749411175-04bf5292ceea'),
-		caption: 'Lights down for Night Bus to Girard. Fish and chips after.'
+		caption: 'Lights down for Night Bus to Girard. Cheesesteaks after.'
 	}
 ];
 
