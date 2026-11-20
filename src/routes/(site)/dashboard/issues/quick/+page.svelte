@@ -5,6 +5,7 @@
 	import ArtistTopNav from '$lib/components/dashboard/ArtistTopNav.svelte';
 	import QrCaseDisplay from '$lib/components/dashboard/QrCaseDisplay.svelte';
 	import { optimizeFileInputOnChange } from '$lib/utils/image-optimize';
+	import { MAX_PHOTO_CAPTION_LENGTH } from '$domain/photo-pile';
 
 	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
 
@@ -311,10 +312,14 @@
 											type="text"
 											name="photoCaption"
 											bind:value={photoCaption}
-											maxlength="280"
+											maxlength={MAX_PHOTO_CAPTION_LENGTH}
+											aria-describedby="photoCaption-hint"
 											placeholder="e.g. Soundcheck from the balcony"
 											class="form-field-input"
 										/>
+										<span id="photoCaption-hint" class="subtext-small text-muted">
+											Written on the back of the photo: fans flip it to read.
+										</span>
 									</Stack>
 								</Stack>
 							</Box>
