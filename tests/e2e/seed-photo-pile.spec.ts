@@ -2,9 +2,11 @@ import { test, expect } from '@playwright/test';
 import { BROOKLYN_ISSUE_PATH, PHILLY_ISSUE_PATH, pileOn, walkPile, watchPage } from './helpers/photo-pile';
 
 /**
- * B1-T03: the sample Issues' Tour Diary pages are captioned polaroid piles.
- * The Brooklyn pile has 4 or 5 photos, most of which flip to a caption and at
- * least one which doesn't; the Philadelphia pile has 3 captioned photos.
+ * B1-T03, seed data: the sample Issues seeded by `src/lib/server/seed.ts` show
+ * their Tour Diary pages as captioned polaroid piles. The Brooklyn pile has 4
+ * or 5 photos, most of which flip to a caption and at least one which doesn't;
+ * the Philadelphia pile has 3 captioned photos. The pile component itself is
+ * covered by `photo-pile.spec.ts`; this file only checks the seeded content.
  */
 
 test.describe('sample Issue photo piles (test mode)', () => {

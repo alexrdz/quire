@@ -277,7 +277,7 @@ export async function seedDatabase() {
 		venue: "Johnny Brenda's",
 		date: '2026-10-15',
 		timezone: 'America/New_York',
-		coverNote: 'Balcony was shaking during the chorus. Fish & chips downstairs after the set.',
+		coverNote: 'Balcony was shaking during the chorus. Cheesesteaks downstairs after the set.',
 		secretKey: 'philly_jb_secret_2026',
 		status: 'published',
 		stampWindowStart: issue2Window.ok ? issue2Window.value.start : now,
