@@ -32,8 +32,10 @@ with a baseline hint. For a local database, the simplest fix is
 `NODE_ENV=development pnpm db:baseline` instead.
 
 Tests build their database the same way. Vitest's global setup
-(`tests/setup/migrate-test-db.ts`) and the Playwright web server
-(`pnpm db:migrate && pnpm preview`) both run the migrations on `local.db`.
+(`tests/setup/migrate-test-db.ts`) and the test-mode Playwright web server
+(`pnpm db:migrate && pnpm preview`) both run the migrations on `local.db`. The
+Demo- and production-mode Playwright servers migrate their own fresh file
+databases in the OS temp directory (see [e2e-local-preview.md](e2e-local-preview.md)).
 
 ## Netlify builds
 

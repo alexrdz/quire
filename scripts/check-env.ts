@@ -7,7 +7,7 @@
  *
  * Usage: pnpm check:env   (reads process.env, plus .env when present)
  */
-import { parseConfig, tipsOpenVenmo, type FeatureName } from '../src/lib/server/config';
+import { LOCAL_PREVIEW_FLAG, parseConfig, tipsOpenVenmo, type FeatureName } from '../src/lib/server/config';
 
 try {
 	process.loadEnvFile?.('.env');
@@ -25,6 +25,18 @@ const FEATURE_KEYS: Partial<Record<FeatureName, string>> = {
 const config = parseConfig(process.env);
 
 console.log(`[check-env] mode: ${config.mode}`);
+
+// The local e2e preview flag (P4L-T03) must never reach a deployed site or a
+// remote database. Its guards make the app ignore it there; the build refuses it.
+if (config.localPreview.requested) {
+	if (!config.localPreview.honored) {
+		console.error(
+			`[check-env] ${LOCAL_PREVIEW_FLAG} is set but its guards fail: ${config.localPreview.ignoredBecause.join('; ')}. It is for local e2e servers only. Unset it.`
+		);
+		process.exit(1);
+	}
+	console.warn(`[check-env] ${LOCAL_PREVIEW_FLAG}: local e2e preview (file database, test secrets). Never deploy this.`);
+}
 
 console.log('[check-env] payments: Stripe dormant (ADR 0008); STRIPE_* keys are optional and ignored');
 console.log(`[check-env] tips: ${tipsOpenVenmo(config.mode) ? 'open Venmo' : 'simulated (Venmo opens only in production)'}`);

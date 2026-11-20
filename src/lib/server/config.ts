@@ -37,6 +37,15 @@ const DEV_AUTH_SECRET = 'quire_development_auth_secret_do_not_deploy_0000';
 const DEV_COOKIE_SECRET = 'quire_development_scan_token_secret_do_not_deploy';
 const DEV_DATABASE_URL = 'file:local.db';
 const DEV_APP_URL = 'http://localhost:5173';
+/**
+ * Local e2e preview only (QUIRE_E2E_LOCAL_PREVIEW, see `localPreviewFor`). Never
+ * accepted by the normal Demo or production rules: these values are public.
+ */
+const LOCAL_PREVIEW_AUTH_SECRET = 'quire_e2e_local_preview_auth_secret_000000000000';
+const LOCAL_PREVIEW_COOKIE_SECRET = 'quire_e2e_local_preview_cookie_secret_00000000000';
+export const LOCAL_PREVIEW_FLAG = 'QUIRE_E2E_LOCAL_PREVIEW';
+/** Netlify sets these on every build and function; any one of them means "not local". */
+const NETLIFY_MARKERS = ['NETLIFY', 'CONTEXT', 'DEPLOY_URL'] as const;
 const DEFAULT_FROM_EMAIL = 'Quire <noreply@quire.live>';
 const DEFAULT_R2_BUCKET = 'quire-media';
 
@@ -94,8 +103,22 @@ export interface Integrations {
 	} | null;
 }
 
+/**
+ * The local e2e preview exception (PRODUCTION_PLAN 4.2, P4L-T03): lets the Demo and
+ * production modes run locally on a file database with fixed test secrets.
+ */
+export interface LocalPreview {
+	/** QUIRE_E2E_LOCAL_PREVIEW=true was set. */
+	requested: boolean;
+	/** Requested, and every guard held. Only then does the exception apply. */
+	honored: boolean;
+	/** Why a requested flag was ignored. Names variables, never values. */
+	ignoredBecause: string[];
+}
+
 export interface Config {
 	mode: Mode;
+	localPreview: LocalPreview;
 	/** True for the Demo and production: real deployments that must be fully configured. */
 	isDeployed: boolean;
 	core: CoreConfig;
@@ -145,7 +168,8 @@ const envSchema = z.object({
 	R2_ACCESS_KEY_ID: optionalString,
 	R2_SECRET_ACCESS_KEY: optionalString,
 	R2_BUCKET_NAME: optionalString,
-	R2_PUBLIC_URL: optionalString
+	R2_PUBLIC_URL: optionalString,
+	QUIRE_E2E_LOCAL_PREVIEW: optionalString
 });
 
 type ParsedEnv = z.infer<typeof envSchema>;
@@ -189,7 +213,28 @@ function ephemeralSecret(): string {
 	return crypto.randomBytes(32).toString('hex');
 }
 
-function parseCore(env: ParsedEnv, mode: Mode): CoreConfig {
+/**
+ * Decides whether the local e2e preview flag applies. All of these must hold,
+ * otherwise the flag is ignored and the normal fail-closed rules apply:
+ * - DATABASE_URL starts with `file:` (a local file, never a remote database);
+ * - NETLIFY, CONTEXT and DEPLOY_URL are all unset (Netlify sets them on every
+ *   build and function, so this never runs on a deployed site). A variable that
+ *   is present but empty still counts as set.
+ */
+export function localPreviewFor(rawEnv: Env): LocalPreview {
+	const requested = rawEnv[LOCAL_PREVIEW_FLAG]?.trim().toLowerCase() === 'true';
+	if (!requested) return { requested: false, honored: false, ignoredBecause: [] };
+	const ignoredBecause: string[] = [];
+	if (!rawEnv.DATABASE_URL?.trim().startsWith('file:')) {
+		ignoredBecause.push('DATABASE_URL is not a file: URL');
+	}
+	for (const name of NETLIFY_MARKERS) {
+		if (rawEnv[name] !== undefined) ignoredBecause.push(`${name} is set (a Netlify build or function)`);
+	}
+	return { requested, honored: ignoredBecause.length === 0, ignoredBecause };
+}
+
+function parseCore(env: ParsedEnv, mode: Mode, localPreview: LocalPreview): CoreConfig {
 	const issues: string[] = [];
 	const local = mode === 'development' || mode === 'test';
 
@@ -213,11 +258,37 @@ function parseCore(env: ParsedEnv, mode: Mode): CoreConfig {
 		};
 	}
 
-	// Demo and production: every core value must be real.
-	const authSecret = checkSecret('BETTER_AUTH_SECRET', env.BETTER_AUTH_SECRET, issues);
-	const cookieSecret = checkSecret('COOKIE_SECRET', env.COOKIE_SECRET, issues);
+	// Demo and production: every core value must be real, except under the honored
+	// local preview, where unset secrets take fixed test values and the database
+	// is a local file. The app URL is still required.
+	const preview = localPreview.honored;
+	const authSecret = checkSecret(
+		'BETTER_AUTH_SECRET',
+		env.BETTER_AUTH_SECRET ?? (preview ? LOCAL_PREVIEW_AUTH_SECRET : undefined),
+		issues
+	);
+	const cookieSecret = checkSecret(
+		'COOKIE_SECRET',
+		env.COOKIE_SECRET ?? (preview ? LOCAL_PREVIEW_COOKIE_SECRET : undefined),
+		issues
+	);
 	if (authSecret && cookieSecret && authSecret === cookieSecret) {
 		issues.push('COOKIE_SECRET (must differ from BETTER_AUTH_SECRET)');
+	}
+
+	if (preview) {
+		const appUrl = checkUrl(env.BETTER_AUTH_URL ?? env.PUBLIC_APP_URL);
+		if (!appUrl) issues.push('BETTER_AUTH_URL');
+		return {
+			ok: issues.length === 0,
+			issues,
+			authSecret: authSecret ?? ephemeralSecret(),
+			cookieSecret: cookieSecret ?? ephemeralSecret(),
+			// localPreviewFor checked it is a file: URL.
+			databaseUrl: env.DATABASE_URL ?? '',
+			databaseAuthToken: undefined,
+			appUrl: appUrl ?? ''
+		};
 	}
 
 	const databaseUrl = env.DATABASE_URL;
@@ -283,6 +354,7 @@ export function parseConfig(rawEnv: Env): Config {
 	const env = envSchema.parse(rawEnv);
 	const mode = resolveMode(rawEnv);
 	const integrations = parseIntegrations(env);
+	const localPreview = localPreviewFor(rawEnv);
 
 	const live: Record<FeatureName, boolean> = {
 		// Stripe is dormant (ADR 0008): never live, whatever keys are set. Tips go to Venmo.
@@ -302,8 +374,9 @@ export function parseConfig(rawEnv: Env): Config {
 
 	return {
 		mode,
+		localPreview,
 		isDeployed: mode === 'demo' || mode === 'production',
-		core: parseCore(env, mode),
+		core: parseCore(env, mode, localPreview),
 		integrations,
 		features,
 		live,
@@ -320,6 +393,8 @@ function loadEnvFileOnce(): void {
 	if (envFileLoaded) return;
 	envFileLoaded = true;
 	if (resolveMode(process.env) === 'test') return;
+	// The local e2e preview is hermetic: a developer's .env (remote keys, R2) never leaks in.
+	if (localPreviewFor(process.env).requested) return;
 	try {
 		process.loadEnvFile?.('.env');
 	} catch {
@@ -335,8 +410,25 @@ export function getConfig(): Config {
 	loadEnvFileOnce();
 	if (cached) return cached;
 	const config = parseConfig(process.env);
+	logLocalPreviewOnce(config);
 	if (config.mode !== 'test') cached = config;
 	return config;
+}
+
+let localPreviewLogged = false;
+
+function logLocalPreviewOnce({ localPreview, mode }: Config): void {
+	if (localPreviewLogged || !localPreview.requested) return;
+	localPreviewLogged = true;
+	if (localPreview.honored) {
+		console.warn(
+			`[config] ${LOCAL_PREVIEW_FLAG}: local e2e preview in ${mode} mode (file database, test secrets). Never deploy this.`
+		);
+	} else {
+		console.warn(
+			`[config] ${LOCAL_PREVIEW_FLAG} ignored: ${localPreview.ignoredBecause.join('; ')}. The normal ${mode} rules apply.`
+		);
+	}
 }
 
 export function isFeatureEnabled(name: FeatureName): boolean {

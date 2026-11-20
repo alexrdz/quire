@@ -62,7 +62,10 @@ const SCENARIOS: Env[] = [
 	{ ...FULL, NODE_ENV: 'development', DATABASE_URL: 'libsql://dev.turso.io' },
 	{ ...FULL, DEMO_MODE: 'true' },
 	{ ...FULL, NODE_ENV: 'production' },
-	{ ...FULL, NODE_ENV: 'production', BETTER_AUTH_URL: undefined, PUBLIC_APP_URL: 'https://quire.example' }
+	{ ...FULL, NODE_ENV: 'production', BETTER_AUTH_URL: undefined, PUBLIC_APP_URL: 'https://quire.example' },
+	// The local e2e preview flag and its guards (P4L-T03).
+	{ DEMO_MODE: 'true', QUIRE_E2E_LOCAL_PREVIEW: 'true', DATABASE_URL: 'file:e2e.db', BETTER_AUTH_URL: 'http://localhost:4174' },
+	{ NODE_ENV: 'production', QUIRE_E2E_LOCAL_PREVIEW: 'true', DATABASE_URL: 'libsql://x.turso.io' }
 ];
 
 /** Netlify contexts the migration script handles (scripts/db-migrate.ts, PRODUCTION_PLAN 3.5). */
@@ -188,6 +191,7 @@ describe('4.1 .env.example matches what the app reads', () => {
 
 	it('groups variables by tier: mode, core, features, Stripe', () => {
 		const sectionOf = new Map(parseEnvExample(exampleText).map((e) => [e.name, e.section]));
+		expect(sectionOf.get('QUIRE_E2E_LOCAL_PREVIEW')).toBe('Test only, never set on a deployed site');
 		expect(sectionOf.get('DEMO_MODE')).toBe('Mode');
 		expect(sectionOf.get('NODE_ENV')).toBe('Mode');
 		for (const name of ['DATABASE_URL', 'DATABASE_AUTH_TOKEN', 'BETTER_AUTH_SECRET', 'COOKIE_SECRET', 'BETTER_AUTH_URL']) {
@@ -205,7 +209,7 @@ describe('4.1 .env.example matches what the app reads', () => {
 
 	it('leaves tooling-set variables commented out, so copying it never overrides them', () => {
 		const entries = parseEnvExample(exampleText);
-		for (const name of ['NODE_ENV', 'VITEST', 'CONTEXT']) {
+		for (const name of ['NODE_ENV', 'VITEST', 'CONTEXT', 'NETLIFY', 'DEPLOY_URL']) {
 			expect(entries.find((e) => e.name === name)?.commented, name).toBe(true);
 		}
 	});
