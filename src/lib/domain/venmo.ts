@@ -5,6 +5,7 @@
  * note filled in, and the Fan confirms the payment inside Venmo.
  */
 import { type Brand, type DomainError, type Result, err, ok } from './types';
+import { MAX_TIP_CENTS, MIN_TIP_CENTS } from './tipping';
 
 export type VenmoUsername = Brand<string, 'VenmoUsername'>;
 
@@ -84,4 +85,40 @@ const NOTE_NAME_MAX = 80;
 export function tipNote(artistName: string): string {
 	const name = (artistName ?? '').replace(/\s+/g, ' ').trim().slice(0, NOTE_NAME_MAX).trim();
 	return `Tip for ${name || 'the artist'} via Quire`;
+}
+
+/** Whole dollars, or dollars with one or two decimal places: "20", "12.5", "12.50", ".5". */
+const TIP_DOLLARS_PATTERN = /^(\d*)(?:\.(\d{1,2}))?$/;
+
+/**
+ * A custom tip amount as the Fan typed it, in whole cents, or null when there is
+ * no usable amount. Never throws.
+ *
+ * It takes what a `type="number"` input binds (a number, or null when the field
+ * is empty or not a number), or a string. The decimal is read digit by digit,
+ * never through floating-point arithmetic, so 12.5 is exactly 1250 cents.
+ * Amounts with more than two decimal places (12.345) are rejected rather than
+ * rounded, matching the tip-tap schema's whole-cents rule. The amount must be
+ * from $2 to $500 (MIN_TIP_CENTS to MAX_TIP_CENTS).
+ */
+export function parseTipDollars(raw: unknown): number | null {
+	let text: string;
+	if (typeof raw === 'number') {
+		if (!Number.isFinite(raw) || raw < 0) return null;
+		// String(12.5) is "12.5"; tiny or huge numbers become "1e-7" / "1e+21" and fail the pattern.
+		text = String(raw);
+	} else if (typeof raw === 'string') {
+		text = raw.trim();
+	} else {
+		return null;
+	}
+
+	const match = TIP_DOLLARS_PATTERN.exec(text);
+	if (!match) return null;
+	const [, whole = '', fraction = ''] = match;
+	if (whole === '' && fraction === '') return null;
+	if (whole.length > 6) return null;
+
+	const cents = Number(whole || '0') * 100 + Number(fraction.padEnd(2, '0'));
+	return cents >= MIN_TIP_CENTS && cents <= MAX_TIP_CENTS ? cents : null;
 }
