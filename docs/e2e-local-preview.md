@@ -7,7 +7,7 @@ exception in `src/lib/server/config.ts` lets them run locally, and
 
 ## What `pnpm test:e2e` runs
 
-`pnpm build` first. Then `pnpm test:e2e` starts three servers on the same build
+`pnpm build` first. Then `pnpm test:e2e` starts four servers on the same build
 and runs three Playwright projects. No Docker and no network.
 
 | Project | Port | Mode | Database | Specs |
@@ -15,6 +15,19 @@ and runs three Playwright projects. No Docker and no network.
 | `chromium` | 4173 | test | `local.db`, migrated | `tests/e2e/` except the two folders below |
 | `demo-mode` | 4174 | demo (`DEMO_MODE=true`) | `<tmp>/quire-e2e/demo.db`: deleted, migrated, then seeded by the Demo on its first request | `tests/e2e/demo/` |
 | `production-mode` | 4175 | production (`NODE_ENV=production`) | `<tmp>/quire-e2e/production.db`: deleted and migrated, never seeded | `tests/e2e/production/` |
+| (`production-mode`) | 4176 | production, core config missing (`BETTER_AUTH_URL` empty) | never opened | `tests/e2e/production/core-missing.spec.ts` |
+
+The fourth server has no project of its own: `core-missing.spec.ts` reaches it
+by URL (`CORE_MISSING_URL` in `tests/e2e/helpers/production-db.ts`). It serves
+the 503 page for every request but `/healthz`, so it is cheap to run.
+
+The production-mode specs create their Artists and Issues straight in the
+production database with `tests/e2e/helpers/production-db.ts` (production has no
+sample data and no sign-up while email is off). That helper's path must match
+`previewServer('production', ...)` in `playwright.config.ts`. The project runs
+with one worker: the specs and the server share that file database, and SQLite
+in rollback-journal mode answers `SQLITE_BUSY` to the server when two
+connections overlap.
 
 `<tmp>` is the OS temp directory, so nothing is written into the repository. The
 Demo and production servers set `QUIRE_E2E_LOCAL_PREVIEW=true`, a `file:`
