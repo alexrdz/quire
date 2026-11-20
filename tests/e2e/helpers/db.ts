@@ -15,7 +15,7 @@ export async function resetRateLimits(): Promise<void> {
 	try {
 		await db.execute('DELETE FROM rate_limits');
 	} catch {
-		// Table not created yet: the server creates it on first request.
+		// No database yet: the web server runs `pnpm db:migrate` before it starts.
 	} finally {
 		db.close();
 	}

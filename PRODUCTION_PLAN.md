@@ -210,6 +210,13 @@ Acceptance: unit tests for username validation, the change flow (password, token
 
 3.5 **Schema source of truth**: remove runtime DDL (`ensureSchemaTables`) from `seed.ts`; drizzle migrations are the only schema path, run in the Netlify build for both sites.
 
+**Status (2026-11-20): done on `prod/p3-migrations` (PR into `main`).** Details and the user's baseline steps are in `docs/database-migrations.md`.
+- **Seed:** `ensureSchemaTables` is gone from `seed.ts`, which now only inserts data. On a database without the schema or a migration history, `seedDatabase()` throws with the `pnpm db:migrate` hint (`db/schema-check.ts`). The old DDL lives on, verbatim, only as the test fixture `tests/fixtures/legacy-schema.ts`.
+- **One migration path:** `pnpm db:migrate` (`scripts/db-migrate.ts`) uses drizzle-orm's libsql migrator, the same one as Vitest's global setup (`tests/setup/migrate-test-db.ts`) and the Playwright web server (`pnpm db:migrate && pnpm preview`). The target database comes from `parseConfig`, so test mode is always `local.db`. `db:migrate` refuses a database with tables but no history (the old runtime DDL) and points to `db:baseline`. `db:push` (drizzle-kit push) is removed.
+- **Netlify:** `netlify.toml` runs `check:env`, then `db:migrate`, then `build` only in `[context.production]` (the live site and the Demo site's live deploy). `[build]`, `deploy-preview` and `branch-deploy` run `db:migrate:preview`, which skips with a log line unless `PREVIEW_DATABASE_URL` is set. That variable must equal the context's `DATABASE_URL`, or the build fails. Plain `db:migrate` follows the same rules when Netlify's `CONTEXT` is a preview. `PREVIEW_DATABASE_URL` and `CONTEXT` are in `.env.example`, and the 4.1 sync test records what the migration plan reads.
+- **Baselining:** `pnpm db:baseline [--dry-run]` (`db/baseline.ts`) compares the live tables and columns (type, NOT NULL, primary key) with the latest snapshot, then writes the migrator's own `__drizzle_migrations` rows without running SQL. It refuses with a diff otherwise. The tests build the old schema from the fixture and check both cases at the function and the CLI level: when it matches, baseline records 5 migrations and `db:migrate` reports up to date with the data kept; when a column or table is dropped or added, or a type changes, it refuses. **The user still has to baseline the production and Demo databases once before the first migrating deploy** (steps in the doc).
+- **`schema.ts` and `drizzle/` agree:** `drizzle-kit generate` reports "No schema changes". A unit test reruns it into a temp copy of `drizzle/` on every `pnpm test`.
+
 3.6 **Observability**
 
 **Status (2026-11-19): done with 3.4 (same PR).**

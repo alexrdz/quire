@@ -1,14 +1,33 @@
-# Production and the Demo build the same way (PRODUCTION_PLAN 3.4, ADR 0007).
-# check:env fails the build when a deployed mode is missing core configuration.
-# Migrations join this command in 3.5.
+# Production and the Demo build the same way (PRODUCTION_PLAN 3.4, 3.5; ADR 0007).
+# check:env fails the build when a deployed mode is missing core configuration,
+# then migrations run, then the build. If migrate fails, the deploy fails.
+#
+# Only the production context migrates. Deploy previews and branch deploys run
+# unmerged code and, unless configured otherwise, see the production
+# DATABASE_URL, so they use db:migrate:preview: it skips (with a log line) unless
+# a separate preview database is opted in with PREVIEW_DATABASE_URL.
+# Details: docs/database-migrations.md.
+
 [build]
-  command = "pnpm check:env && pnpm build"
+  # The default for every context not listed below: never migrates the
+  # production database.
+  command = "pnpm check:env && pnpm db:migrate:preview && pnpm build"
   # Where @sveltejs/adapter-netlify writes the client assets. The server function
   # goes to .netlify/functions-internal and is picked up automatically.
   publish = "build"
 
 [build.environment]
   NODE_VERSION = "22"
+
+# The live site, and the Demo site's live deploy (its own Netlify site and database).
+[context.production]
+  command = "pnpm check:env && pnpm db:migrate && pnpm build"
+
+[context.deploy-preview]
+  command = "pnpm check:env && pnpm db:migrate:preview && pnpm build"
+
+[context.branch-deploy]
+  command = "pnpm check:env && pnpm db:migrate:preview && pnpm build"
 
 # Static assets come from the CDN and never reach hooks.server.ts, so they get
 # the non-CSP security headers here. Pages and endpoints get the full set

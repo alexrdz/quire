@@ -4,7 +4,8 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL;
 
 export default defineConfig({
 	webServer: baseURL ? undefined : {
-		command: 'pnpm preview',
+		// The server's database is built by the drizzle migrations first (PRODUCTION_PLAN 3.5).
+		command: 'pnpm db:migrate && pnpm preview',
 		port: 4173,
 		reuseExistingServer: !process.env.CI,
 		// The built server runs in production mode by default (ADR 0007). The e2e suite
