@@ -3,7 +3,7 @@ import { withSessionModule } from '../helpers/session-event';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { hashPassword, makeSignature } from 'better-auth/crypto';
 import { db, schema } from '$lib/server/db';
 import { authSecret } from '$lib/server/auth';
@@ -15,6 +15,8 @@ import * as __route3 from '../../../src/routes/(zine)/i/[slug]/+page.server';
 const { load: readerLoad } = withSessionModule(__route3);
 import { TINY_JPEG, TINY_MP3, TINY_PNG } from '../helpers/media';
 import { seedDatabase } from '$lib/server/seed';
+import { MAX_PHOTO_CAPTION_LENGTH, resolvePhotoEntries } from '$domain/photo-pile';
+import { photoEntriesSchema } from '$schemas/issue';
 
 interface TestArtistFixture {
 	userId: string;
@@ -184,7 +186,70 @@ describe('P4 Quick Issue + Bookbinder + Reader', () => {
 
 		const photoContent = JSON.parse(issue!.issuePages[1].contentJson);
 		expect(photoContent.imageUrl).toMatch(/^\/uploads\/.+\.webp$/);
-		expect(photoContent.body).toBe('Soundcheck on Frankford Ave');
+		// Z-T07: the caption goes on the back of the polaroid, in the Bookbinder format.
+		expect(photoContent).toEqual({
+			title: 'Philadelphia Photo',
+			imageUrl: photoContent.imageUrl,
+			photos: [{ url: photoContent.imageUrl, caption: 'Soundcheck on Frankford Ave' }]
+		});
+		expect(resolvePhotoEntries(photoContent)).toEqual([
+			{ url: photoContent.imageUrl, caption: 'Soundcheck on Frankford Ave' }
+		]);
+	});
+
+	/** Posts a Quick Issue with a photo URL; returns the action result. */
+	async function quickPublishWithPhoto(tag: string, extra: Record<string, string>) {
+		const fixture = await createTestArtistFixture(tag);
+		const formData = new FormData();
+		formData.set('city', `Captionville ${tag}`);
+		formData.set('venue', 'The Back of the Print');
+		formData.set('date', '2026-11-20');
+		formData.set('timezone', 'America/New_York');
+		formData.set('photoUrl', 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a');
+		formData.set('saveMode', 'published');
+		for (const [key, value] of Object.entries(extra)) formData.set(key, value);
+		const reqUrl = new URL('http://localhost:4173/dashboard/issues/quick');
+		const result = (await (quickActions.default as any)({
+			request: buildPostRequest(reqUrl.toString(), fixture.cookie, formData),
+			url: reqUrl
+		})) as any;
+		return { fixture, result };
+	}
+
+	async function photoPageContent(issueId: string) {
+		const page = await db.query.issuePages.findFirst({
+			where: and(eq(schema.issuePages.issueId, issueId), eq(schema.issuePages.kind, 'photo'))
+		});
+		return JSON.parse(page!.contentJson);
+	}
+
+	it('Quick Issue photo without a caption is a one-photo entry with no caption (a card that does not flip)', async () => {
+		const { result } = await quickPublishWithPhoto('quick-nocap', { photoCaption: '   ' });
+		expect(result.success).toBe(true);
+		const content = await photoPageContent(result.issueId);
+		const url = 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a';
+		expect(content).toEqual({ title: 'Captionville quick-nocap Photo', imageUrl: url, photos: [{ url }] });
+		expect(content).not.toHaveProperty('body');
+		expect(resolvePhotoEntries(content)).toEqual([{ url }]);
+	});
+
+	it('Quick Issue trims the caption and stores it within the photo caption limit', async () => {
+		const caption = 'x'.repeat(MAX_PHOTO_CAPTION_LENGTH);
+		const { result } = await quickPublishWithPhoto('quick-maxcap', { photoCaption: `  ${caption}  ` });
+		expect(result.success).toBe(true);
+		const content = await photoPageContent(result.issueId);
+		expect(content.photos).toEqual([{ url: content.imageUrl, caption }]);
+		expect(photoEntriesSchema.safeParse(content.photos).success).toBe(true);
+	});
+
+	it('Quick Issue refuses a caption over the limit and creates nothing', async () => {
+		const { fixture, result } = await quickPublishWithPhoto('quick-longcap', {
+			photoCaption: 'x'.repeat(MAX_PHOTO_CAPTION_LENGTH + 1)
+		});
+		expect(result.status).toBe(400);
+		expect(result.data.error).toBe(`Photo captions are limited to ${MAX_PHOTO_CAPTION_LENGTH} characters`);
+		const issues = await db.query.issues.findMany({ where: eq(schema.issues.artistId, fixture.artistId) });
+		expect(issues).toHaveLength(0);
 	});
 
 	it('Quick Issue saveMode=draft creates a draft and redirects to Bookbinder', async () => {

@@ -142,3 +142,31 @@ export async function issueForCity(city: string): Promise<{ id: string; slug: st
 		db.close();
 	}
 }
+
+/**
+ * Z-T07: adds a photo page in the format Quick Issue used before captions moved
+ * to the back of the polaroid (`imageUrl` plus the caption as `body`), so the
+ * reader can be checked against pages already published that way.
+ */
+export async function addLegacyQuickPhotoPage(issueId: string, page: { title: string; imageUrl: string; body: string }): Promise<void> {
+	const db = client();
+	try {
+		const next = await db.execute({
+			sql: 'SELECT coalesce(max(position), 0) + 1 AS position FROM issue_pages WHERE issue_id = ?',
+			args: [issueId]
+		});
+		await db.execute({
+			sql: 'INSERT INTO issue_pages (id, issue_id, position, kind, content_json, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+			args: [
+				`${issueId}-legacy-photo`,
+				issueId,
+				Number(next.rows[0]!.position),
+				'photo',
+				JSON.stringify(page),
+				Math.floor(Date.now() / 1000)
+			]
+		});
+	} finally {
+		db.close();
+	}
+}

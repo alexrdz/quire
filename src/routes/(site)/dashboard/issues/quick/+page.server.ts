@@ -7,6 +7,7 @@ import { calculateStampWindow } from '$domain/stamping';
 import { buildIssueUrl, generateIssueScanQrSvg } from '$lib/server/services/qr';
 import { uploadFormFile } from '$lib/server/services/storage';
 import { mediaUrlSchema, quickIssueSchema } from '$schemas/issue';
+import { MAX_PHOTO_CAPTION_LENGTH, type PhotoEntry } from '$domain/photo-pile';
 import {
 	EMAIL_CONFIRMATION_REQUIRED,
 	formHasFileUpload,
@@ -99,6 +100,11 @@ export const actions: Actions = {
 			return fail(400, { error: parse.error.issues[0]?.message || 'Validation error' });
 		}
 
+		// Checked before any upload, so a refused caption leaves no stray file.
+		if (photoCaption.length > MAX_PHOTO_CAPTION_LENGTH) {
+			return fail(400, { error: `Photo captions are limited to ${MAX_PHOTO_CAPTION_LENGTH} characters` });
+		}
+
 		// Calculate 48-hour stamp window
 		const windowResult = calculateStampWindow(parse.data.date, parse.data.timezone);
 		if (!windowResult.ok) {
@@ -178,6 +184,12 @@ export const actions: Actions = {
 		}
 
 		if (resolvedPhotoUrl) {
+			// The Bookbinder's photo format (Z-T07): the caption goes on the back of the
+			// polaroid, so the card flips to it. `imageUrl` mirrors the photo for readers
+			// of the one-photo format. Older Quick Issue pages (caption in `body`) are left as they are.
+			const photo: PhotoEntry = photoCaption
+				? { url: resolvedPhotoUrl, caption: photoCaption }
+				: { url: resolvedPhotoUrl };
 			await db.insert(schema.issuePages).values({
 				id: crypto.randomUUID(),
 				issueId,
@@ -186,7 +198,7 @@ export const actions: Actions = {
 				contentJson: JSON.stringify({
 					title: `${parse.data.city} Photo`,
 					imageUrl: resolvedPhotoUrl,
-					body: photoCaption || undefined
+					photos: [photo]
 				}),
 				createdAt: now
 			});
