@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { withSessionModule } from '../helpers/session-event';
 import { describe, expect, it } from 'vitest';
 import {
 	RATE_LIMITS,
@@ -17,8 +18,10 @@ import { seedDatabase } from '$lib/server/seed';
 import { makeSignature } from 'better-auth/crypto';
 import { authSecret } from '$lib/server/auth';
 import { uniqueClientAddress } from '../helpers/client';
-import { actions as issueActions } from '../../../src/routes/(zine)/i/[slug]/+page.server';
-import { actions as loginActions } from '../../../src/routes/(site)/login/+page.server';
+import * as __route1 from '../../../src/routes/(zine)/i/[slug]/+page.server';
+const { actions: issueActions } = withSessionModule(__route1);
+import * as __route2 from '../../../src/routes/(site)/login/+page.server';
+const { actions: loginActions } = withSessionModule(__route2);
 import { GET as scanGET } from '../../../src/routes/scan/[slug]/+server';
 
 const createdUserIds: string[] = [];

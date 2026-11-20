@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { withSessionModule } from '../helpers/session-event';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -6,12 +7,12 @@ import { asc, eq } from 'drizzle-orm';
 import { hashPassword, makeSignature } from 'better-auth/crypto';
 import { db, schema } from '$lib/server/db';
 import { authSecret } from '$lib/server/auth';
-import { actions as quickActions } from '../../../src/routes/(site)/dashboard/issues/quick/+page.server';
-import {
-	actions as bookbinderActions,
-	load as bookbinderLoad
-} from '../../../src/routes/(site)/dashboard/bookbinder/[id]/+page.server';
-import { load as readerLoad } from '../../../src/routes/(zine)/i/[slug]/+page.server';
+import * as __route1 from '../../../src/routes/(site)/dashboard/issues/quick/+page.server';
+const { actions: quickActions } = withSessionModule(__route1);
+import * as __route2 from '../../../src/routes/(site)/dashboard/bookbinder/[id]/+page.server';
+const { actions: bookbinderActions, load: bookbinderLoad } = withSessionModule(__route2);
+import * as __route3 from '../../../src/routes/(zine)/i/[slug]/+page.server';
+const { load: readerLoad } = withSessionModule(__route3);
 import { TINY_JPEG, TINY_MP3, TINY_PNG } from '../helpers/media';
 import { seedDatabase } from '$lib/server/seed';
 

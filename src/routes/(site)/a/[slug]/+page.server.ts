@@ -6,11 +6,13 @@ import { groupIssuesByMonth } from '$domain/issue';
 import { db, schema } from '$lib/server/db';
 import { eq, and, desc, isNull, inArray } from 'drizzle-orm';
 import { auth, createSessionForUser } from '$lib/server/auth';
+import { optionalUser, requireFan, isDenied } from '$lib/server/guards';
 import { consumeRateLimit } from '$lib/server/services/rate-limit';
 import { submitWallNote, flagWallNote } from '$lib/server/services/moderation';
 import { submitNoteSchema, flagNoteSchema } from '$schemas/wall';
 
-export const load: ServerLoad = async ({ params, request }) => {
+export const load: ServerLoad = async (event) => {
+	const { params, request } = event;
 	const slug = params.slug;
 	if (!slug) throw error(404, 'Artist slug required');
 
@@ -44,9 +46,7 @@ export const load: ServerLoad = async ({ params, request }) => {
 		}
 	});
 
-	const session = await auth.api.getSession({
-		headers: request.headers
-	});
+	const session = optionalUser(event);
 
 	// Parse tip presets and links
 	let tipPresets = [3, 5, 10];
@@ -128,14 +128,10 @@ export const actions: Actions = {
 		throw redirect(303, callbackURL);
 	},
 
-	submitNote: async ({ request, params, getClientAddress }) => {
-		const session = await auth.api.getSession({
-			headers: request.headers
-		});
-
-		if (!session?.user) {
-			return fail(401, { error: 'Please sign in to leave a note on the General Wall.' });
-		}
+	submitNote: async (event) => {
+		const { request, params, getClientAddress } = event;
+		const fan = requireFan(event, 'Please sign in to leave a note on the General Wall.');
+		if (isDenied(fan)) return fan;
 
 		// The Artist comes from the URL slug only; any artistId in the form is
 		// ignored (PRODUCTION_PLAN 3.2). General Wall notes have no Issue.
@@ -158,7 +154,7 @@ export const actions: Actions = {
 		const noteResult = await submitWallNote({
 			artistId: wall.artist.id,
 			issueId: null,
-			fanUserId: session.user.id,
+			fanUserId: fan.user.id,
 			body: parseResult.data.body
 		});
 
@@ -169,14 +165,10 @@ export const actions: Actions = {
 		return { success: true, noteId: noteResult.value.noteId, status: noteResult.value.status };
 	},
 
-	flagNote: async ({ request, params, getClientAddress }) => {
-		const session = await auth.api.getSession({
-			headers: request.headers
-		});
-
-		if (!session?.user) {
-			return fail(401, { error: 'Sign in to flag a note.' });
-		}
+	flagNote: async (event) => {
+		const { request, params, getClientAddress } = event;
+		const fan = requireFan(event, 'Sign in to flag a note.');
+		if (isDenied(fan)) return fan;
 
 		const formData = await request.formData();
 		const noteId = String(formData.get('noteId') || '');
@@ -195,7 +187,7 @@ export const actions: Actions = {
 		if (!wall.ok) return wall.failure;
 
 		// Only a note on this Artist's General Wall can be flagged from this page.
-		const flagResult = await flagWallNote(parseResult.data.noteId, session.user.id, {
+		const flagResult = await flagWallNote(parseResult.data.noteId, fan.user.id, {
 			artistId: wall.artist.id,
 			issueId: null
 		});

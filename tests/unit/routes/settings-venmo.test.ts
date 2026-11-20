@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { withSessionModule } from '../helpers/session-event';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { and, eq, isNull } from 'drizzle-orm';
 import { hashPassword, makeSignature } from 'better-auth/crypto';
@@ -28,10 +29,8 @@ const { seedDatabase } = await import('$lib/server/seed');
 const { EMAIL_CONFIRMATION_REQUIRED } = await import('$lib/server/email/verification');
 const { FEATURE_UNAVAILABLE } = await import('$lib/features');
 const { RATE_LIMITS } = await import('$lib/server/services/rate-limit');
-const settings = await import('../../../src/routes/(site)/dashboard/settings/+page.server');
-const confirmVenmo = await import(
-	'../../../src/routes/(site)/dashboard/settings/confirm-venmo/+page.server'
-);
+const settings = withSessionModule(await import('../../../src/routes/(site)/dashboard/settings/+page.server'));
+const confirmVenmo = withSessionModule(await import('../../../src/routes/(site)/dashboard/settings/confirm-venmo/+page.server'));
 const confirmPayout = await import(
 	'../../../src/routes/(site)/dashboard/settings/confirm-payout/+server'
 );

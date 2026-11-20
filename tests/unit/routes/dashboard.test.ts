@@ -1,5 +1,7 @@
 import { afterEach, describe, it, expect } from 'vitest';
-import { actions, load } from '../../../src/routes/(site)/dashboard/+page.server';
+import { withSessionModule } from '../helpers/session-event';
+import * as __route1 from '../../../src/routes/(site)/dashboard/+page.server';
+const { actions, load } = withSessionModule(__route1);
 import { db, schema } from '$lib/server/db';
 import { authSecret } from '$lib/server/auth';
 import { render } from 'svelte/server';

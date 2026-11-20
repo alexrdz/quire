@@ -5,6 +5,7 @@ import { ArtistAccountStatus } from '$domain/account';
 import { db, schema } from '$lib/server/db';
 import { eq, and, asc, desc } from 'drizzle-orm';
 import { auth, createSessionForUser } from '$lib/server/auth';
+import { optionalUser, requireFan, isDenied } from '$lib/server/guards';
 import { consumeRateLimit } from '$lib/server/services/rate-limit';
 import {
 	submitWallNote,
@@ -18,7 +19,8 @@ import {
 import { submitNoteSchema, flagNoteSchema } from '$schemas/wall';
 import { claimStampSchema, saveIssueSchema } from '$schemas/scan';
 
-export const load: ServerLoad = async ({ params, cookies, request }) => {
+export const load: ServerLoad = async (event) => {
+	const { params, cookies, request } = event;
 	const slug = params.slug;
 	if (!slug) throw error(404, 'Issue slug required');
 
@@ -69,9 +71,7 @@ export const load: ServerLoad = async ({ params, cookies, request }) => {
 	}));
 
 	// Check authentication session
-	const session = await auth.api.getSession({
-		headers: request.headers
-	});
+	const session = optionalUser(event);
 
 	// Check attendance scan token cookie
 	const scanToken = cookies.get(`quire_scan_${slug}`);
@@ -184,14 +184,10 @@ export const actions: Actions = {
 		throw redirect(303, callbackURL);
 	},
 
-	submitNote: async ({ request, params, getClientAddress }) => {
-		const session = await auth.api.getSession({
-			headers: request.headers
-		});
-
-		if (!session?.user) {
-			return fail(401, { error: 'Please sign in to leave a note on the Wall.' });
-		}
+	submitNote: async (event) => {
+		const { request, params, getClientAddress } = event;
+		const fan = requireFan(event, 'Please sign in to leave a note on the Wall.');
+		if (isDenied(fan)) return fan;
 
 		// The Issue and its Artist come from the URL slug only. Any artistId or
 		// issueId in the form is ignored (PRODUCTION_PLAN 3.2).
@@ -214,7 +210,7 @@ export const actions: Actions = {
 		const noteResult = await submitWallNote({
 			artistId: wall.issue.artistId,
 			issueId: wall.issue.id,
-			fanUserId: session.user.id,
+			fanUserId: fan.user.id,
 			body: parseResult.data.body
 		});
 
@@ -225,14 +221,10 @@ export const actions: Actions = {
 		return { success: true, noteId: noteResult.value.noteId, status: noteResult.value.status };
 	},
 
-	flagNote: async ({ request, params, getClientAddress }) => {
-		const session = await auth.api.getSession({
-			headers: request.headers
-		});
-
-		if (!session?.user) {
-			return fail(401, { error: 'Sign in to flag a note.' });
-		}
+	flagNote: async (event) => {
+		const { request, params, getClientAddress } = event;
+		const fan = requireFan(event, 'Sign in to flag a note.');
+		if (isDenied(fan)) return fan;
 
 		const formData = await request.formData();
 		const noteId = String(formData.get('noteId') || '');
@@ -251,7 +243,7 @@ export const actions: Actions = {
 		if (!wall.ok) return wall.failure;
 
 		// Only a note on this Issue's Wall can be flagged from this page.
-		const flagResult = await flagWallNote(parseResult.data.noteId, session.user.id, {
+		const flagResult = await flagWallNote(parseResult.data.noteId, fan.user.id, {
 			artistId: wall.issue.artistId,
 			issueId: wall.issue.id
 		});
@@ -263,14 +255,10 @@ export const actions: Actions = {
 		return { success: true, ...flagResult.value };
 	},
 
-	claimStamp: async ({ request, cookies, params }) => {
-		const session = await auth.api.getSession({
-			headers: request.headers
-		});
-
-		if (!session?.user) {
-			return fail(401, { error: 'Sign in with Google to claim your attendance stamp.' });
-		}
+	claimStamp: async (event) => {
+		const { request, cookies, params } = event;
+		const fan = requireFan(event, 'Sign in with Google to claim your attendance stamp.');
+		if (isDenied(fan)) return fan;
 
 		const slug = params.slug!;
 		const scanToken = cookies.get(`quire_scan_${slug}`);
@@ -289,7 +277,7 @@ export const actions: Actions = {
 			return fail(400, { error: parseResult.error.issues[0]?.message || 'Validation error' });
 		}
 
-		const stampResult = await claimStampForFan(session.user.id, issueId, scanToken);
+		const stampResult = await claimStampForFan(fan.user.id, issueId, scanToken);
 		if (!stampResult.ok) {
 			return fail(400, { error: stampResult.error.message });
 		}
@@ -297,14 +285,10 @@ export const actions: Actions = {
 		return { success: true, stamped: true };
 	},
 
-	saveIssue: async ({ request }) => {
-		const session = await auth.api.getSession({
-			headers: request.headers
-		});
-
-		if (!session?.user) {
-			return fail(401, { error: 'Sign in with Google to bookmark this issue.' });
-		}
+	saveIssue: async (event) => {
+		const { request } = event;
+		const fan = requireFan(event, 'Sign in with Google to bookmark this issue.');
+		if (isDenied(fan)) return fan;
 
 		const formData = await request.formData();
 		const issueId = String(formData.get('issueId') || '');
@@ -314,7 +298,7 @@ export const actions: Actions = {
 			return fail(400, { error: parseResult.error.issues[0]?.message || 'Validation error' });
 		}
 
-		const saveResult = await saveIssueForFan(session.user.id, issueId);
+		const saveResult = await saveIssueForFan(fan.user.id, issueId);
 		if (!saveResult.ok) {
 			return fail(400, { error: saveResult.error.message });
 		}

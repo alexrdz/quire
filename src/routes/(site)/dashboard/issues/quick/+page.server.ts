@@ -2,8 +2,7 @@ import { fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
 import crypto from 'node:crypto';
 import { db, schema } from '$lib/server/db';
 import { eq, desc, asc } from 'drizzle-orm';
-import { auth } from '$lib/server/auth';
-import { ArtistAccountStatus } from '$domain/account';
+import { requireArtist, requireArtistAction, isDenied } from '$lib/server/guards';
 import { calculateStampWindow } from '$domain/stamping';
 import { buildIssueUrl, generateIssueScanQrSvg } from '$lib/server/services/qr';
 import { uploadFormFile } from '$lib/server/services/storage';
@@ -14,26 +13,8 @@ import {
 	isEmailConfirmed
 } from '$lib/server/email/verification';
 
-export const load: ServerLoad = async ({ request }) => {
-	const session = await auth.api.getSession({
-		headers: request.headers
-	});
-
-	if (!session?.user) {
-		throw redirect(303, '/login?redirect=/dashboard/issues/quick');
-	}
-
-	const artist = await db.query.artists.findFirst({
-		where: eq(schema.artists.userId, session.user.id)
-	});
-
-	if (!artist) {
-		throw redirect(303, '/login');
-	}
-
-	if (artist.accountStatus === ArtistAccountStatus.Closed) {
-		throw redirect(303, '/login?closed=1');
-	}
+export const load: ServerLoad = async (event) => {
+	const { artist } = await requireArtist(event);
 
 	const lastIssue = await db.query.issues.findFirst({
 		where: eq(schema.issues.artistId, artist.id),
@@ -74,19 +55,11 @@ export const load: ServerLoad = async ({ request }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request }) => {
-		const session = await auth.api.getSession({
-			headers: request.headers
-		});
-		if (!session?.user) return fail(401, { error: 'Unauthorized' });
-
-		const artist = await db.query.artists.findFirst({
-			where: eq(schema.artists.userId, session.user.id)
-		});
-		if (!artist) return fail(401, { error: 'Artist not found' });
-		if (artist.accountStatus === ArtistAccountStatus.Closed) {
-			return fail(403, { error: 'This artist account has been closed.' });
-		}
+	default: async (event) => {
+		const { request } = event;
+		const guard = await requireArtistAction(event);
+		if (isDenied(guard)) return guard;
+		const { user, artist } = guard;
 
 		const formData = await request.formData();
 		const city = String(formData.get('city') || '');
@@ -100,7 +73,7 @@ export const actions: Actions = {
 		const saveMode = saveModeRaw === 'draft' ? 'draft' : 'published';
 
 		// Decision 31: publishing and uploads wait for a confirmed band email. Drafts without uploads are fine.
-		if (!isEmailConfirmed(session.user)) {
+		if (!isEmailConfirmed(user)) {
 			if (saveMode === 'published') {
 				return fail(403, { error: EMAIL_CONFIRMATION_REQUIRED.publish });
 			}

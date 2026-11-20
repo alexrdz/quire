@@ -11,6 +11,7 @@ import {
 	slugPetitionSchema
 } from '$schemas/auth';
 import { auth, createSessionForUser } from '$lib/server/auth';
+import { optionalUser } from '$lib/server/guards';
 import { db, schema } from '$lib/server/db';
 import { createArtistForNewUser, submitSlugPetition } from '$lib/server/services/account';
 import { consumeRateLimit, consumeRateLimits } from '$lib/server/services/rate-limit';
@@ -42,11 +43,9 @@ async function getAvailableSlugSuggestions(baseSlug: string): Promise<string[]> 
 	return candidates.filter((candidate) => !takenSet.has(candidate)).slice(0, 4);
 }
 
-export const load: ServerLoad = async ({ request, url }) => {
-
-	const session = await auth.api.getSession({
-		headers: request.headers
-	});
+export const load: ServerLoad = async (event) => {
+	const { url } = event;
+	const session = optionalUser(event);
 
 	const { redirectTo, hasExplicitRedirect } = resolveRedirectTarget(
 		url.searchParams.get('redirect')

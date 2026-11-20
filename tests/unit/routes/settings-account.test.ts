@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { withSessionModule } from '../helpers/session-event';
 import { uniqueClientAddress } from '../helpers/client';
 import { recordTipTap } from '$lib/server/services/tip-taps';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -20,10 +21,14 @@ import {
 import { authSecret, verifyUserCredentialPassword } from '$lib/server/auth';
 import { db, schema } from '$lib/server/db';
 import { seedDatabase } from '$lib/server/seed';
-import { actions as settingsActions, load as settingsLoad } from '../../../src/routes/(site)/dashboard/settings/+page.server';
-import { actions as loginActions, load as loginLoad } from '../../../src/routes/(site)/login/+page.server';
-import { load as backPageLoad } from '../../../src/routes/(site)/a/[slug]/+page.server';
-import { load as issueLoad } from '../../../src/routes/(zine)/i/[slug]/+page.server';
+import * as __route1 from '../../../src/routes/(site)/dashboard/settings/+page.server';
+const { actions: settingsActions, load: settingsLoad } = withSessionModule(__route1);
+import * as __route2 from '../../../src/routes/(site)/login/+page.server';
+const { actions: loginActions, load: loginLoad } = withSessionModule(__route2);
+import * as __route3 from '../../../src/routes/(site)/a/[slug]/+page.server';
+const { load: backPageLoad } = withSessionModule(__route3);
+import * as __route4 from '../../../src/routes/(zine)/i/[slug]/+page.server';
+const { load: issueLoad } = withSessionModule(__route4);
 
 const createdUserIds: string[] = [];
 const createdSessionTokens: string[] = [];

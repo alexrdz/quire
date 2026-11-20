@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { withSessionModule } from '../helpers/session-event';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { hashPassword, makeSignature } from 'better-auth/crypto';
@@ -28,8 +29,8 @@ const { seedDatabase } = await import('$lib/server/seed');
 const { buildIssueScanUrl, buildIssueUrl, generateQrSvg } = await import(
 	'$lib/server/services/qr'
 );
-const quick = await import('../../../src/routes/(site)/dashboard/issues/quick/+page.server');
-const bookbinder = await import('../../../src/routes/(site)/dashboard/bookbinder/[id]/+page.server');
+const quick = withSessionModule(await import('../../../src/routes/(site)/dashboard/issues/quick/+page.server'));
+const bookbinder = withSessionModule(await import('../../../src/routes/(site)/dashboard/bookbinder/[id]/+page.server'));
 
 const EVIL = 'evil.example';
 const LOCAL_APP_URL = 'http://localhost:5173';

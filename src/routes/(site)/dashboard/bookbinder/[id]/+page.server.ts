@@ -1,11 +1,10 @@
-import { error, fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
+import { error, fail, type Actions, type ServerLoad } from '@sveltejs/kit';
 import crypto from 'node:crypto';
 import { db, schema } from '$lib/server/db';
 import { eq, and, asc } from 'drizzle-orm';
-import { auth } from '$lib/server/auth';
+import { requireArtist, requireArtistAction, type GuardEvent, isDenied } from '$lib/server/guards';
 import { buildIssueUrl, generateIssueScanQrSvg } from '$lib/server/services/qr';
 import { uploadFormFile } from '$lib/server/services/storage';
-import { ArtistAccountStatus } from '$domain/account';
 import { calculateStampWindow } from '$domain/stamping';
 import {
 	archiveIssue,
@@ -25,21 +24,11 @@ import {
 const BOOKBINDER_PAGE_KINDS = new Set(['text', 'setlist', 'photo', 'audio', 'video'] as const);
 type BookbinderPageKind = 'text' | 'setlist' | 'photo' | 'audio' | 'video';
 
-async function requireOwnedIssue(headers: Headers, issueId: string | undefined) {
-	const session = await auth.api.getSession({ headers });
-	if (!session?.user) {
-		return { errorResponse: fail(401, { error: 'Unauthorized' }) } as const;
-	}
-
-	const artist = await db.query.artists.findFirst({
-		where: eq(schema.artists.userId, session.user.id)
-	});
-	if (!artist) {
-		return { errorResponse: fail(401, { error: 'Artist not found' }) } as const;
-	}
-	if (artist.accountStatus === ArtistAccountStatus.Closed) {
-		return { errorResponse: fail(403, { error: 'This artist account has been closed.' }) } as const;
-	}
+/** The guarded Artist plus the Issue they own, or a failure to return as is. */
+async function requireOwnedIssue(event: GuardEvent, issueId: string | undefined) {
+	const guard = await requireArtistAction(event);
+	if (isDenied(guard)) return { errorResponse: guard } as const;
+	const { user, artist } = guard;
 
 	if (!issueId) {
 		return { errorResponse: fail(400, { error: 'Issue ID is required' }) } as const;
@@ -52,7 +41,7 @@ async function requireOwnedIssue(headers: Headers, issueId: string | undefined) 
 		return { errorResponse: fail(403, { error: 'Issue not found or unauthorized' }) } as const;
 	}
 
-	return { session, artist, issue } as const;
+	return { user, artist, issue } as const;
 }
 
 function toDomainIssue(
@@ -264,26 +253,9 @@ async function resolvePageContentJson(
 	};
 }
 
-export const load: ServerLoad = async ({ params, request }) => {
-	const session = await auth.api.getSession({
-		headers: request.headers
-	});
-
-	if (!session?.user) {
-		throw redirect(303, `/login?redirect=/dashboard/bookbinder/${params.id}`);
-	}
-
-	const artist = await db.query.artists.findFirst({
-		where: eq(schema.artists.userId, session.user.id)
-	});
-
-	if (!artist) {
-		throw redirect(303, '/login');
-	}
-
-	if (artist.accountStatus === ArtistAccountStatus.Closed) {
-		throw redirect(303, '/login?closed=1');
-	}
+export const load: ServerLoad = async (event) => {
+	const { params } = event;
+	const { artist } = await requireArtist(event);
 
 	const issue = await db.query.issues.findFirst({
 		where: and(eq(schema.issues.id, params.id!), eq(schema.issues.artistId, artist.id)),
@@ -311,8 +283,9 @@ export const load: ServerLoad = async ({ params, request }) => {
 };
 
 export const actions: Actions = {
-	save: async ({ request, params }) => {
-		const owned = await requireOwnedIssue(request.headers, params.id);
+	save: async (event) => {
+		const { request, params } = event;
+		const owned = await requireOwnedIssue(event, params.id);
 		if ('errorResponse' in owned) return owned.errorResponse;
 		const existing = owned.issue;
 
@@ -355,7 +328,7 @@ export const actions: Actions = {
 				});
 			} else if (requestedStatus === 'published') {
 				// Decision 31: publishing waits for a confirmed band email.
-				if (!isEmailConfirmed(owned.session.user)) {
+				if (!isEmailConfirmed(owned.user)) {
 					return fail(403, { error: EMAIL_CONFIRMATION_REQUIRED.publish });
 				}
 				const res = publishIssue(domainIssue, {
@@ -400,12 +373,13 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	updatePage: async ({ request, params }) => {
-		const owned = await requireOwnedIssue(request.headers, params.id);
+	updatePage: async (event) => {
+		const { request, params } = event;
+		const owned = await requireOwnedIssue(event, params.id);
 		if ('errorResponse' in owned) return owned.errorResponse;
 
 		const formData = await request.formData();
-		if (!isEmailConfirmed(owned.session.user) && formHasFileUpload(formData)) {
+		if (!isEmailConfirmed(owned.user) && formHasFileUpload(formData)) {
 			return fail(403, { error: EMAIL_CONFIRMATION_REQUIRED.upload });
 		}
 		const pageId = String(formData.get('pageId') || '').trim();
@@ -439,8 +413,9 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	movePage: async ({ request, params }) => {
-		const owned = await requireOwnedIssue(request.headers, params.id);
+	movePage: async (event) => {
+		const { request, params } = event;
+		const owned = await requireOwnedIssue(event, params.id);
 		if ('errorResponse' in owned) return owned.errorResponse;
 
 		const formData = await request.formData();
@@ -477,12 +452,13 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	addPage: async ({ request, params }) => {
-		const owned = await requireOwnedIssue(request.headers, params.id);
+	addPage: async (event) => {
+		const { request, params } = event;
+		const owned = await requireOwnedIssue(event, params.id);
 		if ('errorResponse' in owned) return owned.errorResponse;
 
 		const formData = await request.formData();
-		if (!isEmailConfirmed(owned.session.user) && formHasFileUpload(formData)) {
+		if (!isEmailConfirmed(owned.user) && formHasFileUpload(formData)) {
 			return fail(403, { error: EMAIL_CONFIRMATION_REQUIRED.upload });
 		}
 		const rawKind = String(formData.get('kind') || 'text').trim();
@@ -514,8 +490,9 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	deletePage: async ({ request, params }) => {
-		const owned = await requireOwnedIssue(request.headers, params.id);
+	deletePage: async (event) => {
+		const { request, params } = event;
+		const owned = await requireOwnedIssue(event, params.id);
 		if ('errorResponse' in owned) return owned.errorResponse;
 
 		const formData = await request.formData();

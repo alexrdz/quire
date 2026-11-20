@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { withSessionModule } from '../helpers/session-event';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -7,7 +8,8 @@ import { hashPassword, makeSignature } from 'better-auth/crypto';
 import { db, schema } from '$lib/server/db';
 import { authSecret } from '$lib/server/auth';
 import { checkAccentContrast } from '$domain/theme';
-import { actions, load } from '../../../src/routes/(site)/dashboard/template/+page.server';
+import * as __route1 from '../../../src/routes/(site)/dashboard/template/+page.server';
+const { actions, load } = withSessionModule(__route1);
 import { TINY_JPEG, TINY_MP3, TINY_PNG } from '../helpers/media';
 
 interface TestArtistFixture {

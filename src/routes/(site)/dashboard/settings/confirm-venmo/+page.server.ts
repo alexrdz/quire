@@ -1,32 +1,18 @@
 import { fail, redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
-import { ArtistAccountStatus } from '$domain/account';
-import { db, schema } from '$lib/server/db';
-import { auth } from '$lib/server/auth';
-import { resolveSafeRedirect } from '$schemas/auth';
-import { confirmVenmoChange, inspectVenmoChange, VENMO_CONFIRM_PATH } from '$lib/server/services/venmo';
+import { requireArtist } from '$lib/server/guards';
+import { confirmVenmoChange, inspectVenmoChange } from '$lib/server/services/venmo';
 
 /**
  * Confirms a Venmo username change or removal (ADR 0008, V.3).
  * The load only checks the link and shows the change. Opening the link (or a
  * mail scanner prefetching it) changes nothing; the POST action applies it.
+ *
+ * Both the load and the action use the redirecting guard: an Artist whose
+ * session expired before tapping Confirm signs in and comes back to the link.
  */
-async function requireArtist(request: Request, url: URL) {
-	const session = await auth.api.getSession({ headers: request.headers });
-	if (!session?.user) {
-		const back = resolveSafeRedirect(`${VENMO_CONFIRM_PATH}${url.search}`, '/dashboard/settings');
-		throw redirect(303, `/login?redirect=${encodeURIComponent(back)}`);
-	}
-	const artist = await db.query.artists.findFirst({
-		where: eq(schema.artists.userId, session.user.id)
-	});
-	if (!artist) throw redirect(303, '/login');
-	if (artist.accountStatus === ArtistAccountStatus.Closed) throw redirect(303, '/login?closed=1');
-	return { user: session.user, artist };
-}
-
-export const load: ServerLoad = async ({ request, url }) => {
-	const { artist } = await requireArtist(request, url);
+export const load: ServerLoad = async (event) => {
+	const { url } = event;
+	const { artist } = await requireArtist(event);
 	const token = url.searchParams.get('token');
 	const pending = await inspectVenmoChange({ rawToken: token, artist });
 
@@ -50,8 +36,9 @@ export const load: ServerLoad = async ({ request, url }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, url }) => {
-		const { user, artist } = await requireArtist(request, url);
+	default: async (event) => {
+		const { request, url } = event;
+		const { user, artist } = await requireArtist(event);
 		const formData = await request.formData();
 		const token = String(formData.get('token') ?? '') || url.searchParams.get('token');
 

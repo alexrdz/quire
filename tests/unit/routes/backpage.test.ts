@@ -1,10 +1,12 @@
 import crypto from 'node:crypto';
+import { withSessionModule } from '../helpers/session-event';
 import { ALL_FEATURES_ON } from '../helpers/features';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { render } from 'svelte/server';
 import { db, schema } from '$lib/server/db';
-import { load as backPageLoad } from '../../../src/routes/(site)/a/[slug]/+page.server';
+import * as __route1 from '../../../src/routes/(site)/a/[slug]/+page.server';
+const { load: backPageLoad } = withSessionModule(__route1);
 
 vi.mock('$app/forms', () => ({
 	enhance: () => ({ destroy() {} })
