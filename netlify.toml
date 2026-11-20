@@ -1,0 +1,20 @@
+# Production and the Demo build the same way (PRODUCTION_PLAN 3.4, ADR 0007).
+# check:env fails the build when a deployed mode is missing core configuration.
+# Migrations join this command in 3.5.
+[build]
+  command = "pnpm check:env && pnpm build"
+  # Where @sveltejs/adapter-netlify writes the client assets. The server function
+  # goes to .netlify/functions-internal and is picked up automatically.
+  publish = "build"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Static assets come from the CDN and never reach hooks.server.ts, so they get
+# the non-CSP security headers here. Pages and endpoints get the full set
+# (CSP included) from the hook.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

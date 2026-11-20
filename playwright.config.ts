@@ -9,7 +9,9 @@ export default defineConfig({
 		reuseExistingServer: !process.env.CI,
 		// The built server runs in production mode by default (ADR 0007). The e2e suite
 		// exercises the local stand-ins, so it runs the production build in test mode.
-		env: { NODE_ENV: 'test' }
+		// R2_PUBLIC_URL only feeds the CSP's media origin (security-headers spec);
+		// without the R2 keys, uploads stay on local storage.
+		env: { NODE_ENV: 'test', R2_PUBLIC_URL: 'https://media.e2e.quire.test' }
 	},
 	testDir: 'tests/e2e',
 	testMatch: /(.+\.)?(test|spec)\.[jt]s/,

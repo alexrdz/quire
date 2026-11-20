@@ -175,6 +175,23 @@ describe('feature flags', () => {
 		expect(prod({ R2_ACCOUNT_ID: 'a', R2_ACCESS_KEY_ID: 'b' }).features.uploads).toBe(false);
 	});
 
+	it('R2_PUBLIC_URL alone sets the CSP media origin but never switches uploads to R2', () => {
+		const url = 'https://media.e2e.quire.test/some/path';
+		const local = parseConfig({ NODE_ENV: 'test', R2_PUBLIC_URL: url });
+		expect(local.mediaOrigin).toBe('https://media.e2e.quire.test');
+		expect(local.integrations.r2).toBeNull();
+		expect(local.live.uploads).toBe(false);
+		expect(local.features.uploads).toBe(true);
+
+		const production = prod({ R2_PUBLIC_URL: url });
+		expect(production.mediaOrigin).toBe('https://media.e2e.quire.test');
+		expect(production.integrations.r2).toBeNull();
+		expect(production.features.uploads).toBe(false);
+
+		expect(parseConfig({ NODE_ENV: 'test', R2_PUBLIC_URL: 'not a url' }).mediaOrigin).toBeNull();
+		expect(parseConfig({ NODE_ENV: 'test' }).mediaOrigin).toBeNull();
+	});
+
 	it('removes each feature independently', () => {
 		const removals: Array<[string, keyof ReturnType<typeof prod>['features']]> = [
 			['RESEND_API_KEY', 'email'],

@@ -11,6 +11,13 @@ declare global {
 			session: BetterAuthSession['session'] | null;
 			user: BetterAuthSession['user'] | null;
 			features: PublicFeatures;
+			/** Netlify's x-nf-request-id, or a random UUID. Logged with every server error. */
+			requestId?: string;
+		}
+		interface Error {
+			message: string;
+			/** Present on unexpected errors: matches the id in the server log. */
+			id?: string;
 		}
 	}
 }

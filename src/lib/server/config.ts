@@ -108,6 +108,11 @@ export interface Config {
 	fromEmail: string;
 	/** Sample data is loaded on first request in development and the Demo unless disabled. */
 	autoSeed: boolean;
+	/**
+	 * Origin of R2_PUBLIC_URL (e.g. `https://media.quire.live`), or null. Read on its
+	 * own, without the R2 keys, so the CSP still allows media already stored there.
+	 */
+	mediaOrigin: string | null;
 }
 
 const optionalString = z
@@ -268,6 +273,11 @@ function parseIntegrations(env: ParsedEnv): Integrations {
 	};
 }
 
+function originOf(value: string | undefined): string | null {
+	const url = checkUrl(value);
+	return url ? new URL(url).origin : null;
+}
+
 /** Pure: builds a config from an env object. Used directly by unit tests and `scripts/check-env.ts`. */
 export function parseConfig(rawEnv: Env): Config {
 	const env = envSchema.parse(rawEnv);
@@ -298,7 +308,8 @@ export function parseConfig(rawEnv: Env): Config {
 		features,
 		live,
 		fromEmail: env.RESEND_FROM_EMAIL ?? DEFAULT_FROM_EMAIL,
-		autoSeed: mode !== 'production' && env.DISABLE_AUTO_SEED?.toLowerCase() !== 'true'
+		autoSeed: mode !== 'production' && env.DISABLE_AUTO_SEED?.toLowerCase() !== 'true',
+		mediaOrigin: originOf(env.R2_PUBLIC_URL)
 	};
 }
 
