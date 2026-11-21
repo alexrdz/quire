@@ -150,6 +150,10 @@
 	.btn-page-nav {
 		display: inline-flex;
 		align-items: center;
+		justify-content: center;
+		/* Page buttons are tap targets: at least 44 px (Z-T08). */
+		min-block-size: 44px;
+		min-inline-size: 44px;
 		padding-block: var(--space-2xs);
 		padding-inline: var(--space-xs);
 		border-radius: 6px;
@@ -170,6 +174,10 @@
 	.btn-page-nav-primary {
 		display: inline-flex;
 		align-items: center;
+		justify-content: center;
+		/* Page buttons are tap targets: at least 44 px (Z-T08). */
+		min-block-size: 44px;
+		min-inline-size: 44px;
 		padding-block: var(--space-2xs);
 		padding-inline: var(--space-s);
 		border-radius: 6px;
