@@ -7,10 +7,6 @@ import { createClient } from '@libsql/client';
  * serves from. Used to reset rate-limit counters (every e2e request comes from
  * the same address) and to add the Issue the CSP spec renders.
  */
-function client(url = 'file:local.db') {
-	return createClient({ url });
-}
-
 /**
  * The file database of a local Demo- or production-mode e2e server
  * (playwright.config.ts deletes and migrates it on every start).
@@ -20,22 +16,33 @@ export function previewDatabasePath(name: 'demo' | 'production'): string {
 }
 
 /**
- * A client that waits for the server's writes instead of failing with
- * SQLITE_BUSY: the server and parallel specs share this file.
+ * The only way the helpers open the database: a client that waits for the
+ * server's writes instead of failing with SQLITE_BUSY, since the server and
+ * parallel specs share this file.
  */
-async function waitingClient(databaseUrl?: string) {
-	const db = client(databaseUrl);
-	await db.execute('PRAGMA busy_timeout = 5000');
+async function waitingClient(databaseUrl = 'file:local.db') {
+	const db = createClient({ url: databaseUrl });
+	try {
+		await db.execute('PRAGMA busy_timeout = 5000');
+	} catch (error) {
+		db.close();
+		throw error;
+	}
 	return db;
 }
 
 /** Clears app rate-limit counters so earlier runs on this machine cannot trip a limit. */
 export async function resetRateLimits(): Promise<void> {
-	const db = client();
+	const db = await waitingClient();
 	try {
 		await db.execute('DELETE FROM rate_limits');
-	} catch {
-		// No database yet: the web server runs `pnpm db:migrate` before it starts.
+	} catch (error) {
+		// Only a database the migrations haven't built yet is fine: there are no
+		// counters to clear. This happens only when PLAYWRIGHT_BASE_URL points at a
+		// server that doesn't use local.db; Playwright's own web server always runs
+		// `pnpm db:migrate` first. Anything else, SQLITE_BUSY included, leaves
+		// limits in place, so it must fail the spec.
+		if (!/no such table: rate_limits/.test(String(error))) throw error;
 	} finally {
 		db.close();
 	}
@@ -52,7 +59,7 @@ export const EMBED_ISSUE_SLUG = 'e2e-csp-embeds';
  * embeds. Recreated on each call so earlier runs can't leave it stale.
  */
 export async function seedEmbedIssue(): Promise<string> {
-	const db = client();
+	const db = await waitingClient();
 	try {
 		const artist = await db.execute({
 			sql: 'SELECT id FROM artists WHERE slug = ?',
@@ -149,7 +156,7 @@ export async function issueForCity(city: string): Promise<{ id: string; slug: st
  * reader can be checked against pages already published that way.
  */
 export async function addLegacyQuickPhotoPage(issueId: string, page: { title: string; imageUrl: string; body: string }): Promise<void> {
-	const db = client();
+	const db = await waitingClient();
 	try {
 		const next = await db.execute({
 			sql: 'SELECT coalesce(max(position), 0) + 1 AS position FROM issue_pages WHERE issue_id = ?',

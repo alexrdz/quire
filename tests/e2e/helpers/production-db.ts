@@ -18,12 +18,9 @@ export const PRODUCTION_DB_PATH = path.join(os.tmpdir(), 'quire-e2e', 'productio
 /** Port of the production-mode server with core config missing (playwright.config.ts). */
 export const CORE_MISSING_URL = 'http://localhost:4176';
 
-function client(): Client {
-	return createClient({ url: `file:${PRODUCTION_DB_PATH}` });
-}
-
+/** The only way these helpers open the database. */
 async function withDb<T>(fn: (db: Client) => Promise<T>): Promise<T> {
-	const db = client();
+	const db = createClient({ url: `file:${PRODUCTION_DB_PATH}` });
 	try {
 		// The server shares this file: wait for its writes instead of failing with SQLITE_BUSY.
 		await db.execute('PRAGMA busy_timeout = 5000');
