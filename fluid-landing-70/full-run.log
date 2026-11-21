@@ -1,0 +1,374 @@
+2026-11-21T04:09:13.984Z pw:webserver Starting WebServer process pnpm db:migrate && pnpm preview...
+2026-11-21T04:09:13.986Z pw:webserver Process started
+2026-11-21T04:09:13.986Z pw:webserver Waiting for availability...
+2026-11-21T04:09:13.988Z pw:webserver Waiting 100ms
+2026-11-21T04:09:14.088Z pw:webserver Waiting 250ms
+[WebServer] 
+[WebServer] > quire@0.0.1 db:migrate /Users/alexrodriguez/.jsmhq/quire/dwight
+[WebServer] > node --import tsx scripts/db-migrate.ts
+[WebServer] 
+
+2026-11-21T04:09:14.339Z pw:webserver Waiting 500ms
+[WebServer] [db:migrate] context local; test mode; database file:local.db
+
+[WebServer] [db:migrate] applied 5 of 5 migrations
+
+[WebServer] 
+[WebServer] > quire@0.0.1 preview /Users/alexrodriguez/.jsmhq/quire/dwight
+[WebServer] > vite preview
+[WebServer] 
+
+2026-11-21T04:09:14.840Z pw:webserver Waiting 1000ms
+[WebServer]   ➜  Local:   http://localhost:4173/
+
+[WebServer]   ➜  Network: use --host to expose
+
+2026-11-21T04:09:15.853Z pw:webserver WebServer available
+2026-11-21T04:09:15.854Z pw:webserver Starting WebServer process mkdir -p "/tmp/quire-e2e" && rm -f "/tmp/quire-e2e/demo.db" "/tmp/quire-e2e/demo.db-wal" "/tmp/quire-e2e/demo.db-shm" && pnpm db:migrate && pnpm preview --port 4174 --strictPort...
+2026-11-21T04:09:15.858Z pw:webserver Process started
+2026-11-21T04:09:15.859Z pw:webserver Waiting for availability...
+2026-11-21T04:09:15.860Z pw:webserver Waiting 100ms
+2026-11-21T04:09:15.964Z pw:webserver Waiting 250ms
+[WebServer] 
+[WebServer] > quire@0.0.1 db:migrate /Users/alexrodriguez/.jsmhq/quire/dwight
+[WebServer] > node --import tsx scripts/db-migrate.ts
+[WebServer] 
+
+2026-11-21T04:09:16.215Z pw:webserver Waiting 500ms
+[WebServer] [db:migrate] context local; demo mode; database file:/tmp/quire-e2e/demo.db
+
+[WebServer] [db:migrate] applied 5 of 5 migrations
+
+[WebServer] 
+[WebServer] > quire@0.0.1 preview /Users/alexrodriguez/.jsmhq/quire/dwight
+[WebServer] > vite preview --port 4174 --strictPort
+[WebServer] 
+
+2026-11-21T04:09:16.716Z pw:webserver Waiting 1000ms
+[WebServer] [config] QUIRE_E2E_LOCAL_PREVIEW: local e2e preview in demo mode (file database, test secrets). Never deploy this.
+
+[WebServer]   ➜  Local:   http://localhost:4174/
+
+[WebServer]   ➜  Network: use --host to expose
+
+2026-11-21T04:09:17.719Z pw:webserver WebServer available
+2026-11-21T04:09:17.721Z pw:webserver Starting WebServer process mkdir -p "/tmp/quire-e2e" && rm -f "/tmp/quire-e2e/production.db" "/tmp/quire-e2e/production.db-wal" "/tmp/quire-e2e/production.db-shm" && pnpm db:migrate && pnpm preview --port 4175 --strictPort...
+2026-11-21T04:09:17.724Z pw:webserver Process started
+2026-11-21T04:09:17.724Z pw:webserver Waiting for availability...
+2026-11-21T04:09:17.725Z pw:webserver Waiting 100ms
+2026-11-21T04:09:17.825Z pw:webserver Waiting 250ms
+[WebServer] 
+[WebServer] > quire@0.0.1 db:migrate /Users/alexrodriguez/.jsmhq/quire/dwight
+[WebServer] > node --import tsx scripts/db-migrate.ts
+[WebServer] 
+
+2026-11-21T04:09:18.076Z pw:webserver Waiting 500ms
+[WebServer] [db:migrate] context local; production mode; database file:/tmp/quire-e2e/production.db
+
+[WebServer] [db:migrate] applied 5 of 5 migrations
+
+[WebServer] 
+[WebServer] > quire@0.0.1 preview /Users/alexrodriguez/.jsmhq/quire/dwight
+[WebServer] > vite preview --port 4175 --strictPort
+[WebServer] 
+
+2026-11-21T04:09:18.576Z pw:webserver Waiting 1000ms
+[WebServer] [config] QUIRE_E2E_LOCAL_PREVIEW: local e2e preview in production mode (file database, test secrets). Never deploy this.
+
+[WebServer]   ➜  Local:   http://localhost:4175/
+
+[WebServer]   ➜  Network: use --host to expose
+
+2026-11-21T04:09:19.580Z pw:webserver WebServer available
+2026-11-21T04:09:19.581Z pw:webserver Starting WebServer process pnpm preview --port 4176 --strictPort...
+2026-11-21T04:09:19.586Z pw:webserver Process started
+2026-11-21T04:09:19.586Z pw:webserver Waiting for availability...
+2026-11-21T04:09:19.587Z pw:webserver Waiting 100ms
+2026-11-21T04:09:19.688Z pw:webserver Waiting 250ms
+[WebServer] 
+[WebServer] > quire@0.0.1 preview /Users/alexrodriguez/.jsmhq/quire/dwight
+[WebServer] > vite preview --port 4176 --strictPort
+[WebServer] 
+
+2026-11-21T04:09:19.939Z pw:webserver Waiting 500ms
+[WebServer] [config] QUIRE_E2E_LOCAL_PREVIEW: local e2e preview in production mode (file database, test secrets). Never deploy this.
+
+[WebServer] [config] Core configuration invalid in production mode. Missing or invalid: BETTER_AUTH_URL. Serving 503 for every request.
+
+[WebServer]   ➜  Local:   http://localhost:4176/
+
+[WebServer]   ➜  Network: use --host to expose
+
+2026-11-21T04:09:20.450Z pw:webserver WebServer available
+
+Running 115 tests using 2 workers
+
+[1/115] [chromium] › tests/e2e/bookbinder.spec.ts:4:2 › Dashboard & Desktop Bookbinder Flow › logs in via demo quick-switch and accesses morning-after recap
+[2/115] [chromium] › tests/e2e/demo-banner.spec.ts:17:3 › Demo banner outside the Demo (test mode) › never renders on /
+[WebServer] Seeding Quire database...
+
+[WebServer] Seeding complete: "The Neon Velvet" 3-city tour ready!
+
+[3/115] [chromium] › tests/e2e/bookbinder.spec.ts:19:2 › Dashboard & Desktop Bookbinder Flow › navigates to Quick Issue phone creator
+[4/115] [chromium] › tests/e2e/demo-banner.spec.ts:17:3 › Demo banner outside the Demo (test mode) › never renders on /login
+[5/115] [chromium] › tests/e2e/demo-banner.spec.ts:17:3 › Demo banner outside the Demo (test mode) › never renders on /a/the-neon-velvet
+[6/115] [chromium] › tests/e2e/fluid-landing.spec.ts:53:1 › real landing and simulator remain usable at narrow, intermediate, and wide widths
+[7/115] [chromium] › tests/e2e/demo-banner.spec.ts:17:3 › Demo banner outside the Demo (test mode) › never renders on /i/neon-velvet-brooklyn-2026-10-12
+[8/115] [chromium] › tests/e2e/demo-banner.spec.ts:17:3 › Demo banner outside the Demo (test mode) › never renders on /no-such-page
+[WebServer] [error] id=c7b61231-15dc-4272-b831-78d73ce1042f status=404 GET /no-such-page
+
+[9/115] [chromium] › tests/e2e/demo-banner.spec.ts:24:2 › Demo banner outside the Demo (test mode) › never renders on the dashboard or in the Case Display
+[10/115] [chromium] › tests/e2e/fluid-layout.spec.ts:3:1 › landing typography scales without breakpoint jumps or clipped simulator content
+[11/115] [chromium] › tests/e2e/fluid-layout.spec.ts:30:1 › authentication forms reflow at narrow sizes with keyboard-visible focus
+[12/115] [chromium] › tests/e2e/fluid-tokens.spec.ts:12:1 › type, spacing, and gutters interpolate continuously and stop at their endpoints
+[13/115] [chromium] › tests/e2e/fluid-tokens.spec.ts:39:1 › compact space steps actually grow, and aliases resolve in the browser
+[14/115] [chromium] › tests/e2e/fluid-tokens.spec.ts:62:1 › larger default font preferences and 200% text sizing retain readable, reflowing content
+[15/115] [chromium] › tests/e2e/logout.spec.ts:9:2 › Sign out is POST-only (PRODUCTION_PLAN 2.2) › GET /logout returns 405
+[16/115] [chromium] › tests/e2e/logout.spec.ts:14:2 › Sign out is POST-only (PRODUCTION_PLAN 2.2) › GET /logout with an open-redirect payload still returns 405 and redirects nowhere
+[17/115] [chromium] › tests/e2e/logout.spec.ts:20:2 › Sign out is POST-only (PRODUCTION_PLAN 2.2) › the dashboard Sign Out button posts the form and signs the artist out
+[18/115] [chromium] › tests/e2e/open-redirects.spec.ts:15:1 › /demo?redirect= falls back to the dashboard or the Fan stubs
+[19/115] [chromium] › tests/e2e/open-redirects.spec.ts:31:1 › the stand-in Google sign-in falls back to /me/stubs
+[20/115] [chromium] › tests/e2e/open-redirects.spec.ts:47:1 › an Issue's sign-in keeps the Fan on that Issue, whatever the hash
+[21/115] [chromium] › tests/e2e/photo-pile.spec.ts:16:2 › sample Issue photo piles (test mode) › Brooklyn: a pile of 4 or 5, most captioned and flipping, one bare, every photo loads, no CSP violations
+[22/115] [chromium] › tests/e2e/photo-pile.spec.ts:35:2 › sample Issue photo piles (test mode) › Philadelphia: a pile of 3 captioned photos, every photo loads, no CSP violations
+[23/115] [chromium] › tests/e2e/quick-issue-caption.spec.ts:54:1 › publish a Quick Issue with a captioned photo, open it, and flip the polaroid to the caption
+[24/115] [chromium] › tests/e2e/quick-issue-caption.spec.ts:75:1 › a Quick Issue photo without a caption is a single card that does not flip
+[25/115] [chromium] › tests/e2e/quick-issue-caption.spec.ts:86:1 › an older Quick Issue page, with its caption as the body, still renders it
+[26/115] [chromium] › tests/e2e/fluid-landing.spec.ts:70:1 › enlarged landing text reflows without clipping core content
+  1) [chromium] › tests/e2e/fluid-landing.spec.ts:70:1 › enlarged landing text reflows without clipping core content 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+    -   "bottom": true,
+    +   "bottom": false,
+        "top": true,
+      }
+
+      78 | 		return { top: text.top >= card.top, bottom: text.bottom <= card.bottom };
+      79 | 	});
+    > 80 | 	expect(bounds).toEqual({ top: true, bottom: true });
+         | 	               ^
+      81 | 	await page.getByRole('button', { name: 'Notes', exact: true }).click();
+      82 | 	await expect(page.locator('.notes-scrollable-area')).toBeVisible();
+      83 | 	expect(await page.locator('.notes-scrollable-area').evaluate((el) =>
+        at /Users/alexrodriguez/.jsmhq/quire/dwight/tests/e2e/fluid-landing.spec.ts:80:17
+
+    Error Context: test-results/fluid-landing-enlarged-lan-0a12d-thout-clipping-core-content-chromium/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/fluid-landing-enlarged-lan-0a12d-thout-clipping-core-content-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/fluid-landing-enlarged-lan-0a12d-thout-clipping-core-content-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[27/115] [chromium] › tests/e2e/scan-attendance.spec.ts:5:2 › Physical QR Scan & Attendance Flow › scanning with valid secret key sets attendance cookie and redirects to cover
+[28/115] [chromium] › tests/e2e/reader-footer-nav.spec.ts:46:2 › at 390 px, on every page, the Tip button never covers Prev or Next, and all are 44 px or more
+[29/115] [chromium] › tests/e2e/scan-attendance.spec.ts:17:2 › Physical QR Scan & Attendance Flow › visiting scan endpoint without secret fails with 400
+[30/115] [chromium] › tests/e2e/scan-attendance.spec.ts:22:2 › Physical QR Scan & Attendance Flow › direct link to issue cover allows reading but does NOT grant stamp eligibility
+[31/115] [chromium] › tests/e2e/security-headers.spec.ts:75:2 › Security headers › a normal page has the CSP with a SvelteKit nonce and the other headers
+[32/115] [chromium] › tests/e2e/security-headers.spec.ts:86:2 › Security headers › an /api/auth response has the headers
+[33/115] [chromium] › tests/e2e/security-headers.spec.ts:93:2 › Security headers › /healthz reports a healthy database with the headers
+[34/115] [chromium] › tests/e2e/security-headers.spec.ts:101:2 › Security headers › the reader renders R2 media and YouTube, Vimeo and Bandcamp embeds with no CSP violations
+[35/115] [chromium] › tests/e2e/reader-footer-nav.spec.ts:46:2 › at 320 px, on every page, the Tip button never covers Prev or Next, and all are 44 px or more
+[36/115] [chromium] › tests/e2e/security-headers.spec.ts:144:2 › Security headers › with only R2_PUBLIC_URL set, uploads still go to local storage, not R2
+[37/115] [chromium] › tests/e2e/security-headers.spec.ts:163:2 › Security headers › the main pages render with no CSP violations
+[38/115] [chromium] › tests/e2e/reader-footer-nav.spec.ts:102:1 › the Tip button still takes the Fan to the Venmo tip panel from an inner page
+[39/115] [chromium] › tests/e2e/session-token-leak.spec.ts:13:2 › The session token stays out of page data (P4L-T05) › a signed-in Artist gets no token in HTML or __data.json
+[40/115] [chromium] › tests/e2e/single-photo-polaroid.spec.ts:82:1 › the Quick Issue photo is a single polaroid card, not a plain frame
+[WebServer] [error] id=6f522b11-7c35-4838-bd24-92cd61231298 status=404 GET /uploads/4e1d29ac-db7b-4d2f-b0dc-b624a70a3cb2.webp
+
+[41/115] [chromium] › tests/e2e/single-photo-polaroid.spec.ts:102:1 › a captioned single photo flips to its caption on tap, Enter and Space
+[WebServer] [error] id=b4a6ba63-1065-4fca-b56d-82dde5a0ecbf status=404 GET /uploads/4e1d29ac-db7b-4d2f-b0dc-b624a70a3cb2.webp
+
+[42/115] [chromium] › tests/e2e/single-photo-polaroid.spec.ts:140:1 › a two-photo pile still counts, tosses, clears and restacks
+[WebServer] [error] id=502aae8d-254e-46d8-9796-60aa8d8b4217 status=404 GET /uploads/4e1d29ac-db7b-4d2f-b0dc-b624a70a3cb2.webp
+
+[43/115] [chromium] › tests/e2e/tipping.spec.ts:16:2 › Venmo tip button (test mode) › tapping a preset records a tap, stays on Quire and shows the Demo message
+[44/115] [chromium] › tests/e2e/tipping.spec.ts:49:2 › Venmo tip button (test mode) › a custom amount of 12.5 shows the Demo message for $12.50, with no console errors
+[45/115] [chromium] › tests/e2e/tipping.spec.ts:87:2 › Venmo tip button (test mode) › out-of-range and empty custom amounts keep the button off, with a hint
+[46/115] [chromium] › tests/e2e/tipping.spec.ts:113:2 › Venmo tip button (test mode) › a double tap sends one tap
+[47/115] [chromium] › tests/e2e/tipping.spec.ts:127:2 › Venmo tip button (test mode) › the dashboard shows tip-tap counts with "Check Venmo", and no dollar figures
+[48/115] [chromium] › tests/e2e/upload-hardening.spec.ts:32:1 › every malicious image is refused with its message and writes nothing
+[WebServer] [error] id=ec3eb834-e693-4420-a274-5c61dff104e1 status=404 GET /uploads/3403fe69-e430-4a03-87bb-197c35a8f983.webp
+
+[WebServer] [error] id=e2856ea5-2ff5-4d1c-a866-9ba8e1cf6d66 status=404 GET /uploads/3403fe69-e430-4a03-87bb-197c35a8f983.webp
+
+[WebServer] [error] id=809f1d20-4038-41b3-9975-3dd51b931eb0 status=404 GET /uploads/3403fe69-e430-4a03-87bb-197c35a8f983.webp
+
+[49/115] [chromium] › tests/e2e/upload-hardening.spec.ts:47:1 › text sent as audio is refused and writes nothing
+[50/115] [chromium] › tests/e2e/upload-hardening.spec.ts:60:1 › a real PNG with an appended script is stored re-encoded as WebP, without the script
+[51/115] [chromium] › tests/e2e/zine-foundation.spec.ts:67:2 › the reader is cut-and-paste on dark at 390 px
+[52/115] [chromium] › tests/e2e/security-headers.spec.ts:192:2 › Security headers › the Google sign-in redirect is not blocked by form-action
+[53/115] [chromium] › tests/e2e/zine-foundation.spec.ts:67:2 › the reader is cut-and-paste on dark at 320 px
+[54/115] [chromium] › tests/e2e/zine-wall-endpaper.spec.ts:52:1 › the Wall: taped-up notes with "Was There" stamps and marker replies; post and flag still work
+[55/115] [chromium] › tests/e2e/zine-foundation.spec.ts:165:1 › pages turn as they are swiped, and sit flat when snapped
+[56/115] [chromium] › tests/e2e/zine-foundation.spec.ts:177:1 › with reduced motion the page turn is only a fade
+[57/115] [chromium] › tests/e2e/zine-foundation.spec.ts:233:3 › content pages › every content kind is a paste-up at 390 px
+[58/115] [chromium] › tests/e2e/zine-wall-endpaper.spec.ts:88:1 › the Endpaper: claim the Stamp after a scan, and it is pressed on as an ink stamp
+[59/115] [chromium] › tests/e2e/zine-foundation.spec.ts:233:3 › content pages › every content kind is a paste-up at 320 px
+[60/115] [chromium] › tests/e2e/zine-wall-endpaper.spec.ts:106:1 › the ink Stamp does not move with reduced motion
+[61/115] [chromium] › tests/e2e/zine-foundation.spec.ts:322:2 › content pages › the mock cassette plays, and its reels turn
+[62/115] [chromium] › tests/e2e/zine-foundation.spec.ts:333:2 › content pages › with reduced motion the reels stay still
+[63/115] [chromium] › tests/e2e/zine-wall-endpaper.spec.ts:120:1 › the Endpaper: Save without a scan shows the Saved stamp
+[64/115] [chromium] › tests/e2e/zine-foundation.spec.ts:342:2 › content pages › videos in their screens still load only when tapped
+[65/115] [chromium] › tests/e2e/zine-wall-endpaper.spec.ts:130:1 › at 320 px the Wall and the back cover fit, with 44 px controls
+[66/115] [demo-mode] › tests/e2e/demo/demo-banner.spec.ts:41:3 › Demo banner in the Demo › renders on /
+[WebServer] Seeding Quire database...
+
+[WebServer] Seeding complete: "The Neon Velvet" 3-city tour ready!
+
+[67/115] [demo-mode] › tests/e2e/demo/demo-mode.spec.ts:4:1 › reports Demo mode, healthy, with stand-ins and simulated tips
+[68/115] [demo-mode] › tests/e2e/demo/demo-photo-pile.spec.ts:9:1 › the Demo Issues show the Brooklyn and Philadelphia photo piles with no CSP violations
+[69/115] [demo-mode] › tests/e2e/demo/demo-banner.spec.ts:41:3 › Demo banner in the Demo › renders on /login
+[70/115] [demo-mode] › tests/e2e/demo/demo-banner.spec.ts:41:3 › Demo banner in the Demo › renders on /a/the-neon-velvet
+[71/115] [demo-mode] › tests/e2e/demo/demo-banner.spec.ts:41:3 › Demo banner in the Demo › renders on /i/neon-velvet-brooklyn-2026-10-12
+[72/115] [demo-mode] › tests/e2e/demo/demo-banner.spec.ts:41:3 › Demo banner in the Demo › renders on /no-such-page
+[WebServer] [error] id=219012e3-61f7-4845-839b-93703f0e87f8 status=404 GET /no-such-page
+
+[73/115] [demo-mode] › tests/e2e/demo/demo-banner.spec.ts:53:2 › Demo banner in the Demo › at 360px it does not overlap the Back Page tip buttons
+[74/115] [demo-mode] › tests/e2e/demo/demo-uploads.spec.ts:17:1 › a local Demo stores uploads in static/uploads
+[75/115] [demo-mode] › tests/e2e/demo/demo-banner.spec.ts:58:2 › Demo banner in the Demo › at 360px it does not overlap the Issue Cover CTA or tip buttons
+[76/115] [demo-mode] › tests/e2e/demo/demo-banner.spec.ts:63:2 › Demo banner in the Demo › the Full-Screen Case Display carries the compact banner
+[77/115] [production-mode] › tests/e2e/production/core-missing.spec.ts:65:3 › Production with a missing core key (503 everywhere) › GET / returns the 503 unavailable page
+[78/115] [production-mode] › tests/e2e/production/core-missing.spec.ts:65:3 › Production with a missing core key (503 everywhere) › GET /a/x returns the 503 unavailable page
+[WebServer] 2026-11-21T04:09:43.604Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+
+[79/115] [production-mode] › tests/e2e/production/core-missing.spec.ts:65:3 › Production with a missing core key (503 everywhere) › GET /i/x returns the 503 unavailable page
+[80/115] [production-mode] › tests/e2e/production/core-missing.spec.ts:65:3 › Production with a missing core key (503 everywhere) › GET /login returns the 503 unavailable page
+[81/115] [production-mode] › tests/e2e/production/core-missing.spec.ts:65:3 › Production with a missing core key (503 everywhere) › GET /dashboard returns the 503 unavailable page
+[82/115] [production-mode] › tests/e2e/production/core-missing.spec.ts:65:3 › Production with a missing core key (503 everywhere) › GET /api/auth/session returns the 503 unavailable page
+[83/115] [production-mode] › tests/e2e/production/core-missing.spec.ts:65:3 › Production with a missing core key (503 everywhere) › GET /api/auth/get-session returns the 503 unavailable page
+[84/115] [production-mode] › tests/e2e/production/core-missing.spec.ts:65:3 › Production with a missing core key (503 everywhere) › POST /api/auth/sign-in/email returns the 503 unavailable page
+[85/115] [production-mode] › tests/e2e/production/core-missing.spec.ts:65:3 › Production with a missing core key (503 everywhere) › POST /api/tip-tap returns the 503 unavailable page
+[86/115] [production-mode] › tests/e2e/production/core-missing.spec.ts:65:3 › Production with a missing core key (503 everywhere) › POST /logout returns the 503 unavailable page
+[87/115] [production-mode] › tests/e2e/production/core-missing.spec.ts:88:2 › Production with a missing core key (503 everywhere) › /healthz reports core invalid with 503, and nothing secret
+[WebServer] [healthz] unhealthy: core=invalid db=down
+
+[88/115] [production-mode] › tests/e2e/production/core-missing.spec.ts:97:2 › Production with a missing core key (503 everywhere) › the page renders in a browser with no app requests
+[89/115] [production-mode] › tests/e2e/production/feature-messages.spec.ts:30:2 › Email off › Artist sign-up shows the email-off message and refuses with 503
+[90/115] [production-mode] › tests/e2e/production/feature-messages.spec.ts:48:2 › Email off › password reset shows the email-off message and refuses with 503
+[91/115] [production-mode] › tests/e2e/production/feature-messages.spec.ts:66:2 › Email off › the Better Auth email endpoints answer 503 EMAIL_UNAVAILABLE
+[92/115] [production-mode] › tests/e2e/production/feature-messages.spec.ts:80:2 › Fan sign-in off › the Fan sign-in tab shows the off message and no Google button
+[93/115] [production-mode] › tests/e2e/production/feature-messages.spec.ts:86:2 › Fan sign-in off › the Issue and Back Page sign-in prompts show the off message
+[94/115] [production-mode] › tests/e2e/production/feature-messages.spec.ts:99:2 › Fan sign-in off › every Google sign-in action refuses with 503 and signs no one in
+[95/115] [production-mode] › tests/e2e/production/feature-messages.spec.ts:111:2 › Fan sign-in off › Better Auth has no Google provider to fall back to
+[WebServer] 2026-11-21T04:09:44.585Z WARN [Better Auth]: Rate limiting could not determine a client IP and is falling back to a single shared per-path bucket. Ensure your runtime forwards a trusted client IP header, then set `advanced.ipAddress.ipAddressHeaders` or `advanced.ipAddress.trustedProxies` so the address can be resolved.
+
+[WebServer] 2026-11-21T04:09:44.589Z ERROR [Better Auth]: Provider not found. Make sure to add the provider in your auth config { provider: 'google' }
+
+[96/115] [production-mode] › tests/e2e/production/feature-messages.spec.ts:122:2 › Uploads off › every upload control is disabled and shows the uploads-off message
+[97/115] [production-mode] › tests/e2e/production/logout-and-redirects.spec.ts:24:2 › Sign out › GET /logout is 405 and signs no one out
+[98/115] [production-mode] › tests/e2e/production/logout-and-redirects.spec.ts:33:2 › Sign out › POST /logout from the dashboard button signs out
+[99/115] [production-mode] › tests/e2e/production/logout-and-redirects.spec.ts:44:2 › Open-redirect payloads › signing in from /login?redirect=<payload> lands on /dashboard
+[100/115] [production-mode] › tests/e2e/production/logout-and-redirects.spec.ts:58:2 › Open-redirect payloads › /login?redirect= sends a signed-in Artist to /dashboard, not the payload
+[101/115] [production-mode] › tests/e2e/production/logout-and-redirects.spec.ts:68:2 › Open-redirect payloads › the login action refuses a payload redirect or falls back on this origin
+[102/115] [production-mode] › tests/e2e/production/logout-and-redirects.spec.ts:90:2 › Open-redirect payloads › POST /logout falls back to / for a payload in the query or the form
+[103/115] [production-mode] › tests/e2e/production/logout-and-redirects.spec.ts:109:2 › Open-redirect payloads › /demo?redirect= is 404 in production, payload or not
+[104/115] [production-mode] › tests/e2e/production/logout-and-redirects.spec.ts:117:2 › Open-redirect payloads › Better Auth never redirects off-site for a payload callbackURL
+[WebServer] 2026-11-21T04:09:49.693Z ERROR [Better Auth]: Invalid callbackURL: //evil.com
+
+[WebServer] 2026-11-21T04:09:49.695Z ERROR [Better Auth]: Invalid callbackURL: //evil.com
+
+[WebServer] 2026-11-21T04:09:49.698Z ERROR [Better Auth]: Invalid callbackURL: /\evil.com
+
+[WebServer] 2026-11-21T04:09:49.700Z ERROR [Better Auth]: Invalid callbackURL: /\evil.com
+
+[WebServer] 2026-11-21T04:09:49.703Z ERROR [Better Auth]: Invalid callbackURL: \\evil.com
+
+[WebServer] 2026-11-21T04:09:49.704Z ERROR [Better Auth]: Invalid callbackURL: \\evil.com
+
+[WebServer] 2026-11-21T04:09:49.707Z ERROR [Better Auth]: Invalid callbackURL: /%5Cevil.com
+
+[WebServer] 2026-11-21T04:09:49.709Z ERROR [Better Auth]: Invalid callbackURL: /%5Cevil.com
+
+[WebServer] 2026-11-21T04:09:49.712Z ERROR [Better Auth]: Invalid callbackURL: /%5cevil.com
+
+[WebServer] 2026-11-21T04:09:49.714Z ERROR [Better Auth]: Invalid callbackURL: /%5cevil.com
+
+[WebServer] 2026-11-21T04:09:49.716Z ERROR [Better Auth]: Provider not found. Make sure to add the provider in your auth config { provider: 'google' }
+
+[WebServer] 2026-11-21T04:09:49.721Z ERROR [Better Auth]: Invalid callbackURL: /%2Fevil.com
+
+[WebServer] 2026-11-21T04:09:49.723Z ERROR [Better Auth]: Invalid callbackURL: /%2Fevil.com
+
+[WebServer] 2026-11-21T04:09:49.725Z ERROR [Better Auth]: Invalid callbackURL: %2F%2Fevil.com
+
+[WebServer] 2026-11-21T04:09:49.727Z ERROR [Better Auth]: Invalid callbackURL: %2F%2Fevil.com
+
+[WebServer] 2026-11-21T04:09:49.729Z ERROR [Better Auth]: Invalid callbackURL: /%2F%2Fevil.com
+
+[WebServer] 2026-11-21T04:09:49.731Z ERROR [Better Auth]: Invalid callbackURL: /%2F%2Fevil.com
+
+[WebServer] 2026-11-21T04:09:49.733Z ERROR [Better Auth]: Invalid callbackURL: ////evil.com
+
+[WebServer] 2026-11-21T04:09:49.735Z ERROR [Better Auth]: Invalid callbackURL: ////evil.com
+
+[WebServer] 2026-11-21T04:09:49.737Z ERROR [Better Auth]: Invalid callbackURL: /	/evil.com
+
+[WebServer] 2026-11-21T04:09:49.738Z ERROR [Better Auth]: Invalid callbackURL: /	/evil.com
+
+[WebServer] 2026-11-21T04:09:49.741Z ERROR [Better Auth]: Provider not found. Make sure to add the provider in your auth config { provider: 'google' }
+
+[WebServer] 2026-11-21T04:09:49.745Z ERROR [Better Auth]: Invalid callbackURL: https://evil.com
+
+[WebServer] 2026-11-21T04:09:49.747Z ERROR [Better Auth]: Invalid callbackURL: https://evil.com
+
+[WebServer] 2026-11-21T04:09:49.749Z ERROR [Better Auth]: Invalid callbackURL: http:evil.com
+
+[WebServer] 2026-11-21T04:09:49.750Z ERROR [Better Auth]: Invalid callbackURL: http:evil.com
+
+[WebServer] 2026-11-21T04:09:49.767Z ERROR [Better Auth]: Invalid callbackURL: HTTPS://EVIL.COM
+
+[WebServer] 2026-11-21T04:09:49.768Z ERROR [Better Auth]: Invalid callbackURL: HTTPS://EVIL.COM
+
+[WebServer] 2026-11-21T04:09:49.771Z ERROR [Better Auth]: Invalid callbackURL: javascript:alert(1)
+
+[WebServer] 2026-11-21T04:09:49.773Z ERROR [Better Auth]: Invalid callbackURL: javascript:alert(1)
+
+[WebServer] 2026-11-21T04:09:49.775Z ERROR [Better Auth]: Invalid callbackURL: JavaScript:alert(1)
+
+[WebServer] 2026-11-21T04:09:49.777Z ERROR [Better Auth]: Invalid callbackURL: JavaScript:alert(1)
+
+[WebServer] 2026-11-21T04:09:49.780Z ERROR [Better Auth]: Invalid callbackURL: data:text/html,<script>alert(1)</script>
+
+[WebServer] 2026-11-21T04:09:49.781Z ERROR [Better Auth]: Invalid callbackURL: data:text/html,<script>alert(1)</script>
+
+[WebServer] 2026-11-21T04:09:49.784Z ERROR [Better Auth]: Invalid callbackURL: evil.com
+
+[WebServer] 2026-11-21T04:09:49.785Z ERROR [Better Auth]: Invalid callbackURL: evil.com
+
+[WebServer] 2026-11-21T04:09:49.788Z ERROR [Better Auth]: Invalid callbackURL: /dashboard\..\evil
+
+[WebServer] 2026-11-21T04:09:49.789Z ERROR [Better Auth]: Invalid callbackURL: /dashboard\..\evil
+
+[WebServer] 2026-11-21T04:09:49.791Z ERROR [Better Auth]: Provider not found. Make sure to add the provider in your auth config { provider: 'google' }
+
+[105/115] [production-mode] › tests/e2e/production/production-mode.spec.ts:11:1 › reports production mode, healthy, on the local preview
+[106/115] [production-mode] › tests/e2e/production/production-mode.spec.ts:21:1 › /demo is 404 and nothing is seeded
+[107/115] [production-mode] › tests/e2e/production/production-mode.spec.ts:30:1 › pages carry the production security headers
+[108/115] [production-mode] › tests/e2e/production/uploads.spec.ts:70:1 › every upload action answers uploads-off and writes nothing, for every file
+[109/115] [production-mode] › tests/e2e/production/uploads.spec.ts:100:1 › URLs and embeds still work with uploads off
+[110/115] [production-mode] › tests/e2e/production/venmo-tip.spec.ts:67:1 › no Stripe key is set for the production server, and payments are off
+[111/115] [production-mode] › tests/e2e/production/venmo-tip.spec.ts:74:1 › a preset on the Cover opens the exact Venmo link and records a Tip Tap
+[112/115] [production-mode] › tests/e2e/production/venmo-tip.spec.ts:81:1 › a preset on the Back Page opens the exact Venmo link and records a General Tip Tap
+[113/115] [production-mode] › tests/e2e/production/venmo-tip.spec.ts:88:1 › every preset carries the right amount
+[114/115] [production-mode] › tests/e2e/production/venmo-tip.spec.ts:101:1 › a custom amount carries the right amount
+[115/115] [production-mode] › tests/e2e/production/venmo-tip.spec.ts:113:1 › an Artist without a Venmo username shows no tip buttons
+2026-11-21T04:09:52.072Z pw:webserver Terminating the WebServer
+2026-11-21T04:09:52.075Z pw:webserver Terminated the WebServer
+2026-11-21T04:09:52.075Z pw:webserver Terminating the WebServer
+2026-11-21T04:09:52.078Z pw:webserver Terminated the WebServer
+2026-11-21T04:09:52.078Z pw:webserver Terminating the WebServer
+2026-11-21T04:09:52.080Z pw:webserver Terminated the WebServer
+2026-11-21T04:09:52.080Z pw:webserver Terminating the WebServer
+2026-11-21T04:09:52.083Z pw:webserver Terminated the WebServer
+  1 failed
+    [chromium] › tests/e2e/fluid-landing.spec.ts:70:1 › enlarged landing text reflows without clipping core content 
+  114 passed (38.1s)
