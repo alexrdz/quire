@@ -172,6 +172,24 @@ export async function addLegacyQuickPhotoPage(issueId: string, page: { title: st
 }
 
 /**
+ * Z-T06: removes a Fan's stamp or save for an Issue, so the Endpaper's Claim and
+ * Save flows can be run on the seeded sample data. Waits for the server's writes.
+ */
+export async function clearCollectionFor(email: string, issueSlug: string): Promise<void> {
+	const db = await waitingClient();
+	try {
+		await db.execute({
+			sql: `DELETE FROM collections
+			      WHERE fan_user_id = (SELECT id FROM users WHERE email = ?)
+			        AND issue_id = (SELECT id FROM issues WHERE slug = ?)`,
+			args: [email, issueSlug]
+		});
+	} finally {
+		db.close();
+	}
+}
+
+/**
  * A published Issue for the sample Artist with one page of every content kind
  * the zine reader styles (Z-T05), under its own slug so parallel specs never
  * share it: a setlist, a photo, a text scrap, a mock and a real audio track,
