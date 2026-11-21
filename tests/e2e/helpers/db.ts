@@ -172,18 +172,43 @@ export async function addLegacyQuickPhotoPage(issueId: string, page: { title: st
 }
 
 /**
- * Z-T06: removes a Fan's stamp or save for an Issue, so the Endpaper's Claim and
- * Save flows can be run on the seeded sample data. Waits for the server's writes.
+ * A published Issue for the sample Artist with one page of every content kind
+ * the zine reader styles (Z-T05), under its own slug so parallel specs never
+ * share it: a setlist, a photo, a text scrap, a mock and a real audio track,
+ * and YouTube, Vimeo, Bandcamp and link-out video pages.
  */
-export async function clearCollectionFor(email: string, issueSlug: string): Promise<void> {
+export async function seedZineContentIssue(slug: string): Promise<string> {
 	const db = await waitingClient();
 	try {
+		const artist = await db.execute({ sql: 'SELECT id FROM artists WHERE slug = ?', args: ['the-neon-velvet'] });
+		const artistId = artist.rows[0]?.id;
+		if (!artistId) throw new Error('Sample artist missing: the server seeds it on first request.');
+
+		const issueId = `e2e-zine-${slug}`;
+		const now = Math.floor(Date.now() / 1000);
 		await db.execute({
-			sql: `DELETE FROM collections
-			      WHERE fan_user_id = (SELECT id FROM users WHERE email = ?)
-			        AND issue_id = (SELECT id FROM issues WHERE slug = ?)`,
-			args: [email, issueSlug]
+			sql: `INSERT INTO issues (id, artist_id, slug, city, venue, date, timezone, cover_note, secret_key, status, approve_first, published_at, created_at, updated_at)
+			      VALUES (?, ?, ?, 'Zineville', 'The Paste-Up', '2026-11-20', 'America/New_York', '', 'e2e_zine_secret', 'published', 0, ?, ?, ?)`,
+			args: [issueId, artistId, slug, now, now, now]
 		});
+		const pages: Array<[string, Record<string, unknown>]> = [
+			['setlist', { title: 'Zine Setlist', songs: ['Opener', 'Second Song', 'Encore Song'] }],
+			['photo', { title: 'Zine Photo', body: 'Caption body', imageUrl: `${E2E_MEDIA_ORIGIN}/photos/zine.webp` }],
+			['text', { title: 'Zine Text', body: 'Words on a scrap.' }],
+			['audio', { title: 'Zine Demo' }],
+			['audio', { title: 'Zine Track', audioUrl: `${E2E_MEDIA_ORIGIN}/audio/zine.mp3`, duration: '02:10' }],
+			['video', { title: 'Zine YouTube', videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }],
+			['video', { title: 'Zine Vimeo', videoUrl: 'https://vimeo.com/76979871' }],
+			['video', { title: 'Zine Bandcamp', videoUrl: 'https://bandcamp.com/EmbeddedPlayer/album=1234567890/size=large/tracklist=false' }],
+			['video', { title: 'Zine Link', videoUrl: 'https://example.com/watch' }]
+		];
+		for (const [index, [kind, content]] of pages.entries()) {
+			await db.execute({
+				sql: 'INSERT INTO issue_pages (id, issue_id, position, kind, content_json, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+				args: [`${issueId}-p${index}`, issueId, index, kind, JSON.stringify(content), now]
+			});
+		}
+		return slug;
 	} finally {
 		db.close();
 	}

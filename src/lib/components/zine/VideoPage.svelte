@@ -1,8 +1,11 @@
 <script lang="ts">
-	import { Stack, Box, Cluster, Frame } from '$lib/components/layout';
-	import MetaChip from './MetaChip.svelte';
+	import type { Snippet } from 'svelte';
+	import { Stack, Cluster, Frame } from '$lib/components/layout';
+	import Scrap from './Scrap.svelte';
+	import Tape from './Tape.svelte';
+	import TypeLabel from './TypeLabel.svelte';
 	import ZinePageShell from './ZinePageShell.svelte';
-	import { resolveVideoEmbed, type PageContent, type PageShell } from './reader';
+	import { resolveVideoEmbed, zineTilt, type PageContent, type PageShell } from './reader';
 
 	interface Props {
 		shell: PageShell;
@@ -14,7 +17,18 @@
 	const videoEmbed = $derived(resolveVideoEmbed(content.videoUrl || content.embedUrl));
 	/** YouTube and Vimeo load only after a tap (lazy facade), so a page view never contacts them. */
 	let activated = $state(false);
+	/** The taped-on screen lies a little crooked; less than text, so a playing video stays square enough. */
+	const tilt = $derived(zineTilt(shell.pageNumber + 2, 1.2));
 </script>
+
+{#snippet screen(children: Snippet)}
+	<!-- A screen taped onto the page: a dark bezel around the player. -->
+	<div class="video-screen" style="--screen-tilt: {tilt}deg;">
+		<Tape placement="top-left" position={shell.pageNumber} />
+		<Tape placement="top-right" position={shell.pageNumber + 1} />
+		{@render children()}
+	</div>
+{/snippet}
 
 <ZinePageShell {shell}>
 	<Stack gap="md">
@@ -22,6 +36,7 @@
 
 		{#if videoEmbed.kind === 'youtube'}
 			<Stack gap="xs">
+				{#snippet youtube()}
 				<Frame ratio="16-9" class="video-frame">
 					{#if activated}
 						<iframe
@@ -51,6 +66,8 @@
 						</button>
 					{/if}
 				</Frame>
+				{/snippet}
+				{@render screen(youtube)}
 				<Cluster justify="end">
 					<a href={videoEmbed.watchUrl} target="_blank" rel="noopener noreferrer" class="video-external-link">
 						Watch on YouTube ↗
@@ -59,6 +76,7 @@
 			</Stack>
 		{:else if videoEmbed.kind === 'vimeo'}
 			<Stack gap="xs">
+				{#snippet vimeo()}
 				<Frame ratio="16-9" class="video-frame">
 					{#if activated}
 						<iframe
@@ -84,6 +102,8 @@
 						</div>
 					{/if}
 				</Frame>
+				{/snippet}
+				{@render screen(vimeo)}
 				<Cluster justify="end">
 					<a href={videoEmbed.watchUrl} target="_blank" rel="noopener noreferrer" class="video-external-link">
 						Watch on Vimeo ↗
@@ -91,7 +111,7 @@
 				</Cluster>
 			</Stack>
 		{:else if videoEmbed.kind === 'bandcamp-embed'}
-			<Box variant="raised" padding="sm" radius="md" class="bandcamp-card">
+			{#snippet bandcamp()}
 				<iframe
 					src={videoEmbed.embedSrc}
 					title={content.title || 'Bandcamp Player'}
@@ -99,27 +119,33 @@
 					loading="lazy"
 					seamless
 				></iframe>
-			</Box>
+			{/snippet}
+			{@render screen(bandcamp)}
 		{:else if videoEmbed.kind === 'video-file'}
-			<Frame ratio="16-9" class="video-frame">
-				<video controls preload="metadata" src={videoEmbed.src}>
-					<track kind="captions" />
-				</video>
-			</Frame>
+			{#snippet file()}
+				<Frame ratio="16-9" class="video-frame">
+					<video controls preload="metadata" src={videoEmbed.src}>
+						<track kind="captions" />
+					</video>
+				</Frame>
+			{/snippet}
+			{@render screen(file)}
 		{:else if videoEmbed.kind === 'bandcamp-link' || videoEmbed.kind === 'external-link'}
-			<Box variant="raised" padding="lg" radius="lg" class="video-link-card">
+			<!-- A link out is a dark scrap taped down, not a glass card. -->
+			<Scrap position={shell.pageNumber} class="video-link-card">
+				<Tape placement="top" position={shell.pageNumber + 3} />
 				<Cluster justify="between" align="center" gap="sm">
-					<Stack gap="3xs">
-						<MetaChip tone="accent">
+					<Stack gap="2xs">
+						<TypeLabel position={shell.pageNumber} tone="accent">
 							{videoEmbed.kind === 'bandcamp-link' ? 'BANDCAMP' : 'VIDEO / EMBED'}
-						</MetaChip>
+						</TypeLabel>
 						<span class="video-link-title">{content.title || 'Open Media'}</span>
 					</Stack>
 					<a href={videoEmbed.watchUrl} target="_blank" rel="noopener noreferrer" class="btn-action-highlight">
 						Open ↗
 					</a>
 				</Cluster>
-			</Box>
+			</Scrap>
 		{/if}
 
 		{#if content.body}
@@ -129,10 +155,28 @@
 </ZinePageShell>
 
 <style>
+	/* The screen: a dark bezel, taped on at a slight angle, with a faint glass sheen at the top. */
+	.video-screen {
+		position: relative;
+		/* Inset so the corner tape lands on the page, clear of its edge gutter. */
+		margin-inline: var(--space-s);
+		padding-block: var(--space-2xs) var(--space-xs);
+		padding-inline: var(--space-2xs);
+		background-color: #121016;
+		background-image: var(--zine-grain), linear-gradient(to bottom, #24202b, #121016 40%);
+		background-size: 160px 160px, auto;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		border-radius: 12px;
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.08),
+			0 16px 28px -12px rgba(0, 0, 0, 0.85);
+		transform: rotate(var(--screen-tilt, 0deg));
+	}
+
 	:global(.video-frame) {
-		border-radius: var(--radius-lg);
-		border: 1px solid var(--glass-border);
-		background: rgba(9, 7, 16, 0.9);
+		border-radius: 6px;
+		background: #050407;
+		box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6);
 	}
 
 	.video-poster-img {
@@ -191,15 +235,16 @@
 		text-decoration: underline;
 	}
 
-	:global(.bandcamp-card),
 	:global(.video-link-card) {
-		border-color: var(--glass-border);
+		inline-size: 100%;
 	}
 
 	.bandcamp-iframe {
+		display: block;
 		inline-size: 100%;
 		block-size: 120px;
 		border: none;
+		border-radius: 6px;
 	}
 
 	.video-link-title {
