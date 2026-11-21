@@ -102,17 +102,37 @@ for (const width of [390, 320]) {
 			expect(tilt).toBeLessThanOrEqual(2.05);
 		}
 
-		// Tape and stamps never cover a control.
+		// Tape and stamps never cover a control. Each box is clipped to the scroll areas
+		// around it: a Wall note scrolled out of its list is hidden, so it covers nothing.
 		const overlaps = await page.evaluate(() => {
+			const visibleBox = (el: Element) => {
+				const r = el.getBoundingClientRect();
+				let { left, top, right, bottom } = r;
+				for (let p = el.parentElement; p; p = p.parentElement) {
+					const s = getComputedStyle(p);
+					if (s.overflowX === 'visible' && s.overflowY === 'visible') continue;
+					const c = p.getBoundingClientRect();
+					if (s.overflowX !== 'visible') {
+						left = Math.max(left, c.left);
+						right = Math.min(right, c.right);
+					}
+					if (s.overflowY !== 'visible') {
+						top = Math.max(top, c.top);
+						bottom = Math.min(bottom, c.bottom);
+					}
+				}
+				return { left, top, right, bottom, width: right - left, height: bottom - top };
+			};
 			const deco = [...document.querySelectorAll('.tape, .stamp, .cover-print')];
 			const controls = [...document.querySelectorAll('a[href], button, input, textarea, select')];
 			const hits: string[] = [];
 			for (const d of deco) {
-				const a = d.getBoundingClientRect();
+				const a = visibleBox(d);
+				if (a.width <= 0 || a.height <= 0) continue;
 				for (const c of controls) {
 					if (d.contains(c)) continue;
-					const b = c.getBoundingClientRect();
-					if (b.width === 0 || b.height === 0) continue;
+					const b = visibleBox(c);
+					if (b.width <= 0 || b.height <= 0) continue;
 					const x = Math.min(a.right, b.right) - Math.max(a.left, b.left);
 					const y = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
 					if (x > 0.5 && y > 0.5) hits.push(`${d.className} over ${c.textContent?.trim() || c.tagName}`);
