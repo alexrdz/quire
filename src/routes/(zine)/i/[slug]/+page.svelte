@@ -90,7 +90,7 @@
 </svelte:head>
 
 <div
-	class="book-container"
+	class="book-container {showTips ? 'has-floating-tip' : ''}"
 	style="--accent: {data.artist.accentColor || '#05D9E8'};"
 >
 	<!-- PAGE 1: The Cover -->
@@ -159,7 +159,8 @@
 	/>
 </div>
 
-<!-- Persistent floating tip trigger: jumps to the Venmo tip buttons on the Cover (ADR 0008) -->
+<!-- Persistent floating tip trigger: jumps to the Venmo tip buttons on the Cover (ADR 0008).
+     Every inner page's footer leaves room for it, so it never covers Prev or Next (Z-T08). -->
 {#if showTips && !authDrawerOpen}
 	<a href="#tip" class="btn-floating-tip" aria-label="Tip {data.artist.displayName} with Venmo">
 		<span>Tip</span>
@@ -177,11 +178,14 @@
 {/if}
 
 <style>
+	/* Size and offset are shared with the footer's room for it (components.css, Z-T08). */
 	.btn-floating-tip {
 		position: fixed;
 		text-decoration: none;
-		inset-block-end: 1.5rem;
-		inset-inline-end: 1.5rem;
+		inset-block-end: var(--reader-tip-offset);
+		inset-inline-end: var(--reader-tip-offset);
+		min-block-size: var(--reader-tip-size);
+		min-inline-size: var(--reader-tip-size);
 		z-index: 50;
 		display: inline-flex;
 		align-items: center;

@@ -726,3 +726,22 @@
 	font-family: var(--font-marker);
 }
 
+
+/* ---------------------------------------------------------------------------
+   Issue reader: the floating Tip button and the page footer (Z-T08)
+   ---------------------------------------------------------------------------
+   The Tip button is fixed at the reader's bottom end corner on every page. On
+   phones it used to sit on top of the footer's Next button (ADR 0009: nothing
+   covers a control). When it shows, each inner page's footer leaves room under
+   its row for the button, so Prev and Next sit just above it and keep the full
+   width. The Cover's own footer and tip panel are unchanged. */
+:root {
+	/* The Tip button's block size (3rem, never under 44 px) and its distance from the edges. */
+	--reader-tip-size: var(--space-xl);
+	--reader-tip-offset: var(--space-m);
+}
+
+.book-container.has-floating-tip .zine-page:not(.cover) .page-footer {
+	/* Always positive: the button and its offset are taller than the page's own bottom padding. */
+	padding-block-end: calc(var(--reader-tip-size) + var(--reader-tip-offset) + var(--space-2xs) - var(--page-padding-block));
+}
