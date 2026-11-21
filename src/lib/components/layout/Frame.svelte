@@ -4,7 +4,7 @@
 
 	interface Props extends HTMLAttributes<HTMLElement> {
 		as?: string;
-		ratio?: '1' | '1-1' | 'square' | '16-9' | '16/9' | 'video' | '4-3' | '4/3' | '3-2' | '21-9' | '21/9' | '';
+		ratio?: '1' | '1-1' | 'square' | '16-9' | '16/9' | 'video' | '4-3' | '4/3' | '3-2' | '21-9' | '21/9' | '9-16' | '9/16' | 'reel' | '';
 		class?: string;
 		children?: Snippet;
 		[key: string]: any;

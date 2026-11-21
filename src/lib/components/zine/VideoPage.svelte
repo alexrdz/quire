@@ -21,9 +21,9 @@
 	const tilt = $derived(zineTilt(shell.pageNumber + 2, 1.2));
 </script>
 
-{#snippet screen(children: Snippet)}
+{#snippet screen(children: Snippet, isPortrait = false)}
 	<!-- A screen taped onto the page: a dark bezel around the player. -->
-	<div class="video-screen" style="--screen-tilt: {tilt}deg;">
+	<div class="video-screen" class:is-portrait={isPortrait} style="--screen-tilt: {tilt}deg;">
 		<Tape placement="top-left" position={shell.pageNumber} />
 		<Tape placement="top-right" position={shell.pageNumber + 1} />
 		{@render children()}
@@ -122,14 +122,15 @@
 			{/snippet}
 			{@render screen(bandcamp)}
 		{:else if videoEmbed.kind === 'video-file'}
+			{@const isPortrait = content.orientation === 'portrait'}
 			{#snippet file()}
-				<Frame ratio="16-9" class="video-frame">
-					<video controls preload="metadata" src={videoEmbed.src}>
+				<Frame ratio={isPortrait ? '9-16' : '16-9'} class="video-frame {isPortrait ? 'video-frame-portrait' : ''}">
+					<video controls preload="metadata" src={videoEmbed.src} playsinline>
 						<track kind="captions" />
 					</video>
 				</Frame>
 			{/snippet}
-			{@render screen(file)}
+			{@render screen(file, isPortrait)}
 		{:else if videoEmbed.kind === 'bandcamp-link' || videoEmbed.kind === 'external-link'}
 			<!-- A link out is a dark scrap taped down, not a glass card. -->
 			<Scrap position={shell.pageNumber} class="video-link-card">
@@ -171,6 +172,11 @@
 			inset 0 1px 0 rgba(255, 255, 255, 0.08),
 			0 16px 28px -12px rgba(0, 0, 0, 0.85);
 		transform: rotate(var(--screen-tilt, 0deg));
+	}
+
+	.video-screen.is-portrait {
+		max-inline-size: 300px;
+		margin-inline: auto;
 	}
 
 	:global(.video-frame) {

@@ -218,10 +218,18 @@ async function resolvePageContentJson(
 	}
 
 	if (kind === 'video') {
+		const videoFile = formData.get('videoFile');
 		const videoUrlRaw = String(formData.get('videoUrl') || formData.get('embedUrl') || '').trim();
+		const videoOrientation = String(formData.get('videoOrientation') || '').trim();
 		let resolvedVideoUrl = '';
 
-		if (videoUrlRaw) {
+		if (videoFile instanceof File && videoFile.size > 0) {
+			const uploadRes = await uploadFormFile(videoFile, { kind: 'video' });
+			if (!uploadRes.ok) {
+				return { ok: false, error: uploadRes.error.message };
+			}
+			resolvedVideoUrl = uploadRes.value.url;
+		} else if (videoUrlRaw) {
 			const urlCheck = mediaUrlSchema.safeParse(videoUrlRaw);
 			if (!urlCheck.success) {
 				return {
@@ -239,7 +247,8 @@ async function resolvePageContentJson(
 			contentJson: JSON.stringify({
 				title: title || undefined,
 				body: body || undefined,
-				videoUrl: resolvedVideoUrl || undefined
+				videoUrl: resolvedVideoUrl || undefined,
+				orientation: videoOrientation === 'portrait' || videoOrientation === 'landscape' ? videoOrientation : undefined
 			})
 		};
 	}

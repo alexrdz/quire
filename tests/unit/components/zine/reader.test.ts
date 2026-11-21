@@ -11,6 +11,10 @@ import {
 describe('parseContent', () => {
 	it('reads stored JSON and falls back to an empty object', () => {
 		expect(parseContent('{"title":"Hi","songs":["A"]}')).toEqual({ title: 'Hi', songs: ['A'] });
+		expect(parseContent('{"title":"Live Clip","orientation":"portrait"}')).toEqual({
+			title: 'Live Clip',
+			orientation: 'portrait'
+		});
 		expect(parseContent('')).toEqual({});
 		expect(parseContent('not json')).toEqual({});
 	});

@@ -25,6 +25,7 @@ const s3Client: S3Client | null = r2
 
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 export const MAX_AUDIO_BYTES = 25 * 1024 * 1024; // 25 MB
+export const MAX_VIDEO_BYTES = 50 * 1024 * 1024; // 50 MB
 export const MAX_RASTER_EDGE_PX = 1600;
 
 /** Raster formats accepted as input. Every one is re-encoded to WebP before storage. SVG is never accepted. */
@@ -39,9 +40,16 @@ export const ALLOWED_AUDIO_MIME_TYPES = new Set([
 	'audio/aac'
 ]);
 
+export const ALLOWED_VIDEO_MIME_TYPES = new Set([
+	'video/mp4',
+	'video/webm',
+	'video/quicktime'
+]);
+
 export const ALLOWED_MIME_TYPES = new Set([
 	...ALLOWED_IMAGE_MIME_TYPES,
-	...ALLOWED_AUDIO_MIME_TYPES
+	...ALLOWED_AUDIO_MIME_TYPES,
+	...ALLOWED_VIDEO_MIME_TYPES
 ]);
 
 /** The only source of stored file extensions. Keys are canonical MIME types detected from bytes. */
@@ -55,7 +63,10 @@ export const MIME_TO_EXT: Record<string, string> = {
 	'audio/wav': '.wav',
 	'audio/ogg': '.ogg',
 	'audio/webm': '.webm',
-	'audio/aac': '.aac'
+	'audio/aac': '.aac',
+	'video/mp4': '.mp4',
+	'video/webm': '.webm',
+	'video/quicktime': '.mov'
 };
 
 /**
@@ -73,12 +84,13 @@ const DETECTED_EXT_TO_MIME: Record<string, string> = {
 	ogg: 'audio/ogg',
 	oga: 'audio/ogg',
 	opus: 'audio/ogg',
-	// file-type reports every WebM as video/webm; detectMediaType only accepts audio-only ones.
-	webm: 'audio/webm',
-	aac: 'audio/aac'
+	webm: 'video/webm',
+	aac: 'audio/aac',
+	mov: 'video/quicktime',
+	mp4: 'video/mp4'
 };
 
-export type MediaKindFilter = 'image' | 'audio' | 'any';
+export type MediaKindFilter = 'image' | 'audio' | 'video' | 'any';
 
 export interface UploadOptions {
 	/** Ignored for typing: kept only for callers' logs. The type comes from the bytes. */
@@ -95,7 +107,7 @@ export interface UploadResult {
 }
 
 const UNSUPPORTED_MESSAGE =
-	'This file type is not supported. Allowed images: JPEG, PNG, WebP, AVIF. Allowed audio: MP3, M4A, WAV, OGG, WebM, AAC.';
+	'This file type is not supported. Allowed images: JPEG, PNG, WebP, AVIF. Allowed audio: MP3, M4A, WAV, OGG, WebM, AAC. Allowed video: MP4, WebM, MOV.';
 
 /**
  * Detects the media type from the file's magic bytes. Client filename and MIME
@@ -105,12 +117,13 @@ export async function detectMediaType(buffer: Buffer): Promise<string | null> {
 	const detected = await fileTypeFromBuffer(buffer);
 	if (!detected) return null;
 	if (detected.ext === 'mp4') {
-		// Only audio-branded MP4 containers count as audio.
-		return detected.mime.startsWith('audio/') ? 'audio/mp4' : null;
+		return detected.mime.startsWith('audio/') ? 'audio/mp4' : 'video/mp4';
 	}
 	if (detected.ext === 'webm') {
-		// Browser recordings are WebM; reject any that carry a video (or unknown) track.
-		return isAudioOnlyWebm(buffer) ? 'audio/webm' : null;
+		return isAudioOnlyWebm(buffer) ? 'audio/webm' : 'video/webm';
+	}
+	if (detected.ext === 'mov') {
+		return 'video/quicktime';
 	}
 	return DETECTED_EXT_TO_MIME[detected.ext] ?? null;
 }
@@ -189,14 +202,17 @@ export function isAudioOnlyWebm(buffer: Buffer): boolean {
 }
 
 function maxBytesFor(kind: MediaKindFilter): number {
-	return kind === 'image' ? MAX_IMAGE_BYTES : MAX_AUDIO_BYTES;
+	if (kind === 'image') return MAX_IMAGE_BYTES;
+	if (kind === 'audio') return MAX_AUDIO_BYTES;
+	if (kind === 'video') return MAX_VIDEO_BYTES;
+	return Math.max(MAX_IMAGE_BYTES, MAX_AUDIO_BYTES, MAX_VIDEO_BYTES);
 }
 
 function validateDetectedMedia(
 	mimeType: string | null,
 	byteLength: number,
 	allowedKind: MediaKindFilter
-): Result<{ mimeType: string; isAudio: boolean }, DomainError> {
+): Result<{ mimeType: string; isAudio: boolean; isVideo: boolean; isImage: boolean }, DomainError> {
 	if (byteLength <= 0) {
 		return err({ code: 'EMPTY_FILE', message: 'Uploaded file is empty.' });
 	}
@@ -205,9 +221,11 @@ function validateDetectedMedia(
 		return err({ code: 'UNSUPPORTED_MEDIA_TYPE', message: UNSUPPORTED_MESSAGE });
 	}
 
+	const isImage = ALLOWED_IMAGE_MIME_TYPES.has(mimeType);
 	const isAudio = ALLOWED_AUDIO_MIME_TYPES.has(mimeType);
+	const isVideo = ALLOWED_VIDEO_MIME_TYPES.has(mimeType);
 
-	if (allowedKind === 'image' && isAudio) {
+	if (allowedKind === 'image' && !isImage) {
 		return err({
 			code: 'UNSUPPORTED_MEDIA_TYPE',
 			message: 'This file is not an image. Please upload JPEG, PNG, WebP or AVIF.'
@@ -221,17 +239,26 @@ function validateDetectedMedia(
 		});
 	}
 
-	const maxBytes = isAudio ? MAX_AUDIO_BYTES : MAX_IMAGE_BYTES;
-	if (byteLength > maxBytes) {
+	if (allowedKind === 'video' && !isVideo) {
 		return err({
-			code: 'FILE_TOO_LARGE',
-			message: isAudio
-				? 'Audio file exceeds the 25MB maximum upload size.'
-				: 'Image file exceeds the 10MB maximum upload size.'
+			code: 'UNSUPPORTED_MEDIA_TYPE',
+			message: 'This file is not a supported video format. Please upload MP4, WebM or MOV.'
 		});
 	}
 
-	return ok({ mimeType, isAudio });
+	const maxBytes = isVideo ? MAX_VIDEO_BYTES : isAudio ? MAX_AUDIO_BYTES : MAX_IMAGE_BYTES;
+	if (byteLength > maxBytes) {
+		return err({
+			code: 'FILE_TOO_LARGE',
+			message: isVideo
+				? 'Video file exceeds the 50MB maximum upload size.'
+				: isAudio
+					? 'Audio file exceeds the 25MB maximum upload size.'
+					: 'Image file exceeds the 10MB maximum upload size.'
+		});
+	}
+
+	return ok({ mimeType, isAudio, isVideo, isImage });
 }
 
 /**
@@ -280,7 +307,7 @@ export async function uploadMedia(
 
 	let finalBuffer = options.buffer;
 	let finalMime = validation.value.mimeType;
-	if (!validation.value.isAudio) {
+	if (validation.value.isImage) {
 		const reencoded = await reencodeImageToWebp(options.buffer);
 		if (!reencoded.ok) {
 			return reencoded;
@@ -367,7 +394,9 @@ export async function uploadFormFile(
 			message:
 				allowedKind === 'image'
 					? 'Image file exceeds the 10MB maximum upload size.'
-					: 'File exceeds the 25MB maximum upload size.'
+					: allowedKind === 'video'
+						? 'Video file exceeds the 50MB maximum upload size.'
+						: 'File exceeds the maximum upload size.'
 		});
 	}
 

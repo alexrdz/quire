@@ -22,6 +22,7 @@ export interface PageContent {
 	videoUrl?: string;
 	embedUrl?: string;
 	duration?: string;
+	orientation?: 'portrait' | 'landscape';
 }
 
 export function parseContent(jsonStr: string): PageContent {

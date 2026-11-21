@@ -87,6 +87,11 @@ export const actions: Actions = {
 		const photoUrlRaw = String(formData.get('photoUrl') || '').trim();
 		const photoCaption = String(formData.get('photoCaption') || '').trim();
 
+		const videoFile = formData.get('videoFile');
+		const videoTitle = String(formData.get('videoTitle') || '').trim();
+		const videoCaption = String(formData.get('videoCaption') || '').trim();
+		const videoOrientation = String(formData.get('videoOrientation') || 'portrait').trim();
+
 		const parse = quickIssueSchema.safeParse({
 			city,
 			venue,
@@ -126,6 +131,15 @@ export const actions: Actions = {
 				});
 			}
 			resolvedPhotoUrl = urlCheck.data;
+		}
+
+		let resolvedVideoUrl = '';
+		if (videoFile instanceof File && videoFile.size > 0) {
+			const uploadRes = await uploadFormFile(videoFile, { kind: 'video' });
+			if (!uploadRes.ok) {
+				return fail(400, { error: uploadRes.error.message });
+			}
+			resolvedVideoUrl = uploadRes.value.url;
 		}
 
 		const secretKey = crypto.randomBytes(16).toString('hex');
@@ -199,6 +213,22 @@ export const actions: Actions = {
 					title: `${parse.data.city} Photo`,
 					imageUrl: resolvedPhotoUrl,
 					photos: [photo]
+				}),
+				createdAt: now
+			});
+		}
+
+		if (resolvedVideoUrl) {
+			await db.insert(schema.issuePages).values({
+				id: crypto.randomUUID(),
+				issueId,
+				position: nextPosition++,
+				kind: 'video',
+				contentJson: JSON.stringify({
+					title: videoTitle || `Live from ${parse.data.city}`,
+					body: videoCaption || undefined,
+					videoUrl: resolvedVideoUrl,
+					orientation: videoOrientation === 'landscape' ? 'landscape' : 'portrait'
 				}),
 				createdAt: now
 			});

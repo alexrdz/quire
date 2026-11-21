@@ -6,6 +6,7 @@
 	import QrCaseDisplay from '$lib/components/dashboard/QrCaseDisplay.svelte';
 	import { optimizeFileInputOnChange } from '$lib/utils/image-optimize';
 	import { MAX_PHOTO_CAPTION_LENGTH } from '$domain/photo-pile';
+	import VideoRecorder from '$lib/components/dashboard/VideoRecorder.svelte';
 
 	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
 
@@ -324,6 +325,43 @@
 								</Stack>
 							</Box>
 
+							<Box variant="subtle" padding="md" radius="md" class="video-optional-box">
+								<Stack gap="sm">
+									<span class="input-label">Optional Video Dispatch (Record from phone or upload clip)</span>
+									<VideoRecorder
+										name="videoFile"
+										orientationName="videoOrientation"
+										maxDurationSeconds={60}
+									/>
+									<Split ratio="1-1" gap="md" collapse="sm">
+										<Stack gap="xs">
+											<label for="videoTitle" class="subtext-small text-muted">
+												Video Headline (Optional)
+											</label>
+											<input
+												id="videoTitle"
+												type="text"
+												name="videoTitle"
+												placeholder="e.g. Live from Philly"
+												class="form-field-input"
+											/>
+										</Stack>
+										<Stack gap="xs">
+											<label for="videoCaption" class="subtext-small text-muted">
+												Video Note / Caption (Optional)
+											</label>
+											<input
+												id="videoCaption"
+												type="text"
+												name="videoCaption"
+												placeholder="e.g. Soundcheck warm-up riff"
+												class="form-field-input"
+											/>
+										</Stack>
+									</Split>
+								</Stack>
+							</Box>
+
 							<Cluster as="label" align="center" gap="xs" class="checkbox-label-wrap">
 								<input
 									type="checkbox"
@@ -483,7 +521,8 @@
 		border-color: var(--accent);
 	}
 
-	:global(.photo-optional-box) {
+	:global(.photo-optional-box),
+	:global(.video-optional-box) {
 		border-color: var(--glass-border);
 	}
 
