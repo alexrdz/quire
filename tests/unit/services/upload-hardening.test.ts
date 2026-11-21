@@ -260,4 +260,28 @@ describe('audio magic bytes', () => {
 		const result = await uploadMedia({ buffer: await tinyPng(), allowedKind: 'audio' });
 		expect(result.ok).toBe(false);
 	});
+
+	it('accepts a WebM video when video is allowed', async () => {
+		const result = await uploadMedia({ buffer: webm([1, 2]), allowedKind: 'video' });
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		uploadedKeys.push(result.value.key);
+		expect(result.value.key.endsWith('.webm')).toBe(true);
+	});
+
+	it('rejects an image when video is expected', async () => {
+		const result = await uploadMedia({ buffer: await tinyPng(), allowedKind: 'video' });
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error.code).toBe('UNSUPPORTED_MEDIA_TYPE');
+	});
+
+	it('rejects video exceeding 50MB limit', async () => {
+		const oversized = Buffer.alloc(51 * 1024 * 1024);
+		// Pretend webm header
+		const sample = webm([1, 2]);
+		sample.copy(oversized, 0);
+		const result = await uploadMedia({ buffer: oversized, allowedKind: 'video' });
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error.code).toBe('FILE_TOO_LARGE');
+	});
 });

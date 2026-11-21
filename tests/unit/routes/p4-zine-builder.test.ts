@@ -13,7 +13,7 @@ import * as __route2 from '../../../src/routes/(site)/dashboard/bookbinder/[id]/
 const { actions: bookbinderActions, load: bookbinderLoad } = withSessionModule(__route2);
 import * as __route3 from '../../../src/routes/(zine)/i/[slug]/+page.server';
 const { load: readerLoad } = withSessionModule(__route3);
-import { TINY_JPEG, TINY_MP3, TINY_PNG } from '../helpers/media';
+import { TINY_JPEG, TINY_MP3, TINY_PNG, tinyWebmVideo } from '../helpers/media';
 import { seedDatabase } from '$lib/server/seed';
 import { MAX_PHOTO_CAPTION_LENGTH, resolvePhotoEntries } from '$domain/photo-pile';
 import { photoEntriesSchema } from '$schemas/issue';
@@ -250,6 +250,45 @@ describe('P4 Quick Issue + Bookbinder + Reader', () => {
 		expect(result.data.error).toBe(`Photo captions are limited to ${MAX_PHOTO_CAPTION_LENGTH} characters`);
 		const issues = await db.query.issues.findMany({ where: eq(schema.issues.artistId, fixture.artistId) });
 		expect(issues).toHaveLength(0);
+	});
+
+	it('publishes a Quick Issue with a recorded video note, saving as a video page with orientation', async () => {
+		const fixture = await createTestArtistFixture('quick-video');
+		const formData = new FormData();
+		formData.set('city', 'Montreal');
+		formData.set('venue', 'Casa del Popolo');
+		formData.set('date', '2026-11-25');
+		formData.set('timezone', 'America/Toronto');
+		formData.set('saveMode', 'published');
+		formData.set('videoTitle', 'Montreal Soundcheck');
+		formData.set('videoCaption', 'Warmup riff before soundcheck');
+		formData.set('videoOrientation', 'portrait');
+
+		const videoBytes = tinyWebmVideo();
+		const videoFile = new File([Buffer.from(videoBytes)], 'live-note.webm', { type: 'video/webm' });
+		formData.set('videoFile', videoFile);
+
+		const reqUrl = new URL('http://localhost:4173/dashboard/issues/quick');
+		const result = (await (quickActions.default as any)({
+			request: buildPostRequest(reqUrl.toString(), fixture.cookie, formData),
+			url: reqUrl
+		})) as any;
+
+		expect(result.success).toBe(true);
+
+		const issue = await db.query.issues.findFirst({
+			where: eq(schema.issues.id, result.issueId),
+			with: { issuePages: { orderBy: [asc(schema.issuePages.position)] } }
+		});
+		expect(issue?.issuePages).toHaveLength(1);
+		expect(issue?.issuePages[0].kind).toBe('video');
+
+		const videoContent = JSON.parse(issue!.issuePages[0].contentJson);
+		expect(videoContent.videoUrl).toMatch(/^\/uploads\/.+\.webm$/);
+		trackUploadUrl(videoContent.videoUrl);
+		expect(videoContent.title).toBe('Montreal Soundcheck');
+		expect(videoContent.body).toBe('Warmup riff before soundcheck');
+		expect(videoContent.orientation).toBe('portrait');
 	});
 
 	it('Quick Issue saveMode=draft creates a draft and redirects to Bookbinder', async () => {
@@ -727,5 +766,33 @@ describe('Bookbinder photo pile pages', () => {
 		expect(badRes.status).toBe(400);
 
 		expect(await readPage(issueId)).toHaveLength(0);
+	});
+
+	it('adds and updates a video page with an uploaded video file in Bookbinder', async () => {
+		const { fixture, issueId, baseUrl } = await createPublishedIssue('video-add');
+		const addForm = new FormData();
+		addForm.set('kind', 'video');
+		addForm.set('title', 'Gig Clip');
+		addForm.set('videoOrientation', 'landscape');
+		const videoBytes = tinyWebmVideo();
+		addForm.set('videoFile', new File([Buffer.from(videoBytes)], 'clip.webm', { type: 'video/webm' }));
+
+		const res = (await (bookbinderActions.addPage as any)({
+			request: buildPostRequest(`${baseUrl}?/addPage`, fixture.cookie, addForm),
+			params: { id: issueId }
+		})) as any;
+		expect(res.success).toBe(true);
+
+		const pages = await db.query.issuePages.findMany({
+			where: eq(schema.issuePages.issueId, issueId),
+			orderBy: [asc(schema.issuePages.position)]
+		});
+		const videoPage = pages.find((p) => p.kind === 'video');
+		expect(videoPage).toBeDefined();
+		const content = JSON.parse(videoPage!.contentJson);
+		expect(content.videoUrl).toMatch(/^\/uploads\/.+\.webm$/);
+		trackUploadUrl(content.videoUrl);
+		expect(content.title).toBe('Gig Clip');
+		expect(content.orientation).toBe('landscape');
 	});
 });

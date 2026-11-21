@@ -5,6 +5,7 @@
 	import { optimizeFileInputFilesOnChange } from '$lib/utils/image-optimize';
 	import PhotoPileEditor from '$lib/components/dashboard/PhotoPileEditor.svelte';
 	import { MAX_PHOTOS_PER_PAGE, resolvePhotoEntries } from '$domain/photo-pile';
+	import VideoRecorder from '$lib/components/dashboard/VideoRecorder.svelte';
 
 	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
 
@@ -412,15 +413,24 @@
 									/>
 								</Stack>
 								<Stack gap="xs">
+									<span class="input-label-sm">Record Live Video Note</span>
+									<VideoRecorder
+										name="videoFile"
+										orientationName="videoOrientation"
+										existingVideoUrl={parsed.videoUrl || ''}
+										maxDurationSeconds={60}
+									/>
+								</Stack>
+								<Stack gap="xs">
 									<label for="video-url-{page.id}" class="input-label-sm">
-										Video / Embed URL (YouTube, Vimeo, or Bandcamp)
+										Or Video / Embed URL (YouTube, Vimeo, Bandcamp, or /uploads/...)
 									</label>
 									<input
 										id="video-url-{page.id}"
 										type="text"
 										name="videoUrl"
 										value={parsed.videoUrl || parsed.embedUrl || ''}
-										placeholder="https://www.youtube.com/watch?v=... or Bandcamp URL"
+										placeholder="https://www.youtube.com/watch?v=... or /uploads/..."
 										class="bookbinder-input"
 									/>
 								</Stack>
@@ -603,14 +613,22 @@
 							</Stack>
 						{:else if newKind === 'video'}
 							<Stack gap="xs" class="w-full">
+								<span class="input-label-sm">Record Live Video Note</span>
+								<VideoRecorder
+									name="videoFile"
+									orientationName="videoOrientation"
+									maxDurationSeconds={60}
+								/>
+							</Stack>
+							<Stack gap="xs" class="w-full">
 								<label for="new-video-url" class="input-label-sm">
-									Video / Embed URL (YouTube, Vimeo, or Bandcamp)
+									Or Video / Embed URL (YouTube, Vimeo, Bandcamp, or /uploads/...)
 								</label>
 								<input
 									id="new-video-url"
 									type="text"
 									name="videoUrl"
-									placeholder="https://www.youtube.com/watch?v=... or Bandcamp URL"
+									placeholder="https://www.youtube.com/watch?v=... or /uploads/..."
 									class="bookbinder-input"
 								/>
 							</Stack>

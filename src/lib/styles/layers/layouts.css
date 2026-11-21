@@ -502,6 +502,10 @@
 [data-frame~="ratio:21-9"],
 [data-frame~="ratio:21/9"] { --ratio: 21 / 9; }
 
+[data-frame~="ratio:9-16"],
+[data-frame~="ratio:9/16"],
+[data-frame~="ratio:reel"] { --ratio: 9 / 16; }
+
 /* --------------------------------------------------------------------------
    11. Reel Primitive ([data-reel])
    Horizontally scrolling sequence with optional snap
