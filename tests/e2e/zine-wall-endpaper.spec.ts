@@ -1,18 +1,22 @@
 import { test, expect, type Page } from '@playwright/test';
-import { clearCollectionFor, resetRateLimits } from './helpers/db';
+import { signInAsFan } from './helpers/actions';
+import { addRepliedWallNote, createFan, resetRateLimits } from './helpers/db';
 
 /**
  * Z-T06 (ADR 0009): the Wall's notes are taped-up scraps with ink "Was There"
  * stamps and marker replies, and the Endpaper is the back cover with an ink
  * Stamp. Posting, flagging, Save and Stamp still work in the new look.
+ *
+ * B1-T16: every test owns the state it checks, so the tests run in any order
+ * and in parallel, including --repeat-each copies of themselves. A test that
+ * stamps or saves signs in as a new Fan of its own; the Wall test reads a
+ * replied note it added itself, not the seeded one. Maya (the /demo Fan) only
+ * reads, and posts and flags a note of her own with a unique body.
  */
 
 const BROOKLYN = 'neon-velvet-brooklyn-2026-10-12';
 const PHILLY = 'neon-velvet-philly-2026-10-15';
-const FAN_EMAIL = 'maya@example.com';
 const SCAN = `/scan/${BROOKLYN}?k=kickoff_babys_secret_2026`;
-
-test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async ({ request }) => {
 	// The first request seeds the sample data on a fresh database.
@@ -20,10 +24,24 @@ test.beforeAll(async ({ request }) => {
 	await resetRateLimits();
 });
 
-async function signInAsFan(page: Page) {
+/** Unique per test and per copy, so parallel copies never find each other's notes. */
+const uniqueTag = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+async function blockRemotePhotos(page: Page) {
 	await page.route('https://images.unsplash.com/**', (route) => route.abort());
+}
+
+/** Maya, the sample Fan, through the /demo sign-in. */
+async function signInAsDemoFan(page: Page) {
+	await blockRemotePhotos(page);
 	await page.goto('/demo?role=fan&redirect=/me/stubs');
 	await expect(page).toHaveURL(/\/me\/stubs/);
+}
+
+/** A new Fan with no stamps or saves, signed in before the page has any cookies. */
+async function signInAsNewFan(page: Page, label: string) {
+	await blockRemotePhotos(page);
+	await signInAsFan(page, await createFan(label));
 }
 
 async function noHorizontalScroll(page: Page) {
@@ -32,21 +50,28 @@ async function noHorizontalScroll(page: Page) {
 }
 
 test('the Wall: taped-up notes with "Was There" stamps and marker replies; post and flag still work', async ({ page }) => {
-	await signInAsFan(page);
+	const tag = uniqueTag();
+	const replied = { body: `Front row at the kickoff ${tag}`, reply: `Thanks for singing along ${tag}` };
+	const { fanName } = await addRepliedWallNote(BROOKLYN, replied);
+
+	await signInAsDemoFan(page);
 	await page.goto(`/i/${BROOKLYN}`);
 	const wall = page.locator('#page-wall');
 	await wall.scrollIntoViewIfNeeded();
 
-	const notes = wall.locator('.wall-note');
-	expect(await notes.count()).toBeGreaterThan(0);
-	await expect(notes.first().locator('.tape')).toHaveCount(1);
-	await expect(wall.locator('.stamp', { hasText: 'Was There' }).first()).toBeVisible();
-	const reply = wall.locator('.wall-reply').first();
+	// The note this test added: taped up, stamped "Was There" (its Fan is stamped
+	// at this show), with the Artist's reply in marker stuck under it.
+	const item = wall.locator('.wall-note-item', { hasText: replied.body });
+	await expect(item.locator('.wall-note .note-author')).toHaveText(fanName);
+	await expect(item.locator('.wall-note .tape')).toHaveCount(1);
+	await expect(item.locator('.wall-note .stamp', { hasText: 'Was There' })).toBeVisible();
+	const reply = item.locator('.wall-reply');
 	await expect(reply).toContainText('(Artist)');
+	await expect(reply).toContainText(replied.reply);
 	await expect(reply.locator('.marker-face')).toHaveCSS('font-family', /Permanent Marker/);
 
 	// Post a note.
-	const body = `Taped to the wall ${Date.now().toString(36)}`;
+	const body = `Taped to the wall ${tag}`;
 	await wall.getByLabel('Your note to The Neon Velvet').fill(body);
 	await wall.getByRole('button', { name: 'Post Note →' }).click();
 	await expect(wall.getByRole('status')).toHaveText(/Your note is live on the Wall!|Note submitted for artist approval!/);
@@ -61,8 +86,7 @@ test('the Wall: taped-up notes with "Was There" stamps and marker replies; post 
 });
 
 test('the Endpaper: claim the Stamp after a scan, and it is pressed on as an ink stamp', async ({ page }) => {
-	await clearCollectionFor(FAN_EMAIL, BROOKLYN);
-	await signInAsFan(page);
+	await signInAsNewFan(page, 'Stamp Fan');
 	await page.goto(SCAN);
 	await expect(page).toHaveURL(new RegExp(BROOKLYN));
 
@@ -81,16 +105,20 @@ test('the Endpaper: claim the Stamp after a scan, and it is pressed on as an ink
 
 test('the ink Stamp does not move with reduced motion', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
-	await signInAsFan(page);
-	await page.goto(`/i/${BROOKLYN}`);
-	const stamp = page.locator('#page-endpaper .ink-stamp');
-	await expect(stamp).toBeAttached();
+	await signInAsNewFan(page, 'Still Stamp Fan');
+	await page.goto(SCAN);
+	await expect(page).toHaveURL(new RegExp(BROOKLYN));
+
+	const endpaper = page.locator('#page-endpaper');
+	await endpaper.scrollIntoViewIfNeeded();
+	await endpaper.getByRole('button', { name: 'Claim Attendance Stamp' }).click();
+	const stamp = endpaper.locator('.ink-stamp');
+	await expect(stamp).toContainText('OFFICIAL ATTENDANCE STAMPED');
 	expect(await stamp.evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
 });
 
 test('the Endpaper: Save without a scan shows the Saved stamp', async ({ page }) => {
-	await clearCollectionFor(FAN_EMAIL, PHILLY);
-	await signInAsFan(page);
+	await signInAsNewFan(page, 'Save Fan');
 	await page.goto(`/i/${PHILLY}`);
 	const endpaper = page.locator('#page-endpaper');
 	await endpaper.scrollIntoViewIfNeeded();
@@ -102,7 +130,7 @@ test('the Endpaper: Save without a scan shows the Saved stamp', async ({ page })
 test('at 320 px the Wall and the back cover fit, with 44 px controls', async ({ browser, baseURL }) => {
 	const context = await browser.newContext({ baseURL, viewport: { width: 320, height: 720 } });
 	const page = await context.newPage();
-	await signInAsFan(page);
+	await signInAsDemoFan(page);
 	await page.goto(`/i/${BROOKLYN}`);
 	for (const id of ['page-wall', 'page-endpaper']) {
 		await page.locator(`#${id}`).scrollIntoViewIfNeeded();

@@ -70,3 +70,15 @@ export async function signInWithPassword(page: Page, email: string, password: st
 	await page.locator('button.btn-band-submit').click();
 	await expect(page).toHaveURL(/\/dashboard/);
 }
+
+/**
+ * Signs a Fan made by `createFan` in through Better Auth's email endpoint, so the
+ * session cookie lands in the page's browser context. Fans have no password form
+ * (they sign in with Google), and this skips /login's per-address sign-in limit,
+ * which parallel copies of a spec would share. Call it before the page has any
+ * cookies: Better Auth only checks the Origin of requests that carry them.
+ */
+export async function signInAsFan(page: Page, fan: { email: string; password: string }): Promise<void> {
+	const response = await page.request.post('/api/auth/sign-in/email', { data: { email: fan.email, password: fan.password } });
+	expect(response.status(), await response.text()).toBe(200);
+}

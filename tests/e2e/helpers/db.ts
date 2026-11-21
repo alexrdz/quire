@@ -1,12 +1,15 @@
+/**
+ * Direct access to `local.db`, the test database that `pnpm preview`
+ * (NODE_ENV=test) serves from. The helpers reset rate-limit counters (every e2e
+ * request comes from the same address), add the Issues, pages, Fans and Wall
+ * notes specs need, and read back what the server stored.
+ */
+import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { createClient } from '@libsql/client';
+import { hashPassword } from 'better-auth/crypto';
 
-/**
- * Direct access to the local test database that `pnpm preview` (NODE_ENV=test)
- * serves from. Used to reset rate-limit counters (every e2e request comes from
- * the same address) and to add the Issue the CSP spec renders.
- */
 /**
  * The file database of a local Demo- or production-mode e2e server
  * (playwright.config.ts deletes and migrates it on every start).
@@ -179,24 +182,6 @@ export async function addLegacyQuickPhotoPage(issueId: string, page: { title: st
 }
 
 /**
- * Z-T06: removes a Fan's stamp or save for an Issue, so the Endpaper's Claim and
- * Save flows can be run on the seeded sample data. Waits for the server's writes.
- */
-export async function clearCollectionFor(email: string, issueSlug: string): Promise<void> {
-	const db = await waitingClient();
-	try {
-		await db.execute({
-			sql: `DELETE FROM collections
-			      WHERE fan_user_id = (SELECT id FROM users WHERE email = ?)
-			        AND issue_id = (SELECT id FROM issues WHERE slug = ?)`,
-			args: [email, issueSlug]
-		});
-	} finally {
-		db.close();
-	}
-}
-
-/**
  * A published Issue for the sample Artist with one page of every content kind
  * the zine reader styles (Z-T05), under its own slug so parallel specs never
  * share it: a setlist, a photo, a text scrap, a mock and a real audio track,
@@ -237,4 +222,87 @@ export async function seedZineContentIssue(slug: string): Promise<string> {
 	} finally {
 		db.close();
 	}
+}
+
+export interface E2eFan {
+	id: string;
+	name: string;
+	email: string;
+	password: string;
+}
+
+/**
+ * B1-T16: a new Fan with a password login and no stamps, saves or notes, so a
+ * test, and each --repeat-each copy of it, owns its Fan state instead of sharing
+ * Maya's with every other copy running in parallel.
+ */
+export async function createFan(label: string): Promise<E2eFan> {
+	const id = crypto.randomUUID();
+	const tag = id.slice(0, 8);
+	const fan = { id, name: `${label} ${tag}`, email: `e2e-fan-${tag}@example.com`, password: `e2e-fan-password-${tag}` };
+	const hash = await hashPassword(fan.password);
+	const now = Math.floor(Date.now() / 1000);
+	const db = await waitingClient();
+	try {
+		await db.batch(
+			[
+				{
+					sql: `INSERT INTO users (id, name, email, email_verified, account_type, created_at, updated_at)
+					      VALUES (?, ?, ?, 1, 'fan', ?, ?)`,
+					args: [fan.id, fan.name, fan.email, now, now]
+				},
+				{
+					sql: `INSERT INTO accounts (id, user_id, account_id, provider_id, password, created_at, updated_at)
+					      VALUES (?, ?, ?, 'credential', ?, ?, ?)`,
+					args: [crypto.randomUUID(), fan.id, fan.id, hash, now, now]
+				}
+			],
+			'write'
+		);
+	} finally {
+		db.close();
+	}
+	return fan;
+}
+
+/**
+ * B1-T16: a live note on an Issue's Wall from a new Fan who is stamped at that
+ * show, with the Artist's reply. The Wall test checks the note it made, so it
+ * never depends on the seeded note and reply still being live in a `local.db`
+ * that earlier runs and local development share.
+ */
+export async function addRepliedWallNote(
+	issueSlug: string,
+	note: { body: string; reply: string }
+): Promise<{ fanName: string }> {
+	const fan = await createFan('Wall Fan');
+	const noteId = crypto.randomUUID();
+	const now = Math.floor(Date.now() / 1000);
+	const db = await waitingClient();
+	try {
+		const issue = await db.execute({ sql: 'SELECT id, artist_id FROM issues WHERE slug = ?', args: [issueSlug] });
+		const row = issue.rows[0];
+		if (!row) throw new Error(`Issue ${issueSlug} missing: the server seeds it on first request.`);
+		await db.batch(
+			[
+				{
+					sql: `INSERT INTO collections (id, fan_user_id, issue_id, kind, created_at) VALUES (?, ?, ?, 'stamped', ?)`,
+					args: [crypto.randomUUID(), fan.id, row.id, now]
+				},
+				{
+					sql: `INSERT INTO notes (id, artist_id, issue_id, fan_user_id, body, status, flag_count, flag_immune, created_at)
+					      VALUES (?, ?, ?, ?, ?, 'live', 0, 0, ?)`,
+					args: [noteId, row.artist_id, row.id, fan.id, note.body, now]
+				},
+				{
+					sql: 'INSERT INTO note_replies (id, note_id, artist_id, body, created_at) VALUES (?, ?, ?, ?, ?)',
+					args: [crypto.randomUUID(), noteId, row.artist_id, note.reply, now]
+				}
+			],
+			'write'
+		);
+	} finally {
+		db.close();
+	}
+	return { fanName: fan.name };
 }
