@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Stack } from '$lib/components/layout';
+	import { Stack, Cluster } from '$lib/components/layout';
 	import Scrap from './Scrap.svelte';
 	import Tape from './Tape.svelte';
 	import ZinePageShell from './ZinePageShell.svelte';
@@ -16,29 +16,89 @@
 </script>
 
 <ZinePageShell {shell}>
-	<Stack gap="md">
-		<h2 class="bespoke-heading">
-			{content.title || (source === 'template' ? `About ${artistName}` : 'From the Road')}
-		</h2>
-		<!-- The words are on a paper scrap taped to the page, within the ADR 0009 tilt for text. -->
+	<Stack gap="md" class="tour-diary-container">
+		<header class="tour-diary-header">
+			<Cluster justify="between" align="center" gap="xs" class="diary-meta-bar">
+				<span class="diary-badge type-face">Tour Diary</span>
+				<span class="diary-byline type-face">By {artistName}</span>
+			</Cluster>
+			<h2 class="bespoke-heading diary-heading">
+				{content.title || (source === 'template' ? `About ${artistName}` : 'From the Road')}
+			</h2>
+		</header>
+
+		<!-- The words are on an archival paper scrap taped to the page, within the ADR 0009 tilt for text. -->
 		<Scrap position={shell.pageNumber} tone="light" class="text-scrap">
 			<Tape placement={shell.pageNumber % 2 === 0 ? 'top-left' : 'top-right'} position={shell.pageNumber} />
-			<p class="bespoke-body-text">
-				{content.body || 'Thank you for being here tonight with us in this room.'}
-			</p>
+			<div class="reading-measure">
+				<p class="bespoke-body-text diary-prose">
+					{content.body || 'Thank you for being here tonight with us in this room.'}
+				</p>
+			</div>
 		</Scrap>
 	</Stack>
 </ZinePageShell>
 
 <style>
-	:global(.text-scrap) {
-		max-inline-size: 34rem;
-		/* Inset so the corner tape lands on the page, clear of its edge gutter. */
-		margin-inline: var(--space-s);
+	:global(.tour-diary-container) {
+		inline-size: 100%;
+		max-inline-size: 65ch;
+		margin-inline: auto;
 	}
 
-	/* Dark ink on the light scrap; the Artist's body face is kept. */
+	.tour-diary-header {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2xs);
+	}
+
+	:global(.diary-meta-bar) {
+		inline-size: 100%;
+		padding-block-end: var(--space-3xs);
+		border-block-end: 1px solid rgba(255, 255, 255, 0.12);
+	}
+
+	.diary-badge {
+		font-size: var(--text-meta);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: var(--highlight);
+	}
+
+	.diary-byline {
+		font-size: var(--text-meta);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: #d4cfdc;
+	}
+
+	.diary-heading {
+		font-size: var(--text-heading);
+		font-weight: var(--weight-black);
+		line-height: 1.15;
+		color: var(--paper);
+		letter-spacing: var(--tracking-tight);
+	}
+
+	:global(.text-scrap) {
+		max-inline-size: 65ch;
+		inline-size: 100%;
+		/* Inset so the corner tape lands on the page, clear of its edge gutter. */
+		margin-inline: auto;
+		padding-block: var(--space-m);
+		padding-inline: var(--space-m);
+	}
+
+	.reading-measure {
+		max-inline-size: 65ch;
+	}
+
+	/* Dark ink on the light scrap; comfortable reading measure with editorial typography. */
 	:global(.text-scrap) p.bespoke-body-text {
 		color: var(--zine-scrap-light-ink);
+		font-size: var(--step-0);
+		line-height: 1.7;
+		white-space: pre-wrap;
+		overflow-wrap: break-word;
 	}
 </style>

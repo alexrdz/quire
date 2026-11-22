@@ -11,7 +11,9 @@
 	import {
 		contentPageShell,
 		endpaperShell,
+		getAllReaderPageIds,
 		parseContent,
+		stepPage,
 		wallShell,
 		type AuthAction,
 		type PageSource
@@ -83,7 +85,50 @@
 	function toggleAudio(id: string) {
 		playingAudioId = playingAudioId === id ? null : id;
 	}
+
+	function getActivePageId(): string {
+		if (typeof document === 'undefined') return 'page-cover';
+		const allIds = getAllReaderPageIds(contentPages.length);
+		let closestId = allIds[0] ?? 'page-cover';
+		let minDistance = Infinity;
+		for (const id of allIds) {
+			const el = document.getElementById(id);
+			if (el) {
+				const rect = el.getBoundingClientRect();
+				const dist = Math.abs(rect.left);
+				if (dist < minDistance) {
+					minDistance = dist;
+					closestId = id;
+				}
+			}
+		}
+		return closestId;
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (authDrawerOpen) return;
+		const target = e.target as HTMLElement | null;
+		if (
+			target &&
+			(target.tagName === 'INPUT' ||
+				target.tagName === 'TEXTAREA' ||
+				target.isContentEditable ||
+				target.closest('input, textarea, [contenteditable="true"]'))
+		) {
+			return;
+		}
+
+		if (e.key === 'ArrowRight') {
+			e.preventDefault();
+			stepPage(getActivePageId(), contentPages.length, 'next');
+		} else if (e.key === 'ArrowLeft') {
+			e.preventDefault();
+			stepPage(getActivePageId(), contentPages.length, 'prev');
+		}
+	}
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <svelte:head>
 	<title>{data.issue.city} @ {data.issue.venue} — {data.artist.displayName} | Quire</title>
@@ -167,6 +212,22 @@
 	</a>
 {/if}
 
+<!-- Interactive Story Edge Tap Zones (SPEC §5.2) -->
+{#if !authDrawerOpen}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<div
+		class="story-edge-tap story-edge-tap-prev"
+		role="presentation"
+		onclick={() => stepPage(getActivePageId(), contentPages.length, 'prev')}
+	></div>
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<div
+		class="story-edge-tap story-edge-tap-next"
+		role="presentation"
+		onclick={() => stepPage(getActivePageId(), contentPages.length, 'next')}
+	></div>
+{/if}
+
 {#if authDrawerOpen}
 	<AuthDrawer
 		pendingAction={pendingAuthAction}
@@ -184,9 +245,9 @@
 		text-decoration: none;
 		inset-block-end: var(--reader-tip-offset);
 		inset-inline-end: var(--reader-tip-offset);
-		min-block-size: var(--reader-tip-size);
-		min-inline-size: var(--reader-tip-size);
-		z-index: 50;
+		min-block-size: max(44px, var(--reader-tip-size));
+		min-inline-size: max(44px, var(--reader-tip-size));
+		z-index: 60;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -196,16 +257,57 @@
 		border-radius: 12px;
 		background: var(--support);
 		color: #ffffff;
-		border: 1px solid rgba(255, 42, 109, 0.5);
+		border: 1px solid rgba(255, 255, 255, 0.4);
 		font-size: var(--text-ui);
 		font-weight: var(--weight-heavy);
 		cursor: pointer;
-		box-shadow: 0 4px 20px rgba(255, 42, 109, 0.4);
+		box-shadow: 0 4px 20px rgba(255, 42, 109, 0.45), 0 0 12px rgba(255, 42, 109, 0.25);
 		transition: transform 0.15s ease, box-shadow 0.15s ease;
 	}
 
 	.btn-floating-tip:hover {
 		transform: translateY(-2px);
-		box-shadow: 0 8px 28px rgba(255, 42, 109, 0.65);
+		box-shadow: 0 8px 28px rgba(255, 42, 109, 0.7), 0 0 16px rgba(255, 42, 109, 0.4);
+	}
+
+	.btn-floating-tip:active {
+		transform: translateY(0);
+	}
+
+	/* Interactive edge tap zones (Instagram story gestures) */
+	.story-edge-tap {
+		position: fixed;
+		inset-block-start: 4.5rem;
+		inset-block-end: calc(var(--reader-tip-size) + var(--reader-tip-offset) + var(--space-m));
+		inline-size: var(--space-2xl);
+		min-inline-size: 44px;
+		max-inline-size: 20vw;
+		z-index: 30;
+		background: transparent;
+		border: none;
+		cursor: pointer;
+		padding-block: 0;
+		padding-inline: 0;
+		margin-block: 0;
+		margin-inline: 0;
+		opacity: 0;
+		transition: opacity 0.2s ease;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	@media (hover: hover) {
+		.story-edge-tap:hover {
+			opacity: 1;
+		}
+	}
+
+	.story-edge-tap-prev {
+		inset-inline-start: 0;
+		background: linear-gradient(to right, rgba(255, 255, 255, 0.04), transparent);
+	}
+
+	.story-edge-tap-next {
+		inset-inline-end: 0;
+		background: linear-gradient(to left, rgba(255, 255, 255, 0.04), transparent);
 	}
 </style>

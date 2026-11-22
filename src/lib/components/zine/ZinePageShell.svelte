@@ -35,10 +35,34 @@
 </script>
 
 {#snippet header()}
+	<div
+		class="story-progress-bar"
+		role="progressbar"
+		aria-label="Story progress"
+		aria-valuenow={shell.pageNumber}
+		aria-valuemin={1}
+		aria-valuemax={shell.pageCount}
+	>
+		{#each Array.from({ length: shell.pageCount }, (_, i) => i + 1) as pageNum}
+			<div
+				class="story-progress-segment{pageNum === shell.pageNumber
+					? ' is-active'
+					: pageNum < shell.pageNumber
+						? ' is-completed'
+						: ''}"
+			></div>
+		{/each}
+	</div>
 	<header class="cover-header">
 		<Cluster align="center" gap="xs">
 			{#each shell.chips as chip, i}
-				<TypeLabel position={i} tone={chip.tone ?? 'plain'}>{chip.label}</TypeLabel>
+				{#if i === 0}
+					<a href="#page-cover" class="header-chip-link" aria-label="Return to cover: {chip.label}">
+						<TypeLabel position={i} tone={chip.tone ?? 'plain'}>{chip.label}</TypeLabel>
+					</a>
+				{:else}
+					<TypeLabel position={i} tone={chip.tone ?? 'plain'}>{chip.label}</TypeLabel>
+				{/if}
 			{/each}
 		</Cluster>
 		<span class="text-muted type-face subtext-page">
@@ -147,6 +171,19 @@
 		color: var(--highlight);
 	}
 
+	.header-chip-link {
+		display: inline-flex;
+		align-items: center;
+		text-decoration: none;
+		color: inherit;
+		cursor: pointer;
+		transition: opacity 0.15s ease;
+	}
+
+	.header-chip-link:hover {
+		opacity: 0.85;
+	}
+
 	.btn-page-nav {
 		display: inline-flex;
 		align-items: center;
@@ -154,20 +191,23 @@
 		/* Page buttons are tap targets: at least 44 px (Z-T08). */
 		min-block-size: 44px;
 		min-inline-size: 44px;
-		padding-block: var(--space-2xs);
-		padding-inline: var(--space-xs);
+		block-size: 44px;
+		padding-block: 0;
+		padding-inline: var(--space-s);
 		border-radius: 6px;
-		background: rgba(255, 255, 255, 0.05);
-		color: #e4e4e7;
-		border: 1px solid rgba(255, 255, 255, 0.12);
+		background: rgba(255, 255, 255, 0.08);
+		color: #ffffff;
+		border: 1px solid rgba(255, 255, 255, 0.3);
 		font-size: var(--text-meta);
 		font-weight: var(--weight-semibold);
 		cursor: pointer;
-		transition: background-color 0.15s ease;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+		transition: background-color 0.15s ease, border-color 0.15s ease;
 	}
 
 	.btn-page-nav:hover {
-		background: rgba(255, 255, 255, 0.1);
+		background: rgba(255, 255, 255, 0.16);
+		border-color: rgba(255, 255, 255, 0.55);
 		color: #ffffff;
 	}
 
@@ -178,19 +218,23 @@
 		/* Page buttons are tap targets: at least 44 px (Z-T08). */
 		min-block-size: 44px;
 		min-inline-size: 44px;
-		padding-block: var(--space-2xs);
-		padding-inline: var(--space-s);
+		block-size: 44px;
+		padding-block: 0;
+		padding-inline: var(--space-m);
 		border-radius: 6px;
-		background: rgba(1, 255, 195, 0.14);
+		background: rgba(1, 255, 195, 0.16);
 		color: var(--highlight);
-		border: 1px solid rgba(1, 255, 195, 0.4);
+		border: 1px solid rgba(1, 255, 195, 0.7);
 		font-size: var(--text-meta);
 		font-weight: var(--weight-bold);
 		cursor: pointer;
-		transition: background-color 0.15s ease;
+		box-shadow: 0 0 10px rgba(1, 255, 195, 0.2), 0 1px 3px rgba(0, 0, 0, 0.5);
+		transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 	}
 
 	.btn-page-nav-primary:hover {
-		background: rgba(1, 255, 195, 0.24);
+		background: rgba(1, 255, 195, 0.28);
+		border-color: rgba(1, 255, 195, 0.95);
+		box-shadow: 0 0 16px rgba(1, 255, 195, 0.4);
 	}
 </style>

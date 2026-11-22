@@ -337,44 +337,61 @@
 		inset: 0;
 		padding-block: var(--space-xs) var(--space-2xs);
 		padding-inline: var(--space-xs);
-		background-color: var(--paper);
-		color: var(--ink);
+		background-color: #fbfaf7;
+		background-image: var(--zine-grain);
+		background-size: 160px 160px;
+		color: #17141d;
+		border: 1px solid rgba(0, 0, 0, 0.08);
 		border-radius: var(--radius-sm);
 		box-shadow:
-			0 1px 2px rgba(0, 0, 0, 0.35),
-			0 0.75rem 1.75rem rgba(0, 0, 0, 0.45);
+			0 1px 3px rgba(0, 0, 0, 0.25),
+			0 12px 28px -6px rgba(0, 0, 0, 0.6),
+			0 24px 44px -12px rgba(0, 0, 0, 0.4);
 		backface-visibility: hidden;
 		-webkit-backface-visibility: hidden;
 	}
 
+	/* Archival frosted glassine hinge tape */
 	.polaroid-body :global(.polaroid-front)::before {
 		content: '';
 		position: absolute;
-		inset-block-start: calc(var(--space-xs) * -0.6);
+		inset-block-start: calc(var(--space-xs) * -0.5);
 		inset-inline-start: 50%;
-		inline-size: 22%;
+		inline-size: 26%;
 		block-size: var(--space-s);
-		background-color: var(--accent);
-		opacity: 0.55;
-		transform: translateX(-50%) rotate(-3deg);
-		z-index: 1;
+		background: rgba(255, 255, 255, 0.35);
+		backdrop-filter: blur(2px);
+		-webkit-backdrop-filter: blur(2px);
+		border-block: 1px solid rgba(255, 255, 255, 0.4);
+		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+		transform: translateX(-50%) rotate(-2deg);
+		z-index: 10;
 	}
 
 	.polaroid-body :global(.polaroid-back) {
 		transform: rotateY(180deg);
 		justify-content: center;
 		padding-inline: var(--space-s);
-		background-image: repeating-linear-gradient(
-			to bottom,
-			transparent 0,
-			transparent calc(var(--space-m) - 1px),
-			rgba(9, 7, 16, 0.08) calc(var(--space-m) - 1px),
-			rgba(9, 7, 16, 0.08) var(--space-m)
-		);
+		background-color: #f7f6f2;
+		background-image:
+			var(--zine-grain),
+			repeating-linear-gradient(
+				to bottom,
+				transparent 0,
+				transparent calc(var(--space-m) - 1px),
+				rgba(23, 20, 29, 0.07) calc(var(--space-m) - 1px),
+				rgba(23, 20, 29, 0.07) var(--space-m)
+			);
+		background-size: 160px 160px, auto;
 	}
 
 	.polaroid-body :global(.polaroid-photo) {
-		background-color: var(--ink-surface);
+		background-color: #0b090e;
+		box-shadow:
+			inset 0 0 0 1px rgba(0, 0, 0, 0.15),
+			inset 0 1px 3px rgba(0, 0, 0, 0.2);
+		border-radius: var(--radius-2xs, 2px);
+		overflow: hidden;
 	}
 
 	.polaroid-strip {
@@ -383,11 +400,13 @@
 		font-size: var(--text-meta);
 		letter-spacing: var(--tracking-wide);
 		text-transform: uppercase;
-		color: var(--ink-muted);
+		color: #5e5768;
 	}
 
 	.polaroid-hint {
 		float: inline-end;
+		color: var(--accent);
+		font-weight: var(--weight-bold);
 	}
 
 	.polaroid-note {
@@ -396,6 +415,7 @@
 		font-size: var(--text-lead);
 		line-height: var(--leading-snug);
 		text-align: center;
+		color: #17141d;
 		overflow-wrap: anywhere;
 	}
 
@@ -417,20 +437,28 @@
 	}
 
 	.pile-btn {
+		min-inline-size: 2.75rem;
 		min-block-size: var(--control-size);
 		padding-inline: var(--space-s);
-		border: 1px solid var(--glass-border);
+		border: 1px solid rgba(255, 255, 255, 0.12);
 		border-radius: var(--radius-full);
-		background-color: var(--glass-surface);
-		color: var(--paper);
-		font: inherit;
+		background-color: rgba(18, 16, 22, 0.7);
+		backdrop-filter: blur(8px);
+		-webkit-backdrop-filter: blur(8px);
+		color: #f7f6f2;
+		font-family: var(--font-mono);
 		font-size: var(--text-ui);
 		font-weight: var(--weight-semibold);
+		letter-spacing: var(--tracking-normal);
 		cursor: pointer;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+		transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 	}
 
 	.pile-btn:hover:not(:disabled) {
-		border-color: var(--glass-border-hover);
+		border-color: var(--accent);
+		color: var(--accent);
+		transform: translateY(-1px);
 	}
 
 	.pile-btn:focus-visible {
@@ -439,13 +467,19 @@
 	}
 
 	.pile-btn:disabled {
-		opacity: 0.4;
+		opacity: 0.35;
 		cursor: default;
 	}
 
 	.pile-btn-primary {
 		border-color: var(--accent);
+		background-color: rgba(5, 217, 232, 0.14);
 		color: var(--accent);
+	}
+
+	.pile-btn-primary:hover:not(:disabled) {
+		background-color: var(--accent);
+		color: #090710;
 	}
 
 	@media (prefers-reduced-motion: reduce) {

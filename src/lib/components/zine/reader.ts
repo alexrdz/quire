@@ -131,6 +131,27 @@ export function scrollToPage(id: string): void {
 	el?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest', inline: 'start' });
 }
 
+/** Array of all page IDs in order from Cover to Endpaper. */
+export function getAllReaderPageIds(contentCount: number): string[] {
+	return [
+		'page-cover',
+		...Array.from({ length: contentCount }, (_, i) => contentPageId(i)),
+		'page-wall',
+		'page-endpaper'
+	];
+}
+
+/** Navigates to the adjacent page given current page ID. */
+export function stepPage(currentId: string, contentCount: number, direction: 'prev' | 'next'): void {
+	const all = getAllReaderPageIds(contentCount);
+	const idx = all.indexOf(currentId);
+	if (idx === -1) return;
+	const targetIdx = direction === 'next' ? Math.min(all.length - 1, idx + 1) : Math.max(0, idx - 1);
+	if (targetIdx !== idx) {
+		scrollToPage(all[targetIdx]!);
+	}
+}
+
 /* ---------------------------------------------------------------------------
    Cut-and-paste tilts (ADR 0009)
    --------------------------------------------------------------------------- */

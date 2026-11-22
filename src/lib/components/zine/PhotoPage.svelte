@@ -40,6 +40,9 @@
 <style>
 	:global(.photo-caption) {
 		max-inline-size: 30rem;
+		box-shadow:
+			0 1px 3px rgba(0, 0, 0, 0.25),
+			0 12px 28px -6px rgba(0, 0, 0, 0.6);
 	}
 
 	/* Typed on the slip: the typewriter face in dark ink. */

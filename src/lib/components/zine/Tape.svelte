@@ -20,16 +20,18 @@
 	.tape {
 		position: absolute;
 		z-index: 2;
-		inline-size: 4.75rem;
-		block-size: 1.35rem;
-		background-color: var(--zine-tape);
-		background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.18), transparent 60%);
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-		/* Torn ends. */
-		clip-path: polygon(
-			0% 8%, 4% 0%, 8% 10%, 12% 2%, 88% 3%, 92% 11%, 96% 1%, 100% 9%,
-			100% 92%, 96% 100%, 92% 89%, 88% 98%, 12% 97%, 8% 88%, 4% 100%, 0% 90%
-		);
+		inline-size: 4.5rem;
+		block-size: 1.25rem;
+		background-color: rgba(240, 235, 215, 0.48);
+		background-image:
+			linear-gradient(to bottom, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.05) 50%, rgba(0, 0, 0, 0.08)),
+			repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(0, 0, 0, 0.03) 3px, rgba(0, 0, 0, 0.03) 6px);
+		border-radius: 2px;
+		box-shadow:
+			0 1px 3px rgba(0, 0, 0, 0.35),
+			inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+		backdrop-filter: blur(1.5px);
+		-webkit-backdrop-filter: blur(1.5px);
 		pointer-events: none;
 	}
 

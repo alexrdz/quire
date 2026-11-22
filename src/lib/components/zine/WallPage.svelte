@@ -47,23 +47,26 @@
 </script>
 
 <!--
-	The Wall (ADR 0009): Fan notes are dark paper scraps taped up at a small,
-	deterministic tilt; the Artist's reply is a cream slip in the marker face
-	stuck under its note; "Was There" is an ink stamp. The composer is taped
-	down and never tilted, and every control is at least 44 px.
+	The Wall: VIP Backstage Greenroom Board
+	Fan notes are archival dark paper cards taped up with avatar badges and authentic 'Was There' ink stamps.
+	Verified artist replies feature distinct accent borders and authentic marker writing.
+	Every control meets the >= 44px touch target requirement.
 -->
 <ZinePageShell {shell} variant="wall">
 	<Stack gap="2xs" class="wall-head">
-		<h2 class="wall-heading marker-face">Digital Guestbook</h2>
+		<Cluster justify="between" align="center" gap="xs">
+			<h2 class="wall-heading marker-face">Greenroom Board</h2>
+			<span class="wall-badge type-face">VIP Access</span>
+		</Cluster>
 		<p class="wall-subtext type-face">
 			Leave your mark from tonight’s show. Public notes only—no links, emails, or phone numbers.
 		</p>
 	</Stack>
 
-	<!-- Note composer: taped down, never tilted. -->
+	<!-- Note composer: taped down flat, never tilted. -->
 	<div class="wall-composer">
 		<Tape placement="top" position={3} />
-		<Stack gap="sm" class="wall-composer-paper">
+		<div class="wall-composer-paper">
 			{#if isReadOnly}
 				<p class="wall-composer-note">
 					{isArtistClosed
@@ -111,21 +114,23 @@
 					</Cluster>
 				</form>
 			{:else}
-				<label for="wall-note-draft" class="visually-hidden">Your note to {artistName}</label>
-				<textarea
-					id="wall-note-draft"
-					bind:value={noteBody}
-					placeholder="Type your note to the band first..."
-					rows="2"
-					maxlength="250"
-					class="wall-textarea"
-				></textarea>
-				<Cluster justify="between" align="center" gap="xs">
-					<span class="char-count type-face">{250 - noteBody.length} chars left</span>
-					<button type="button" class="btn-wall-post" onclick={onSignInToPost}>
-						Sign in with Google to Post →
-					</button>
-				</Cluster>
+				<div data-stack="gap:sm">
+					<label for="wall-note-draft" class="visually-hidden">Your note to {artistName}</label>
+					<textarea
+						id="wall-note-draft"
+						bind:value={noteBody}
+						placeholder="Type your note to the band first..."
+						rows="2"
+						maxlength="250"
+						class="wall-textarea"
+					></textarea>
+					<Cluster justify="between" align="center" gap="xs">
+						<span class="char-count type-face">{250 - noteBody.length} chars left</span>
+						<button type="button" class="btn-wall-post" onclick={onSignInToPost}>
+							Sign in with Google to Post →
+						</button>
+					</Cluster>
+				</div>
 			{/if}
 
 			{#if wallMessage || formError}
@@ -133,10 +138,10 @@
 					{wallMessage || formError}
 				</p>
 			{/if}
-		</Stack>
+		</div>
 	</div>
 
-	<!-- The notes, taped up. -->
+	<!-- The notes board -->
 	<div class="wall-notes-scroll">
 		{#if notes.length === 0}
 			<Scrap position={0} tone="light" class="wall-empty">
@@ -152,6 +157,9 @@
 							<Stack gap="xs">
 								<Cluster justify="between" align="center" gap="xs">
 									<Cluster align="center" gap="xs">
+										<span class="note-avatar-badge type-face" aria-hidden="true">
+											{(note.author?.name || 'F').charAt(0).toUpperCase()}
+										</span>
 										<span class="note-author type-face">{note.author?.name || 'Fan'}</span>
 										{#if note.wasThere}
 											<Stamp label="Was There" tone="highlight" position={i} />
@@ -177,10 +185,18 @@
 						</Scrap>
 
 						{#if note.replies && note.replies.length > 0}
-							<!-- The Artist's reply: a marker note stuck under the Fan's note. -->
+							<!-- The Artist's reply: authentic marker writing with verified accent border -->
 							<Scrap position={i + 31} tone="light" class="wall-reply">
 								<Stack gap="3xs">
-									<span class="reply-author-label type-face">{artistName} (Artist)</span>
+									<Cluster align="center" gap="2xs">
+										<span class="verified-icon" aria-hidden="true">
+											<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+												<path d="M8 0l2 2 2.8-.5.9 2.7 2.7.9-.5 2.8 2 2-2 2 .5 2.8-2.7.9-.9 2.7-2.8-.5-2 2-2-2-2.8.5-.9-2.7-2.7-.9.5-2.8-2-2 2-2-.5-2.8 2.7-.9.9-2.7 2.8.5zM6.5 11l5-5-1.1-1.1-3.9 3.9-1.8-1.8-1.1 1.1z"/>
+											</svg>
+										</span>
+										<span class="reply-author-label type-face">{artistName} (Artist)</span>
+										<span class="verified-pill type-face">Verified</span>
+									</Cluster>
 									<p class="reply-content-text marker-face">{note.replies[0].body}</p>
 								</Stack>
 							</Scrap>
@@ -200,29 +216,48 @@
 		color: var(--paper);
 	}
 
+	.wall-badge {
+		font-size: var(--text-meta);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: var(--highlight);
+		border: 1px solid rgba(1, 255, 195, 0.4);
+		border-radius: 2px;
+		padding-block: var(--space-4xs);
+		padding-inline: var(--space-3xs);
+		background: rgba(1, 255, 195, 0.08);
+	}
+
 	.wall-subtext {
 		font-size: var(--text-small);
 		line-height: var(--leading-body);
 		color: #d4cfdc;
 	}
 
-	/* The composer: a sheet of dark paper taped flat to the page. */
+	/* The composer: backstage clipboard card taped flat to the wall. */
 	.wall-composer {
 		position: relative;
 		margin-block-start: var(--space-xs);
 	}
 
-	:global(.wall-composer-paper) {
+	.wall-composer-paper {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-sm);
 		padding-block: var(--space-m) var(--space-s);
 		padding-inline: var(--space-s);
 		background-color: var(--zine-scrap-dark);
-		background-image: var(--zine-grain);
-		background-size: 160px 160px;
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		border-radius: 2px 3px 2px 4px;
+		background-image:
+			var(--zine-grain),
+			radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.05), transparent 75%),
+			linear-gradient(to bottom, rgba(255, 255, 255, 0.03), transparent 50%);
+		background-size: 160px 160px, auto, auto;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		border-radius: 3px;
 		box-shadow:
-			0 1px 1px rgba(0, 0, 0, 0.4),
-			0 10px 22px -8px rgba(0, 0, 0, 0.7);
+			0 1px 2px rgba(0, 0, 0, 0.4),
+			0 12px 28px -6px rgba(0, 0, 0, 0.75),
+			inset 0 1px 0 rgba(255, 255, 255, 0.1);
 	}
 
 	.wall-composer-note {
@@ -233,9 +268,9 @@
 
 	.wall-textarea {
 		inline-size: 100%;
-		min-block-size: 44px;
-		background: rgba(0, 0, 0, 0.45);
-		border: 1px solid rgba(255, 255, 255, 0.22);
+		min-block-size: 48px;
+		background: rgba(9, 7, 16, 0.6);
+		border: 1px solid rgba(255, 255, 255, 0.2);
 		border-radius: 2px;
 		color: var(--paper);
 		padding-block: var(--space-xs);
@@ -243,6 +278,7 @@
 		font-family: inherit;
 		font-size: var(--text-body);
 		resize: none;
+		transition: border-color 0.15s ease, box-shadow 0.15s ease;
 	}
 
 	.wall-textarea::placeholder {
@@ -251,7 +287,9 @@
 
 	.wall-textarea:focus-visible {
 		outline: 2px solid var(--highlight);
-		outline-offset: 2px;
+		outline-offset: 1px;
+		border-color: var(--highlight);
+		box-shadow: 0 0 12px rgba(1, 255, 195, 0.2);
 	}
 
 	.char-count {
@@ -264,7 +302,7 @@
 		color: var(--highlight);
 	}
 
-	/* The notes scroll inside the page; padding leaves room for tape and tilt. */
+	/* The notes scroll inside the greenroom board */
 	.wall-notes-scroll {
 		flex: 1;
 		overflow-y: auto;
@@ -284,9 +322,26 @@
 		display: flow-root;
 	}
 
+	.note-avatar-badge {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		inline-size: 1.5rem;
+		block-size: 1.5rem;
+		border-radius: 50%;
+		background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.04));
+		border: 1px solid rgba(255, 255, 255, 0.22);
+		color: var(--highlight);
+		font-size: var(--text-meta);
+		font-weight: var(--weight-bold);
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+		flex-shrink: 0;
+	}
+
 	.note-author {
 		font-size: var(--text-small);
 		color: var(--paper);
+		font-weight: var(--weight-semibold);
 	}
 
 	.note-content-text {
@@ -296,18 +351,45 @@
 		overflow-wrap: anywhere;
 	}
 
-	/* Stuck under the note, overlapping only the note's bottom edge. */
+	/* Verified artist reply: sleek accent border with ambient glow */
 	:global(.wall-reply) {
 		margin-block-start: calc(-1 * var(--space-3xs));
-		margin-inline-start: var(--space-l);
+		margin-inline-start: var(--space-m);
 		padding-block: var(--space-xs);
+		padding-inline: var(--space-s);
+		border-inline-start: 3px solid var(--accent);
+		box-shadow:
+			0 1px 3px rgba(0, 0, 0, 0.25),
+			-3px 0 12px rgba(5, 217, 232, 0.3);
+	}
+
+	.verified-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--accent);
+		inline-size: 12px;
+		block-size: 12px;
+	}
+
+	.verified-pill {
+		font-size: var(--text-meta);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: var(--accent);
+		background: rgba(5, 217, 232, 0.12);
+		border: 1px solid rgba(5, 217, 232, 0.3);
+		border-radius: 2px;
+		padding-block: var(--space-4xs);
+		padding-inline: var(--space-3xs);
 	}
 
 	.reply-author-label {
 		font-size: var(--text-meta);
 		text-transform: uppercase;
 		letter-spacing: var(--tracking-label);
-		color: #4a4356;
+		color: #3b3545;
+		font-weight: var(--weight-bold);
 	}
 
 	.reply-content-text {
@@ -327,6 +409,7 @@
 		align-items: center;
 		justify-content: center;
 		min-block-size: 44px;
+		min-inline-size: 44px;
 		padding-block: var(--space-2xs);
 		padding-inline: var(--space-s);
 		border-radius: 2px;

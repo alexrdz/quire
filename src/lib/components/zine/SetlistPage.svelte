@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Stack } from '$lib/components/layout';
+	import { Stack, Cluster } from '$lib/components/layout';
 	import Tape from './Tape.svelte';
 	import ZinePageShell from './ZinePageShell.svelte';
 	import { zineTilt, type PageContent, type PageShell } from './reader';
@@ -23,10 +23,16 @@
 		<h2 class="bespoke-heading">{content.title || "Tonight's Setlist"}</h2>
 	</Stack>
 
-	<!-- A typewritten sheet with a torn bottom edge, taped to the page. -->
+	<!-- An authentic laminated backstage setlist sheet, taped to the page. -->
 	<div class="setlist-sheet" style="--sheet-tilt: {tilt}deg;">
 		<Tape placement="top" position={shell.pageNumber} />
 		<div class="setlist-paper">
+			<div class="setlist-laminate-header">
+				<Cluster justify="between" align="center">
+					<span class="setlist-badge font-mono">BACKSTAGE SETLIST</span>
+					<span class="setlist-order-tag font-mono">OFFICIAL RUN</span>
+				</Cluster>
+			</div>
 			<ol class="setlist-songs type-face">
 				{#each songs as song, sIdx}
 					<li class="song-row" class:is-last={sIdx === songs.length - 1}>
@@ -45,46 +51,54 @@
 		position: relative;
 		inline-size: 100%;
 		max-inline-size: 30rem;
+		margin-inline: auto;
 		transform: rotate(var(--sheet-tilt, 0deg));
-		/* The shadow follows the torn edge (a box-shadow would be clipped with it). */
-		filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45)) drop-shadow(0 12px 16px rgba(0, 0, 0, 0.55));
+	}
+
+	.setlist-sheet :global(.tape) {
+		background: rgba(255, 255, 255, 0.22);
+		backdrop-filter: blur(8px);
+		-webkit-backdrop-filter: blur(8px);
+		border: 1px solid rgba(255, 255, 255, 0.35);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 	}
 
 	.setlist-paper {
+		position: relative;
 		padding-block: var(--space-m) var(--space-l);
-		padding-inline: var(--space-s);
-		background-color: var(--zine-scrap-light);
-		background-image: var(--zine-mottle);
-		background-size: 420px 420px;
-		color: var(--zine-scrap-light-ink);
-		/* Torn off the pad at the bottom. */
-		clip-path: polygon(
-			0% 0%,
-			100% 0%,
-			100.00% 100%,
-			95.45% calc(100% - 7px),
-			90.91% 100%,
-			86.36% calc(100% - 6px),
-			81.82% 100%,
-			77.27% calc(100% - 8px),
-			72.73% 100%,
-			68.18% calc(100% - 5px),
-			63.64% 100%,
-			59.09% calc(100% - 5px),
-			54.55% 100%,
-			50.00% calc(100% - 5px),
-			45.45% 100%,
-			40.91% calc(100% - 7px),
-			36.36% 100%,
-			31.82% calc(100% - 5px),
-			27.27% 100%,
-			22.73% calc(100% - 6px),
-			18.18% 100%,
-			13.64% calc(100% - 5px),
-			9.09% 100%,
-			4.55% calc(100% - 5px),
-			0.00% 100%
-		);
+		padding-inline: var(--space-m);
+		background-color: var(--zine-scrap-dark);
+		background-image: var(--zine-grain);
+		background-size: 160px 160px;
+		color: #ffffff;
+		border: 1px solid rgba(255, 255, 255, 0.16);
+		border-radius: 6px;
+		box-shadow:
+			0 4px 20px rgba(0, 0, 0, 0.7),
+			0 0 0 4px rgba(255, 255, 255, 0.04),
+			inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+	}
+
+	.setlist-laminate-header {
+		padding-block-end: var(--space-s);
+		margin-block-end: var(--space-xs);
+		border-block-end: 1px solid rgba(255, 255, 255, 0.1);
+	}
+
+	.setlist-badge {
+		font-size: var(--text-meta);
+		font-weight: var(--weight-bold);
+		letter-spacing: var(--tracking-wide);
+		color: var(--highlight);
+		text-transform: uppercase;
+	}
+
+	.setlist-order-tag {
+		font-size: var(--text-meta);
+		font-weight: var(--weight-bold);
+		letter-spacing: var(--tracking-wide);
+		color: #cbd5e1;
+		text-transform: uppercase;
 	}
 
 	.setlist-songs {
@@ -92,34 +106,50 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2xs);
+		margin: 0;
+		padding: 0;
 	}
 
 	.song-row {
 		display: flex;
 		align-items: baseline;
-		gap: var(--space-xs);
+		gap: var(--space-s);
+		padding-block: var(--space-2xs);
+		border-block-end: 1px solid rgba(255, 255, 255, 0.06);
 		font-size: var(--text-body);
-		line-height: 1.5;
+		line-height: var(--leading-body);
+	}
+
+	.song-row:last-child {
+		border-block-end: none;
 	}
 
 	.song-num {
 		flex-shrink: 0;
 		font-size: var(--text-small);
-		color: #5b5466;
+		color: #cbd5e1;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.song-title {
 		position: relative;
 		min-inline-size: 0;
 		overflow-wrap: anywhere;
+		color: #ffffff;
 	}
 
 	.song-tag {
 		flex-shrink: 0;
 		margin-inline-start: auto;
 		font-size: var(--text-meta);
+		font-weight: var(--weight-bold);
 		letter-spacing: var(--tracking-label);
-		color: #5b5466;
+		padding-block: var(--space-4xs);
+		padding-inline: var(--space-3xs);
+		border-radius: 4px;
+		background: rgba(1, 255, 195, 0.12);
+		border: 1px solid rgba(1, 255, 195, 0.35);
+		color: var(--highlight);
 	}
 
 	/* The last song (the encore) is underlined in marker, by hand. */
@@ -130,6 +160,7 @@
 		inset-block-end: -0.2em;
 		block-size: 0.55em;
 		border-block-end: 3px solid var(--support);
+		border-bottom-style: solid;
 		border-radius: 0 0 60% 40% / 0 0 100% 70%;
 		transform: rotate(-1.5deg);
 		pointer-events: none;

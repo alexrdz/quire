@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { Stack, Cluster } from '$lib/components/layout';
+	import { Cluster } from '$lib/components/layout';
 	import Stamp from './Stamp.svelte';
 	import Tape from './Tape.svelte';
 	import TypeLabel from './TypeLabel.svelte';
@@ -25,40 +25,86 @@
 </script>
 
 <!--
-	The Endpaper is the zine's back cover (ADR 0009): a sheet of dark paper taped
-	on flat, with the Issue's details typed on it. Save and Stamp are plain,
-	clear buttons. A claimed Stamp is an ink stamp pressed onto the cover (a
-	short press, or no motion at all with reduced motion).
+	The Endpaper: Authentic Minted Concert Ticket Stub
+	Featuring perforated border detailing, authentic minted barcode, serial verification,
+	and an ink-pressed official attendance stamp. Compact layout fits within 844px at 320px width.
 -->
 <ZinePageShell {shell} variant="endpaper">
-	<div class="back-cover">
+	<div class="ticket-stub-wrapper">
 		<Tape placement="top-left" position={5} />
 		<Tape placement="top-right" position={6} />
 
-		<Stack as="article" gap="md" class="back-cover-paper" aria-label="Back cover">
-			<Cluster justify="between" align="center" gap="xs">
+		<article class="ticket-stub" aria-label="Concert ticket stub">
+			<!-- Ticket Header Bar -->
+			<div class="ticket-top-bar">
 				<TypeLabel position={0} tone="highlight">{issue.date}</TypeLabel>
+				<span class="ticket-tier-badge type-face">Admit One · Live Attendance</span>
+			</div>
+
+			<!-- Main Ticket Info -->
+			<div class="ticket-main">
+				<span class="type-face ticket-artist-label">{artistName}</span>
+				<h2 class="ticket-city-heading">{issue.city}</h2>
+				<p class="type-face ticket-venue-desc">{issue.venue}</p>
+			</div>
+
+			<!-- Perforated Tear Line -->
+			<div class="ticket-perforation" aria-hidden="true">
+				<hr class="back-cover-rule" />
+			</div>
+
+			<!-- Barcode and Serial Section -->
+			<div class="ticket-barcode-section">
+				<div class="ticket-barcode-svg-wrap" aria-hidden="true">
+					<svg class="ticket-barcode-svg" viewBox="0 0 160 22" fill="currentColor">
+						<rect x="0" y="0" width="3" height="22" />
+						<rect x="5" y="0" width="1" height="22" />
+						<rect x="8" y="0" width="4" height="22" />
+						<rect x="14" y="0" width="2" height="22" />
+						<rect x="18" y="0" width="5" height="22" />
+						<rect x="25" y="0" width="1" height="22" />
+						<rect x="28" y="0" width="3" height="22" />
+						<rect x="33" y="0" width="6" height="22" />
+						<rect x="41" y="0" width="2" height="22" />
+						<rect x="45" y="0" width="4" height="22" />
+						<rect x="51" y="0" width="1" height="22" />
+						<rect x="54" y="0" width="5" height="22" />
+						<rect x="61" y="0" width="3" height="22" />
+						<rect x="66" y="0" width="1" height="22" />
+						<rect x="69" y="0" width="4" height="22" />
+						<rect x="75" y="0" width="2" height="22" />
+						<rect x="79" y="0" width="6" height="22" />
+						<rect x="87" y="0" width="3" height="22" />
+						<rect x="92" y="0" width="1" height="22" />
+						<rect x="95" y="0" width="5" height="22" />
+						<rect x="102" y="0" width="2" height="22" />
+						<rect x="106" y="0" width="4" height="22" />
+						<rect x="112" y="0" width="1" height="22" />
+						<rect x="115" y="0" width="3" height="22" />
+						<rect x="120" y="0" width="6" height="22" />
+						<rect x="128" y="0" width="2" height="22" />
+						<rect x="132" y="0" width="4" height="22" />
+						<rect x="138" y="0" width="1" height="22" />
+						<rect x="141" y="0" width="5" height="22" />
+						<rect x="148" y="0" width="2" height="22" />
+						<rect x="152" y="0" width="3" height="22" />
+						<rect x="157" y="0" width="3" height="22" />
+					</svg>
+				</div>
 				<span class="type-face back-cover-serial">#{issue.slug.slice(0, 14).toUpperCase()}</span>
-			</Cluster>
+			</div>
 
-			<Stack gap="2xs">
-				<span class="type-face back-cover-artist">{artistName}</span>
-				<h2 class="back-cover-city">{issue.city}</h2>
-				<p class="type-face back-cover-venue">{issue.venue}</p>
-			</Stack>
-
-			<hr class="back-cover-rule" />
-
+			<!-- Stamp or Claim Action -->
 			{#if stamped}
-				<Stack gap="sm" align="start">
-					<Stack gap="3xs" align="center" class="ink-stamp type-face">
+				<div class="stamp-action-block">
+					<div class="ink-stamp type-face">
 						<span class="ink-stamp-title">OFFICIAL ATTENDANCE STAMPED</span>
 						<span class="ink-stamp-meta">{issue.city} · {issue.date}</span>
-					</Stack>
+					</div>
 					<a href="/me/stubs" class="btn-back-cover">View My Stubs →</a>
-				</Stack>
+				</div>
 			{:else if isScanVerified}
-				<Stack gap="sm">
+				<div class="ticket-action-box">
 					<p class="back-cover-note">
 						<span class="type-face back-cover-verified">Venue QR scan verified.</span>
 						Claim your permanent attendance stub:
@@ -73,9 +119,9 @@
 							Sign in with Google to Claim Stamp
 						</button>
 					{/if}
-				</Stack>
+				</div>
 			{:else}
-				<Stack gap="sm">
+				<div class="ticket-action-box">
 					<p class="back-cover-note">
 						Browsing remotely. Physical venue QR scan during the 48-hour Stamp Window is required to stamp attendance, or bookmark this issue to your reading list:
 					</p>
@@ -95,14 +141,14 @@
 							+ Sign in with Google to Save Issue
 						</button>
 					{/if}
-				</Stack>
+				</div>
 			{/if}
 
 			<p class="type-face back-cover-colophon">Made by {artistName} after the show. Printed on Quire.</p>
-		</Stack>
+		</article>
 	</div>
 
-	<Cluster justify="center" gap="sm">
+	<Cluster justify="center" gap="xs" class="endpaper-links-row">
 		<a href="/a/{artistSlug}" class="btn-endpaper-link">
 			{artistName} Hub ↗
 		</a>
@@ -113,59 +159,120 @@
 </ZinePageShell>
 
 <style>
-	/* The back cover: dark paper, taped on flat so its buttons stay square. */
-	/* The margin keeps the corner tape clear of the page's typed labels. */
-	.back-cover {
+	/* The back cover: authentic minted concert ticket stub */
+	.ticket-stub-wrapper {
 		position: relative;
-		margin-block-start: var(--space-l);
+		margin-block-start: 0;
 	}
 
-	:global(.back-cover-paper) {
-		padding-block: var(--space-m);
-		padding-inline: var(--space-m);
+	.ticket-stub {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3xs);
+		padding-block: var(--space-xs);
+		padding-inline: var(--space-s);
 		background-color: var(--zine-scrap-dark);
-		background-image: var(--zine-grain);
-		background-size: 160px 160px;
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		border-radius: 2px 3px 2px 4px;
+		background-image:
+			var(--zine-grain),
+			radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.06), transparent 75%),
+			linear-gradient(to bottom, rgba(255, 255, 255, 0.03), transparent 50%);
+		background-size: 160px 160px, auto, auto;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		border-radius: 4px;
 		box-shadow:
-			0 1px 1px rgba(0, 0, 0, 0.4),
-			0 14px 30px -10px rgba(0, 0, 0, 0.75);
+			0 1px 2px rgba(0, 0, 0, 0.4),
+			0 14px 32px -8px rgba(0, 0, 0, 0.8),
+			inset 0 1px 0 rgba(255, 255, 255, 0.1);
+	}
+
+	.ticket-top-bar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-xs);
+		flex-wrap: wrap;
+	}
+
+	.ticket-tier-badge {
+		font-size: var(--text-meta);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: var(--highlight);
+	}
+
+	.ticket-main {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4xs);
+	}
+
+	.ticket-artist-label {
+		font-size: var(--text-small);
+		text-transform: uppercase;
+		letter-spacing: var(--tracking-label);
+		color: var(--accent);
+		font-weight: var(--weight-bold);
+	}
+
+	.ticket-city-heading {
+		font-size: var(--text-heading);
+		font-weight: var(--weight-black);
+		text-transform: uppercase;
+		letter-spacing: var(--tracking-tight);
+		line-height: 1.1;
+		color: var(--paper);
+		overflow-wrap: anywhere;
+	}
+
+	.ticket-venue-desc {
+		font-size: var(--text-small);
+		color: #d4cfdc;
+	}
+
+	/* Perforated tear line with notch styling */
+	.ticket-perforation {
+		position: relative;
+		margin-block: var(--space-4xs);
+	}
+
+	.back-cover-rule {
+		border: 0;
+		border-block-start: 2px dashed rgba(244, 244, 240, 0.28);
+		margin: 0;
+	}
+
+	/* Barcode and serial number */
+	.ticket-barcode-section {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-sm);
+		padding-block: var(--space-4xs);
+	}
+
+	.ticket-barcode-svg-wrap {
+		inline-size: 6rem;
+		block-size: 1.1rem;
+		color: #c9c3d4;
+	}
+
+	.ticket-barcode-svg {
+		inline-size: 100%;
+		block-size: 100%;
+		display: block;
 	}
 
 	.back-cover-serial {
 		font-size: var(--text-meta);
 		color: #c9c3d4;
-		overflow-wrap: anywhere;
-	}
-
-	.back-cover-artist {
-		font-size: var(--text-small);
-		text-transform: uppercase;
 		letter-spacing: var(--tracking-label);
-		color: var(--accent);
-	}
-
-	.back-cover-city {
-		font-size: var(--text-title);
-		font-weight: var(--weight-black);
-		text-transform: uppercase;
-		letter-spacing: var(--tracking-tight);
-		line-height: 1;
-		color: var(--paper);
 		overflow-wrap: anywhere;
 	}
 
-	.back-cover-venue {
-		font-size: var(--text-body);
-		color: #d4cfdc;
-	}
-
-	/* A cut line across the cover. */
-	.back-cover-rule {
-		border: 0;
-		border-block-start: 2px dashed rgba(244, 244, 240, 0.28);
-		margin: 0;
+	.ticket-action-box {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2xs);
 	}
 
 	.back-cover-note {
@@ -176,6 +283,7 @@
 
 	.back-cover-verified {
 		color: var(--highlight);
+		font-weight: var(--weight-semibold);
 	}
 
 	.back-cover-colophon {
@@ -183,9 +291,19 @@
 		color: #b9b3c4;
 	}
 
-	/* The ink Stamp: a double rule and type in mint ink, broken up by grain. */
+	.stamp-action-block {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--space-xs);
+	}
+
+	/* The ink Stamp: authentic mint ink impression with grain texture */
 	:global(.ink-stamp) {
-		padding-block: var(--space-xs);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		padding-block: var(--space-2xs);
 		padding-inline: var(--space-s);
 		border: 3px solid currentColor;
 		border-radius: 4px;
@@ -202,6 +320,7 @@
 		font-size: var(--text-ui);
 		letter-spacing: var(--tracking-label);
 		line-height: 1.2;
+		font-weight: var(--weight-bold);
 	}
 
 	.ink-stamp-meta {
@@ -210,10 +329,16 @@
 		letter-spacing: var(--tracking-label);
 	}
 
-	/* The press: the stamp comes down onto the cover. None with reduced motion. */
+	/* The stamp press animation runs when motion is allowed, disabled for reduced motion */
 	@media (prefers-reduced-motion: no-preference) {
 		:global(.ink-stamp) {
 			animation: ink-press 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		:global(.ink-stamp) {
+			animation: none;
 		}
 	}
 
@@ -232,6 +357,7 @@
 		}
 	}
 
+	/* Interactive action buttons (>= 44px touch target) */
 	.btn-claim-stamp,
 	.btn-save-issue {
 		inline-size: 100%;
@@ -239,6 +365,7 @@
 		align-items: center;
 		justify-content: center;
 		min-block-size: 44px;
+		min-inline-size: 44px;
 		padding-block: var(--space-xs);
 		padding-inline: var(--space-m);
 		border-radius: 2px;
@@ -268,14 +395,19 @@
 		background: rgba(1, 255, 195, 0.12);
 	}
 
+	:global(.endpaper-links-row) {
+		margin-block-start: calc(-1 * var(--space-s));
+	}
+
 	.btn-back-cover,
 	.btn-endpaper-link {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
 		min-block-size: 44px;
-		padding-block: var(--space-2xs);
-		padding-inline: var(--space-s);
+		min-inline-size: 44px;
+		padding-block: var(--space-3xs);
+		padding-inline: var(--space-xs);
 		border-radius: 2px;
 		font-size: var(--text-meta);
 		font-weight: var(--weight-semibold);

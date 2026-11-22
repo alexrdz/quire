@@ -156,22 +156,34 @@
 </ZinePageShell>
 
 <style>
-	/* The screen: a dark bezel, taped on at a slight angle, with a faint glass sheen at the top. */
+	/* Cinema-grade theater frame with ambient projection glow */
 	.video-screen {
 		position: relative;
 		/* Inset so the corner tape lands on the page, clear of its edge gutter. */
 		margin-inline: var(--space-s);
-		padding-block: var(--space-2xs) var(--space-xs);
-		padding-inline: var(--space-2xs);
-		background-color: #121016;
-		background-image: var(--zine-grain), linear-gradient(to bottom, #24202b, #121016 40%);
-		background-size: 160px 160px, auto;
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		border-radius: 12px;
+		padding-block: var(--space-xs);
+		padding-inline: var(--space-xs);
+		background-color: #0c0a10;
+		background-image:
+			var(--zine-grain),
+			linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%),
+			radial-gradient(circle at 50% 0%, rgba(5, 217, 232, 0.12), transparent 70%);
+		background-size: 160px 160px, auto, auto;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		border-radius: var(--radius-md);
 		box-shadow:
-			inset 0 1px 0 rgba(255, 255, 255, 0.08),
-			0 16px 28px -12px rgba(0, 0, 0, 0.85);
+			0 0 40px -10px rgba(5, 217, 232, 0.2),
+			inset 0 1px 0 rgba(255, 255, 255, 0.15),
+			0 20px 40px -12px rgba(0, 0, 0, 0.9);
 		transform: rotate(var(--screen-tilt, 0deg));
+		transition: box-shadow 0.3s ease;
+	}
+
+	.video-screen:hover {
+		box-shadow:
+			0 0 55px -5px rgba(5, 217, 232, 0.3),
+			inset 0 1px 0 rgba(255, 255, 255, 0.2),
+			0 24px 48px -12px rgba(0, 0, 0, 0.95);
 	}
 
 	.video-screen.is-portrait {
@@ -180,9 +192,12 @@
 	}
 
 	:global(.video-frame) {
-		border-radius: 6px;
-		background: #050407;
-		box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+		border-radius: var(--radius-sm);
+		background: #000000;
+		overflow: hidden;
+		box-shadow:
+			inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+			0 4px 16px rgba(0, 0, 0, 0.8);
 	}
 
 	.video-poster-img {
@@ -195,9 +210,10 @@
 	.video-facade-backdrop {
 		inline-size: 100%;
 		block-size: 100%;
-		background: radial-gradient(circle at 50% 40%, rgba(5, 217, 232, 0.16), rgba(9, 7, 16, 0.95));
+		background: radial-gradient(circle at 50% 50%, rgba(5, 217, 232, 0.18) 0%, rgba(9, 7, 16, 0.96) 80%);
 	}
 
+	/* Cinema theater play button with glowing accent highlight */
 	.video-facade-play {
 		position: absolute;
 		inset-block-start: 50%;
@@ -208,20 +224,32 @@
 		gap: var(--space-2xs);
 		padding-block: var(--space-xs);
 		padding-inline: var(--space-s);
-		border-radius: 8px;
+		min-inline-size: 3rem;
+		min-block-size: 3rem;
+		border-radius: var(--radius-full);
 		background: rgba(9, 7, 16, 0.88);
+		backdrop-filter: blur(8px);
+		-webkit-backdrop-filter: blur(8px);
 		color: #ffffff;
 		border: 1px solid var(--accent);
+		font-family: var(--font-mono);
 		font-size: var(--text-small);
 		font-weight: var(--weight-bold);
+		letter-spacing: var(--tracking-normal);
 		cursor: pointer;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-		transition: background-color 0.15s ease, transform 0.15s ease;
+		box-shadow:
+			0 0 20px rgba(5, 217, 232, 0.3),
+			0 8px 24px rgba(0, 0, 0, 0.7);
+		transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 	}
 
 	.video-facade-play:hover {
 		background: var(--accent);
 		color: #090710;
+		transform: translate(-50%, -50%) scale(1.04);
+		box-shadow:
+			0 0 30px var(--accent),
+			0 10px 28px rgba(0, 0, 0, 0.8);
 	}
 
 	.video-play-icon {
@@ -235,6 +263,7 @@
 		font-size: var(--text-meta);
 		color: var(--accent);
 		text-decoration: none;
+		letter-spacing: var(--tracking-normal);
 	}
 
 	.video-external-link:hover {
@@ -250,7 +279,7 @@
 		inline-size: 100%;
 		block-size: 120px;
 		border: none;
-		border-radius: 6px;
+		border-radius: var(--radius-sm);
 	}
 
 	.video-link-title {

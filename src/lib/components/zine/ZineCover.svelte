@@ -74,28 +74,29 @@
 		</header>
 
 		<Stack gap="md" class="cover-middle-stack">
-			<!-- The print and its typed labels share a row, so the tip panel stays near the top. -->
-			<Cluster align="end" gap="sm" class="cover-top">
-				{#if artist.coverArtUrl}
-					<!-- The cover art is a print taped onto the page. Decorative: the title names the Issue. -->
-					<div class="cover-print" aria-hidden="true">
-						<Tape placement="top-left" position={0} />
-						<Tape placement="top-right" position={1} />
-						<div class="cover-print-image"></div>
-					</div>
-				{/if}
+			<div class="poster-head">
+				<div class="poster-edition-badge font-mono">LIMITED EDITION LIVE ARCHIVE</div>
+				<h1 class="cover-title">{issue.city}</h1>
+				<p class="cover-venue">LIVE AT {issue.venue}</p>
 
-				<Stack gap="2xs" align="start" class="cover-labels">
+				<Cluster align="center" gap="2xs" class="cover-labels">
 					<TypeLabel position={0} tone="highlight">{issue.date}</TypeLabel>
 					<TypeLabel position={1}>{issue.city}</TypeLabel>
 					<TypeLabel position={2}>@ {issue.venue}</TypeLabel>
 					{#if statusStamp}
 						<Stamp label={statusStamp.label} tone={statusStamp.tone} position={2} />
 					{/if}
-				</Stack>
-			</Cluster>
+				</Cluster>
+			</div>
 
-			<h1 class="cover-title">{issue.city}</h1>
+			{#if artist.coverArtUrl}
+				<!-- The cover art is a limited-edition gig poster print with archival tape -->
+				<div class="cover-print" aria-hidden="true">
+					<Tape placement="top-left" position={0} />
+					<Tape placement="top-right" position={1} />
+					<div class="cover-print-image"></div>
+				</div>
+			{/if}
 
 			{#if issue.coverNote}
 				<Scrap position={1} tone="light" class="cover-note-scrap">
@@ -125,11 +126,12 @@
 			{/if}
 		</Stack>
 
-		<Cluster justify="between" align="center" gap="sm" class="cover-actions-strip">
+		<div class="cover-actions-strip">
 			<button type="button" class="btn-open-zine" onclick={() => scrollToPage(contentPageId(0))}>
-				Open Tonight's Zine →
+				<span class="btn-open-label">Swipe or Tap to Open Tonight's Zine</span>
+				<span class="btn-open-arrow" aria-hidden="true">→</span>
 			</button>
-		</Cluster>
+		</div>
 
 		<footer class="page-footer">
 			<span>Swipe or tap to read ({readerPageCount(contentCount)} pages)</span>
@@ -139,45 +141,103 @@
 </section>
 
 <style>
-	/* The taped print: a white-bordered photo at a small tilt (art, not text, so up to about 3 degrees). */
+	:global(.cover-middle-stack) {
+		margin-block: auto;
+	}
+
+	.poster-head {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3xs);
+		margin-block-start: var(--space-xs);
+		margin-block-end: var(--space-2xs);
+	}
+
+	.poster-edition-badge {
+		font-size: var(--text-meta);
+		font-weight: var(--weight-bold);
+		letter-spacing: var(--tracking-display);
+		text-transform: uppercase;
+		color: var(--highlight);
+		opacity: 0.9;
+	}
+
+	.cover-title {
+		font-size: var(--text-hero);
+		font-weight: var(--weight-black);
+		line-height: var(--leading-solid);
+		letter-spacing: var(--tracking-tight);
+		text-transform: uppercase;
+		color: #ffffff;
+		margin: 0;
+		text-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+	}
+
+	.cover-venue {
+		font-size: var(--text-small);
+		font-weight: var(--weight-semibold);
+		letter-spacing: var(--tracking-wide);
+		text-transform: uppercase;
+		color: rgba(255, 255, 255, 0.75);
+		margin: 0;
+	}
+
+	:global(.cover-labels) {
+		margin-block-start: var(--space-3xs);
+	}
+
+	/* The taped print: full-width limited-edition vinyl gig artwork presentation at a subtle tilt (art, not text). */
 	.cover-print {
 		position: relative;
-		/* Small enough that the tip panel stays near the top, inset so the tape never reaches the header buttons. */
-		inline-size: min(46%, 12rem);
-		margin-block-start: var(--space-s);
-		margin-inline-start: var(--space-2xs);
-		padding-block: var(--space-3xs) var(--space-s);
+		inline-size: 100%;
+		max-inline-size: 28rem;
+		margin-inline: auto;
+		margin-block: var(--space-xs);
+		padding-block: var(--space-3xs);
 		padding-inline: var(--space-3xs);
-		background-color: var(--zine-scrap-light);
-		background-image: var(--zine-mottle);
-		background-size: 420px 420px;
+		background-color: var(--zine-scrap-dark);
+		background-image: var(--zine-grain);
+		background-size: 160px 160px;
+		border: 1px solid rgba(255, 255, 255, 0.14);
+		border-radius: 4px;
 		box-shadow:
-			0 1px 2px rgba(0, 0, 0, 0.5),
-			0 16px 30px -10px rgba(0, 0, 0, 0.8);
-		transform: rotate(-2.6deg);
+			0 4px 16px rgba(0, 0, 0, 0.6),
+			0 18px 36px -8px rgba(0, 0, 0, 0.85),
+			inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+		transform: rotate(-1.5deg);
 	}
 
 	.cover-print-image {
-		aspect-ratio: 4 / 3;
+		aspect-ratio: 16 / 9;
+		inline-size: 100%;
 		background-color: var(--ink-surface);
 		background-image: var(--cover-art, none);
 		background-size: cover;
 		background-position: center;
-		/* A photocopied print: a little grain over the art. */
-		box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+		border-radius: 2px;
+		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 	}
 
-	:global(.cover-labels) {
-		flex: 1 1 6.5rem;
-		min-inline-size: 0;
+	.cover-print :global(.tape) {
+		background: rgba(255, 255, 255, 0.22);
+		backdrop-filter: blur(8px);
+		-webkit-backdrop-filter: blur(8px);
+		border: 1px solid rgba(255, 255, 255, 0.35);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+	}
+
+	.cover-print :global(.tape-top-left) {
+		inset-block-start: -0.45rem;
+		inset-inline-start: 1rem;
+	}
+
+	.cover-print :global(.tape-top-right) {
+		inset-block-start: -0.45rem;
+		inset-inline-end: 1rem;
 	}
 
 	:global(.cover-note-scrap) {
 		max-inline-size: 34rem;
-	}
-
-	:global(.cover-middle-stack) {
-		margin-block: auto;
 	}
 
 	.cover-note-text {
@@ -186,18 +246,27 @@
 		color: var(--zine-scrap-light-ink);
 	}
 
-	/* The reader's tip panel is a scrap of dark paper, not glass, and keeps its pink edge so it stays obvious. */
 	.cover-tip {
 		position: relative;
+		margin-block-start: var(--space-s);
+	}
+
+	.cover-tip :global(.tape) {
+		background: rgba(255, 255, 255, 0.22);
+		backdrop-filter: blur(8px);
+		-webkit-backdrop-filter: blur(8px);
+		border: 1px solid rgba(255, 255, 255, 0.35);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 	}
 
 	.cover-tip :global(.venmo-tip-panel) {
 		background-color: var(--zine-scrap-dark);
 		background-image: var(--zine-grain);
 		background-size: 160px 160px;
-		border: 2px solid rgba(255, 42, 109, 0.6);
-		border-radius: 3px;
-		box-shadow: 0 12px 26px -10px rgba(0, 0, 0, 0.8);
+		border: 1px solid rgba(255, 42, 109, 0.45);
+		border-radius: 6px;
+		box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.85);
+		transform: none;
 	}
 
 	.cover-tip :global(.venmo-tip-title) {
@@ -206,18 +275,24 @@
 		letter-spacing: var(--tracking-normal);
 	}
 
-	/* Tip targets stay at least 44 px (ADR 0009). */
+	/* Tip targets stay at least 44 px with zero rotation (ADR 0009). */
 	.cover-tip :global(.venmo-tip-preset),
 	.cover-tip :global(.venmo-tip-go),
 	.cover-tip :global(.venmo-tip-input) {
-		min-block-size: var(--control-size);
+		min-inline-size: 44px;
+		min-block-size: 44px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		transform: none;
 	}
 
-	:global(.cover-actions-strip) {
-		margin-block-start: var(--space-l);
+	.cover-actions-strip {
+		margin-block-start: var(--space-m);
+		display: flex;
+		justify-content: center;
 	}
 
-	/* Dark paper, not glass (ADR 0009). */
 	:global(.closed-artist-notice) {
 		background-color: var(--zine-scrap-dark);
 		border-color: rgba(255, 42, 109, 0.45);
@@ -226,9 +301,35 @@
 	}
 
 	.btn-open-zine {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: var(--space-xs);
+		inline-size: 100%;
+		max-inline-size: 28rem;
+		min-block-size: 48px;
 		padding-block: var(--space-xs);
-		padding-inline: var(--space-s);
-		font-size: var(--text-small);
+		padding-inline: var(--space-m);
+		border-radius: 8px;
+		background: rgba(1, 255, 195, 0.12);
+		color: var(--highlight);
+		border: 1px solid rgba(1, 255, 195, 0.45);
+		box-shadow: 0 4px 16px rgba(1, 255, 195, 0.12);
+		font-size: var(--text-ui);
+		font-weight: var(--weight-bold);
+		letter-spacing: var(--tracking-label);
+		cursor: pointer;
+		transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+	}
+
+	.btn-open-zine:hover {
+		background: rgba(1, 255, 195, 0.22);
+		border-color: rgba(1, 255, 195, 0.8);
+		transform: translateY(-1px);
+	}
+
+	.btn-open-zine:active {
+		transform: translateY(0);
 	}
 
 	/* Sleek Rectangular Buttons (Zero 9999px Pills) */
@@ -291,26 +392,5 @@
 
 	.btn-nav-primary:hover {
 		background: rgba(1, 255, 195, 0.24);
-	}
-
-	.btn-open-zine {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		padding-block: var(--space-xs);
-		padding-inline: var(--space-m);
-		border-radius: 8px;
-		background: rgba(1, 255, 195, 0.14);
-		color: var(--highlight);
-		border: 1px solid rgba(1, 255, 195, 0.4);
-		font-size: var(--text-ui);
-		font-weight: var(--weight-bold);
-		cursor: pointer;
-		transition: background-color 0.15s ease, border-color 0.15s ease;
-	}
-
-	.btn-open-zine:hover {
-		background: rgba(1, 255, 195, 0.24);
-		border-color: rgba(1, 255, 195, 0.7);
 	}
 </style>
