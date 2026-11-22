@@ -14,7 +14,7 @@
 		<Container width="lg" padding="none">
 			<Cluster justify="between" align="center" gap="md">
 				<Cluster align="center" gap="sm">
-					<a href="/" class="btn-back-link">← Quire Portal</a>
+					<a href="/" class="btn-back-link">← Quire Home</a>
 					<span class="text-highlight font-mono eyebrow-tag">FAN COLLECTION</span>
 				</Cluster>
 
@@ -79,7 +79,7 @@
 
 								<Cluster justify="between" align="center">
 									<a href="/i/{item.issue.slug}" class="btn-stub-open">
-										Open Issue Zine →
+										Read Tour Zine →
 									</a>
 									<span class="text-highlight font-mono attended-text">✓ STAMPED</span>
 								</Cluster>
@@ -127,7 +127,7 @@
 										<p class="text-muted saved-venue-subtext">{item.issue.venue}</p>
 
 										<a href="/i/{item.issue.slug}" class="btn-stub-open">
-											Read Issue →
+											Read Tour Zine →
 										</a>
 									</Stack>
 								</Box>

@@ -103,7 +103,7 @@
               </a>
 
               <a href="/a/the-neon-velvet" class="hero-btn-tertiary">
-                <span>View Artist Back Page ↗</span>
+                <span>View Artist Hub ↗</span>
               </a>
             </Cluster>
 

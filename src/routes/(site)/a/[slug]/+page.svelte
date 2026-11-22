@@ -16,7 +16,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.artist.displayName} — Quire Back Page</title>
+	<title>{data.artist.displayName} — Artist Hub | Quire</title>
 </svelte:head>
 
 <div class="artist-page-root" style="--accent: {data.artist.accentColor || '#05D9E8'};">
@@ -25,8 +25,8 @@
 		<Container width="lg" padding="none">
 			<Cluster justify="between" align="center" gap="md">
 				<Cluster align="center" gap="sm">
-					<a href="/" class="btn-back-link">← Quire Portal</a>
-					<span class="text-highlight font-mono eyebrow-tag">ARTIST BACK PAGE</span>
+					<a href="/" class="btn-back-link">← Quire Home</a>
+					<span class="text-highlight font-mono eyebrow-tag">ARTIST TOUR HUB</span>
 				</Cluster>
 
 				<Cluster align="center" gap="xs">
@@ -61,7 +61,7 @@
 			>
 				<Cluster justify="between" align="center" gap="sm">
 					<Cluster align="center" gap="xs">
-						<span class="meta-chip meta-accent">PERMANENT ARTIST HUB</span>
+						<span class="meta-chip meta-accent">ARTIST TOUR ARCHIVE</span>
 						{#if data.artist.verified}
 							<span class="meta-chip meta-highlight">✓ Verified Artist</span>
 						{/if}
@@ -120,8 +120,8 @@
 			<!-- All Issues Grouped by Month -->
 			<Stack as="section" gap="md">
 				<Cluster justify="between" align="center">
-					<h2 class="section-title">All Gig Issues</h2>
-					<span class="text-muted subtext-small">City-specific tour zines</span>
+					<h2 class="section-title">Tour Zines</h2>
+					<span class="text-muted subtext-small">City-specific interactive zines from the road</span>
 				</Cluster>
 
 				{#if data.isArtistClosed}
@@ -154,23 +154,46 @@
 												radius="lg"
 												class="issue-card-box"
 											>
-												<Stack gap="sm">
-													<Cluster justify="between" align="center">
-														<span class="meta-chip meta-highlight">{issue.date}</span>
-														{#if issue.status === 'cancelled'}
-															<span class="meta-chip meta-support">Cancelled</span>
-														{:else}
-															<span class="text-muted font-mono zine-num">{issue.venue}</span>
+												<Stack gap="md" class="issue-card-content">
+													<Stack gap="xs">
+														<Cluster justify="between" align="center">
+															<span class="meta-chip meta-highlight">{issue.date}</span>
+															{#if issue.status === 'cancelled'}
+																<span class="meta-chip meta-support">Cancelled</span>
+															{:else}
+																<span class="meta-chip meta-zine-pill">Tour Zine</span>
+															{/if}
+														</Cluster>
+
+														<h3 class="issue-city-title">{issue.city}</h3>
+														<span class="text-muted font-mono zine-venue-text">@ {issue.venue}</span>
+
+														{#if issue.coverNote}
+															<p class="text-muted issue-note-snippet">"{issue.coverNote}"</p>
 														{/if}
+													</Stack>
+
+													<Cluster gap="3xs" class="zine-feature-tags">
+														<span class="feature-tag">Setlist</span>
+														<span class="feature-tag">Tour Photos</span>
+														<span class="feature-tag">Live Audio</span>
+														<span class="feature-tag">Gig Wall</span>
 													</Cluster>
 
-													<h4 class="issue-city-title">{issue.city}</h4>
-
-													{#if issue.coverNote}
-														<p class="text-muted issue-note-snippet">"{issue.coverNote}"</p>
-													{/if}
-
-													<span class="text-highlight open-zine-cue">Open Issue Zine →</span>
+													<div class="btn-read-zine-cta">
+														<span>Read Tour Zine</span>
+														<svg
+															class="cta-arrow-icon"
+															viewBox="0 0 24 24"
+															fill="none"
+															stroke="currentColor"
+															stroke-width="2.5"
+															aria-hidden="true"
+														>
+															<line x1="5" y1="12" x2="19" y2="12" />
+															<polyline points="12 5 19 12 12 19" />
+														</svg>
+													</div>
 												</Stack>
 											</Box>
 										{/each}
@@ -408,9 +431,13 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: var(--space-sm);
+		min-block-size: 2.75rem;
 		padding-block: var(--space-2xs);
+		padding-inline: var(--space-3xs);
+		border-radius: var(--radius-sm);
 		cursor: pointer;
 		list-style: none;
+		transition: color 0.15s ease;
 	}
 
 	.month-accordion-summary::-webkit-details-marker {
@@ -448,18 +475,85 @@
 	}
 
 	:global(.issue-card-box) {
+		display: block;
+		cursor: pointer;
 		border-color: var(--glass-border);
+		background-color: var(--bg-surface);
 		text-decoration: none;
-		transition: border-color 0.15s ease, transform 0.15s ease;
+		transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+	}
+
+	:global(.issue-card-box:focus-visible) {
+		outline: 2px solid var(--highlight);
+		outline-offset: 3px;
+	}
+
+	:global(.issue-card-box:active) {
+		transform: scale(0.985);
 	}
 
 	:global(.issue-card-box:hover) {
 		border-color: var(--highlight);
 		transform: translateY(-2px);
+		box-shadow: 0 8px 24px -4px rgba(1, 255, 195, 0.2);
 	}
 
-	.zine-num {
+	.zine-venue-text {
+		font-size: var(--text-small);
+		color: #d4d2df;
+		letter-spacing: var(--tracking-snug);
+	}
+
+	:global(.zine-feature-tags) {
+		padding-block-start: var(--space-3xs);
+	}
+
+	.feature-tag {
+		font-family: var(--font-mono);
 		font-size: var(--text-meta);
+		font-weight: var(--weight-medium);
+		padding-block: var(--space-3xs);
+		padding-inline: var(--space-2xs);
+		border-radius: 4px;
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		color: var(--text-muted);
+	}
+
+	.btn-read-zine-cta {
+		inline-size: 100%;
+		min-block-size: 2.85rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: var(--space-2xs);
+		padding-block: var(--space-2xs);
+		padding-inline: var(--space-s);
+		border-radius: 8px;
+		background: rgba(1, 255, 195, 0.14);
+		color: var(--highlight);
+		border: 1px solid rgba(1, 255, 195, 0.45);
+		font-size: var(--text-small);
+		font-weight: var(--weight-heavy);
+		letter-spacing: var(--tracking-normal);
+		transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+	}
+
+	:global(.issue-card-box:hover) .btn-read-zine-cta {
+		background: rgba(1, 255, 195, 0.26);
+		border-color: rgba(1, 255, 195, 0.8);
+		color: #ffffff;
+	}
+
+	.cta-arrow-icon {
+		inline-size: 1.1rem;
+		block-size: 1.1rem;
+		stroke: currentColor;
+		transition: transform 0.15s ease;
+	}
+
+	:global(.issue-card-box:hover) .cta-arrow-icon {
+		transform: translateX(4px);
 	}
 
 	.issue-city-title {
@@ -473,9 +567,10 @@
 		line-height: var(--leading-snug);
 	}
 
-	.open-zine-cue {
-		font-size: var(--text-meta);
-		font-weight: var(--weight-bold);
+	.meta-chip.meta-zine-pill {
+		background: rgba(255, 255, 255, 0.08);
+		border: 1px solid rgba(255, 255, 255, 0.16);
+		color: #ffffff;
 	}
 
 	:global(.wall-card-box) {
