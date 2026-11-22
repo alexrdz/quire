@@ -42,7 +42,7 @@
 					href="/a/{artist.slug}"
 					class="app-nav-tab"
 				>
-					Back Page ↗
+					Artist Hub ↗
 				</a>
 			</Cluster>
 

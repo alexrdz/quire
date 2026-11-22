@@ -104,7 +104,7 @@
 
 	<Cluster justify="center" gap="sm">
 		<a href="/a/{artistSlug}" class="btn-endpaper-link">
-			{artistName} Back Page ↗
+			{artistName} Hub ↗
 		</a>
 		<a href="/me/stubs" class="btn-endpaper-link">
 			My Stubs Collection →
