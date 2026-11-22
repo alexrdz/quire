@@ -212,22 +212,6 @@
 	</a>
 {/if}
 
-<!-- Interactive Story Edge Tap Zones (SPEC §5.2) -->
-{#if !authDrawerOpen}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<div
-		class="story-edge-tap story-edge-tap-prev"
-		role="presentation"
-		onclick={() => stepPage(getActivePageId(), contentPages.length, 'prev')}
-	></div>
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<div
-		class="story-edge-tap story-edge-tap-next"
-		role="presentation"
-		onclick={() => stepPage(getActivePageId(), contentPages.length, 'next')}
-	></div>
-{/if}
-
 {#if authDrawerOpen}
 	<AuthDrawer
 		pendingAction={pendingAuthAction}
@@ -274,40 +258,4 @@
 		transform: translateY(0);
 	}
 
-	/* Interactive edge tap zones (Instagram story gestures) */
-	.story-edge-tap {
-		position: fixed;
-		inset-block-start: 4.5rem;
-		inset-block-end: calc(var(--reader-tip-size) + var(--reader-tip-offset) + var(--space-m));
-		inline-size: var(--space-2xl);
-		min-inline-size: 44px;
-		max-inline-size: 20vw;
-		z-index: 30;
-		background: transparent;
-		border: none;
-		cursor: pointer;
-		padding-block: 0;
-		padding-inline: 0;
-		margin-block: 0;
-		margin-inline: 0;
-		opacity: 0;
-		transition: opacity 0.2s ease;
-		-webkit-tap-highlight-color: transparent;
-	}
-
-	@media (hover: hover) {
-		.story-edge-tap:hover {
-			opacity: 1;
-		}
-	}
-
-	.story-edge-tap-prev {
-		inset-inline-start: 0;
-		background: linear-gradient(to right, rgba(255, 255, 255, 0.04), transparent);
-	}
-
-	.story-edge-tap-next {
-		inset-inline-end: 0;
-		background: linear-gradient(to left, rgba(255, 255, 255, 0.04), transparent);
-	}
 </style>

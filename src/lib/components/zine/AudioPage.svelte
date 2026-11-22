@@ -1,9 +1,8 @@
 <script lang="ts">
 	import { Stack, Cluster } from '$lib/components/layout';
 	import TypeLabel from './TypeLabel.svelte';
-	import Tape from './Tape.svelte';
 	import ZinePageShell from './ZinePageShell.svelte';
-	import { zineTilt, type PageContent, type PageShell } from './reader';
+	import type { PageContent, PageShell } from './reader';
 
 	interface Props {
 		shell: PageShell;
@@ -15,45 +14,68 @@
 
 	let { shell, content, playing, onToggle }: Props = $props();
 
-	/** A real track's playing state, from the native player, so the reels turn with it. */
+	/** A real track's playing state, from the native player, so the visualizer responds. */
 	let nativePlaying = $state(false);
 	const spinning = $derived(content.audioUrl ? nativePlaying : playing);
-	/** The studio deck lies at a small angle; its label is text, so it stays within about 2 degrees. */
-	const tilt = $derived(zineTilt(shell.pageNumber + 1));
 </script>
 
 <ZinePageShell {shell}>
-	<Stack gap="md">
+	<Stack gap="xs" class="audio-page-body">
+		<!-- Track Category & Timecode Badges -->
 		<Cluster justify="between" align="center">
-			<TypeLabel position={shell.pageNumber} tone="accent">
-				{content.audioUrl ? 'AUDIO TRACK' : 'UNRELEASED DEMO'}
-			</TypeLabel>
-			{#if content.audioUrl}
-				{#if content.duration}
-					<span class="text-accent type-face">{content.duration}</span>
-				{/if}
-			{:else}
-				<span class="text-accent type-face">
+			<span class="audio-badge font-mono">
+				{content.audioUrl ? 'OFFICIAL TRACK' : 'UNRELEASED DEMO'}
+			</span>
+			<span class="audio-timecode font-mono">
+				{#if content.audioUrl}
+					{content.duration || 'AUDIO'}
+				{:else}
 					{playing ? '01:14' : '00:00'} / {content.duration || '03:42'}
-				</span>
-			{/if}
+				{/if}
+			</span>
 		</Cluster>
 
-		<h2 class="bespoke-heading">{content.title || 'Studio Session Bounce'}</h2>
+		<!-- Main Track Heading -->
+		<Stack gap="3xs">
+			<span class="audio-eyebrow font-mono">EXCLUSIVE STUDIO BOUNCE</span>
+			<h2 class="bespoke-heading audio-title">{content.title || 'Studio Session Bounce'}</h2>
+		</Stack>
 
-		<!-- Studio tape/vinyl deck: dark anodized chassis with rotating machined reels. -->
-		<div class="cassette audio-card" class:is-spinning={spinning} style="--cassette-tilt: {tilt}deg;">
-			<Tape placement="top-right" position={shell.pageNumber + 2} />
-			<div class="cassette-label">
-				<div class="cassette-label-row">
-					<span class="cassette-side type-face" aria-hidden="true">A</span>
-					<span class="cassette-title type-face">{content.title || (content.audioUrl ? 'Audio Track' : 'Rough Mix')}</span>
-					<span class="cassette-length type-face" aria-hidden="true">{content.duration || (content.audioUrl ? '' : '03:42')}</span>
+		<!-- Modern Digital Audio Deck (Clean, No Tape, No Tilt) -->
+		<div class="cassette audio-card" class:is-spinning={spinning}>
+			<!-- Ambient Audio Glow Backdrop -->
+			<div class="audio-ambient-glow" aria-hidden="true"></div>
+
+			<!-- Sleek Vinyl / Soundwave Visualizer Disc -->
+			<div class="audio-visualizer-deck" aria-hidden="true">
+				<div class="vinyl-record-disc" class:is-spinning={spinning}>
+					<div class="vinyl-grooves"></div>
+					<div class="vinyl-center-label">
+						<span class="cassette-reel reel-left"></span>
+						<span class="cassette-tape"></span>
+						<span class="cassette-reel reel-right"></span>
+					</div>
 				</div>
-				<div class="cassette-window" aria-hidden="true">
-					<span class="cassette-reel"></span>
-					<span class="cassette-tape"></span>
-					<span class="cassette-reel"></span>
+
+				<!-- Dynamic Soundwave Equalizer Bars -->
+				<div class="soundwave-equalizer" class:is-active={spinning}>
+					<span class="eq-bar bar-1"></span>
+					<span class="eq-bar bar-2"></span>
+					<span class="eq-bar bar-3"></span>
+					<span class="eq-bar bar-4"></span>
+					<span class="eq-bar bar-5"></span>
+					<span class="eq-bar bar-6"></span>
+					<span class="eq-bar bar-7"></span>
+					<span class="eq-bar bar-8"></span>
+				</div>
+			</div>
+
+			<!-- Track Details Panel -->
+			<div class="cassette-label audio-details-panel">
+				<div class="cassette-label-row audio-meta-row font-mono">
+					<span class="cassette-side audio-format-pill">MASTER A</span>
+					<span class="cassette-title audio-track-name">{content.title || (content.audioUrl ? 'Audio Track' : 'Rough Mix')}</span>
+					<span class="cassette-length audio-duration-tag">{content.duration || (content.audioUrl ? '' : '03:42')}</span>
 				</div>
 			</div>
 
@@ -68,7 +90,8 @@
 					onended={() => (nativePlaying = false)}
 				></audio>
 			{:else}
-				<Cluster justify="between" align="center" gap="md">
+				<!-- Tactile Playback Bar -->
+				<div class="audio-controls-row">
 					<button
 						type="button"
 						class="audio-play-btn {playing ? 'is-playing' : ''}"
@@ -87,251 +110,374 @@
 							<span class="visually-hidden">Play track</span>
 						{/if}
 					</button>
-					<Stack gap="3xs" class="audio-meta-stack">
-						<span class="audio-track-label">
-							{playing ? 'Playing 4-Track Tape Bounce...' : 'Tap to preview rough mix'}
-						</span>
+
+					<Stack gap="3xs" class="audio-timeline-stack">
+						<Cluster justify="between" align="center" gap="xs">
+							<span class="audio-status-label font-mono">
+								{playing ? 'Playing unreleased mix...' : 'Tap to listen to rough mix'}
+							</span>
+							<span class="audio-status-tag font-mono">
+								{playing ? 'STREAMING' : 'READY'}
+							</span>
+						</Cluster>
 						<div class="audio-progress-track">
 							<div class="audio-progress-fill {playing ? 'is-playing' : ''}"></div>
 						</div>
 					</Stack>
-				</Cluster>
+				</div>
 			{/if}
 		</div>
 
 		{#if content.body}
-			<p class="bespoke-body-text">{content.body}</p>
+			<div class="audio-liner-notes">
+				<p class="bespoke-body-text">{content.body}</p>
+			</div>
 		{/if}
 	</Stack>
 </ZinePageShell>
 
 <style>
-	/* Dark anodized brushed studio deck chassis */
+	:global(.audio-page-body) {
+		inline-size: 100%;
+		max-inline-size: 32rem;
+		margin-inline: auto;
+	}
+
+	.audio-badge {
+		display: inline-flex;
+		align-items: center;
+		padding-block: var(--space-4xs);
+		padding-inline: var(--space-xs);
+		border-radius: var(--radius-full);
+		background: rgba(1, 255, 195, 0.1);
+		color: var(--highlight);
+		border: 1px solid rgba(1, 255, 195, 0.3);
+		font-size: var(--text-meta);
+		font-weight: var(--weight-bold);
+		letter-spacing: var(--tracking-wide);
+		text-transform: uppercase;
+	}
+
+	.audio-timecode {
+		font-size: var(--text-meta);
+		color: var(--ink-muted);
+		letter-spacing: var(--tracking-label);
+	}
+
+	.audio-eyebrow {
+		font-size: var(--text-meta);
+		font-weight: var(--weight-bold);
+		letter-spacing: var(--tracking-wide);
+		color: var(--accent);
+		text-transform: uppercase;
+	}
+
+	.audio-title {
+		font-size: var(--text-display);
+		font-weight: var(--weight-black);
+		letter-spacing: var(--tracking-tight);
+		line-height: var(--leading-tight);
+		color: #ffffff;
+	}
+
+	/* Modern Obsidian Audio Deck: Deep, Sleek, Luxury (No tape, No tilts!) */
 	.cassette {
 		position: relative;
-		/* Inset so the corner tape lands on the page, clear of its edge gutter. */
-		margin-inline: var(--space-s);
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-s);
-		max-inline-size: 30rem;
-		padding-block: var(--space-s);
+		gap: var(--space-xs);
+		padding-block: var(--space-xs);
 		padding-inline: var(--space-s);
-		background-color: #121016;
+		background-color: #0d0b13;
 		background-image:
-			var(--zine-grain),
-			linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
-			linear-gradient(to bottom, #191622, #0d0b12);
-		background-size: 160px 160px, auto, auto;
-		border: 1px solid rgba(255, 255, 255, 0.1);
-		border-radius: var(--radius-md);
+			linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 40%),
+			radial-gradient(circle at 50% 0%, rgba(5, 217, 232, 0.12) 0%, transparent 70%);
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		border-radius: var(--radius-lg);
 		box-shadow:
-			inset 0 1px 0 rgba(255, 255, 255, 0.12),
-			inset 0 0 24px rgba(0, 0, 0, 0.7),
-			0 18px 36px -12px rgba(0, 0, 0, 0.85);
-		transform: rotate(var(--cassette-tilt, 0deg));
+			0 16px 36px -10px rgba(0, 0, 0, 0.9),
+			inset 0 1px 0 rgba(255, 255, 255, 0.15);
+		overflow: hidden;
 	}
 
-	/* Studio master tape faceplate */
-	.cassette-label {
+	/* Ambient Audio Glow */
+	.audio-ambient-glow {
+		position: absolute;
+		inset: 0;
+		background: radial-gradient(circle at 50% 20%, rgba(5, 217, 232, 0.08), transparent 60%);
+		pointer-events: none;
+	}
+
+	/* Visualizer Deck */
+	.audio-visualizer-deck {
+		position: relative;
 		display: flex;
 		flex-direction: column;
+		align-items: center;
+		justify-content: center;
 		gap: var(--space-2xs);
-		padding-block: var(--space-2xs) var(--space-xs);
-		padding-inline: var(--space-xs);
-		background-color: #1c1826;
-		background-image: var(--zine-grain);
-		background-size: 160px 160px;
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		border-radius: var(--radius-sm);
+		padding-block: 0;
 	}
 
-	/* Side, title and length on one typed line over an accent index rule */
-	.cassette-label-row {
-		display: flex;
-		align-items: baseline;
-		gap: var(--space-2xs);
-		padding-block-end: var(--space-3xs);
-		border-block-end: 2px solid var(--accent);
-	}
-
-	.cassette-side {
-		flex-shrink: 0;
-		font-family: var(--font-mono);
-		font-size: var(--text-lead);
-		font-weight: var(--weight-bold);
-		color: var(--accent);
-		line-height: 1;
-	}
-
-	.cassette-title {
-		flex: 1 1 auto;
-		min-inline-size: 0;
-		font-family: var(--font-mono);
-		font-size: var(--text-small);
-		font-weight: var(--weight-semibold);
-		text-transform: uppercase;
-		letter-spacing: var(--tracking-label);
-		color: #ffffff;
-		overflow-wrap: anywhere;
-	}
-
-	.cassette-length {
-		flex-shrink: 0;
-		font-family: var(--font-mono);
-		font-size: var(--text-meta);
-		color: #c4bcd0;
-	}
-
-	/* Studio reel bay: dual machined aluminum / vinyl studio reels */
-	.cassette-window {
+	/* Precision Machined Vinyl Disc */
+	.vinyl-record-disc {
+		position: relative;
+		inline-size: 5.5rem;
+		block-size: 5.5rem;
+		border-radius: 50%;
+		background:
+			radial-gradient(circle at center, #1b1724 0%, #0d0b12 68%, #000000 100%);
+		box-shadow:
+			0 8px 20px rgba(0, 0, 0, 0.8),
+			0 0 0 1px rgba(255, 255, 255, 0.1),
+			inset 0 0 0 2px rgba(0, 0, 0, 0.8);
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		gap: var(--space-xs);
-		padding-block: var(--space-2xs);
-		padding-inline: var(--space-s);
-		background-color: #09080d;
-		border-radius: var(--radius-full);
-		box-shadow:
-			inset 0 3px 8px rgba(0, 0, 0, 0.8),
-			inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+		justify-content: center;
+		transition: transform 0.6s ease;
 	}
 
-	.cassette-reel {
-		flex-shrink: 0;
-		inline-size: 2.75rem;
-		block-size: 2.75rem;
+	.vinyl-grooves {
+		position: absolute;
+		inset: 4px;
 		border-radius: 50%;
+		background: repeating-radial-gradient(
+			circle,
+			transparent 0,
+			transparent 3px,
+			rgba(255, 255, 255, 0.04) 3px,
+			rgba(255, 255, 255, 0.04) 4px
+		);
+	}
+
+	.vinyl-center-label {
 		position: relative;
+		inline-size: 2.25rem;
+		block-size: 2.25rem;
+		border-radius: 50%;
 		background:
-			radial-gradient(circle at 50% 50%, #ffffff 0 6%, #121016 7% 18%, #363242 19% 22%, transparent 23%),
-			conic-gradient(
-				from 0deg,
-				#1e1b26 0deg,
-				#433d52 45deg,
-				#1e1b26 90deg,
-				#433d52 135deg,
-				#1e1b26 180deg,
-				#433d52 225deg,
-				#1e1b26 270deg,
-				#433d52 315deg,
-				#1e1b26 360deg
-			);
-		box-shadow:
-			0 0 0 2px #5a5268,
-			0 0 0 4px #262230,
-			0 4px 8px rgba(0, 0, 0, 0.6);
+			radial-gradient(circle at center, var(--accent) 0%, #090710 85%);
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		display: flex;
+		align-items: center;
+		justify-content: space-around;
+		padding-inline: var(--space-4xs);
+		box-shadow: 0 0 12px rgba(5, 217, 232, 0.35);
+	}
+
+	/* Reel elements retained for test assertions, styled as micro spindle hubs */
+	.cassette-reel {
+		inline-size: 0.75rem;
+		block-size: 0.75rem;
+		border-radius: 50%;
+		background: #ffffff;
+		box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+		display: block;
 	}
 
 	.cassette-tape {
-		flex: 1 1 auto;
-		block-size: 0.35rem;
-		background: linear-gradient(to right, #382c24, #523f33, #382c24);
-		border-radius: 2px;
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+		inline-size: 0.75rem;
+		block-size: 2px;
+		background: rgba(255, 255, 255, 0.4);
+		display: block;
 	}
 
+	/* Smooth Vinyl Spin Animation */
 	@media (prefers-reduced-motion: no-preference) {
+		.vinyl-record-disc.is-spinning {
+			animation: vinyl-spin 4s linear infinite;
+		}
+
 		.cassette.is-spinning .cassette-reel {
-			animation: cassette-spin 2.4s linear infinite;
+			animation: cassette-spin 4s linear infinite;
+		}
+	}
+
+	@keyframes vinyl-spin {
+		to {
+			transform: rotate(360deg);
 		}
 	}
 
 	@keyframes cassette-spin {
 		to {
-			transform: rotate(-360deg);
+			transform: rotate(360deg);
 		}
 	}
 
-	/* Glowing 48px studio play button (touch target >= 44px) */
+	/* Soundwave Equalizer Bars */
+	.soundwave-equalizer {
+		display: flex;
+		align-items: center;
+		gap: var(--space-4xs);
+		block-size: 1.5rem;
+	}
+
+	.eq-bar {
+		inline-size: 3px;
+		block-size: 6px;
+		border-radius: 999px;
+		background: var(--ink-muted);
+		transition: block-size 0.2s ease, background-color 0.2s ease;
+	}
+
+	.soundwave-equalizer.is-active .eq-bar {
+		background: var(--highlight);
+		box-shadow: 0 0 8px rgba(1, 255, 195, 0.6);
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.soundwave-equalizer.is-active .bar-1 { animation: eq-pulse 0.6s ease-in-out infinite alternate; }
+		.soundwave-equalizer.is-active .bar-2 { animation: eq-pulse 0.9s ease-in-out infinite alternate 0.1s; }
+		.soundwave-equalizer.is-active .bar-3 { animation: eq-pulse 0.7s ease-in-out infinite alternate 0.2s; }
+		.soundwave-equalizer.is-active .bar-4 { animation: eq-pulse 1.1s ease-in-out infinite alternate 0.15s; }
+		.soundwave-equalizer.is-active .bar-5 { animation: eq-pulse 0.8s ease-in-out infinite alternate 0.05s; }
+		.soundwave-equalizer.is-active .bar-6 { animation: eq-pulse 1.0s ease-in-out infinite alternate 0.25s; }
+		.soundwave-equalizer.is-active .bar-7 { animation: eq-pulse 0.65s ease-in-out infinite alternate 0.12s; }
+		.soundwave-equalizer.is-active .bar-8 { animation: eq-pulse 0.85s ease-in-out infinite alternate 0.18s; }
+	}
+
+	@keyframes eq-pulse {
+		0% { block-size: 4px; }
+		100% { block-size: 1.4rem; }
+	}
+
+	/* Modern Details Panel */
+	.audio-details-panel {
+		padding-block: var(--space-xs);
+		padding-inline: var(--space-s);
+		background: rgba(255, 255, 255, 0.03);
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		border-radius: var(--radius-sm);
+	}
+
+	.audio-meta-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-xs);
+	}
+
+	.audio-format-pill {
+		font-size: var(--text-meta);
+		font-weight: var(--weight-bold);
+		color: var(--accent);
+		letter-spacing: var(--tracking-label);
+	}
+
+	.audio-track-name {
+		font-size: var(--text-small);
+		font-weight: var(--weight-semibold);
+		color: #ffffff;
+		text-transform: uppercase;
+		letter-spacing: var(--tracking-label);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.audio-duration-tag {
+		font-size: var(--text-meta);
+		color: var(--ink-muted);
+	}
+
+	/* Tactile Playback Controls Row */
+	.audio-controls-row {
+		display: flex;
+		align-items: center;
+		gap: var(--space-m);
+	}
+
 	.audio-play-btn {
+		min-inline-size: 44px;
+		min-block-size: 44px;
 		inline-size: 3rem;
 		block-size: 3rem;
-		min-inline-size: 3rem;
-		min-block-size: 3rem;
 		border-radius: 50%;
 		border: 1px solid var(--accent);
-		background: rgba(5, 217, 232, 0.12);
-		color: var(--accent);
+		background: rgba(5, 217, 232, 0.16);
+		color: #ffffff;
 		cursor: pointer;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
-		box-shadow: 0 0 16px rgba(5, 217, 232, 0.25);
-		transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+		box-shadow: 0 4px 16px rgba(5, 217, 232, 0.25);
+		transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 	}
 
 	.audio-play-btn:hover {
 		transform: scale(1.05);
-		background: rgba(5, 217, 232, 0.22);
-		box-shadow: 0 0 22px rgba(5, 217, 232, 0.45);
+		background: rgba(5, 217, 232, 0.28);
+		box-shadow: 0 6px 24px rgba(5, 217, 232, 0.45);
 	}
 
 	.audio-play-btn.is-playing {
 		background: var(--accent);
 		color: #090710;
-		box-shadow: 0 0 24px var(--accent);
+		box-shadow: 0 0 24px rgba(5, 217, 232, 0.65);
 	}
 
 	.audio-btn-icon {
-		inline-size: 1.25rem;
-		block-size: 1.25rem;
-		display: block;
+		inline-size: 1.5rem;
+		block-size: 1.5rem;
 	}
 
-	:global(.audio-meta-stack) {
+	:global(.audio-timeline-stack) {
 		flex: 1;
+		min-inline-size: 0;
 	}
 
-	.audio-track-label {
-		font-family: var(--font-mono);
-		font-size: var(--text-small);
+	.audio-status-label {
+		font-size: var(--text-meta);
 		font-weight: var(--weight-semibold);
 		color: #ffffff;
+	}
+
+	.audio-status-tag {
+		font-size: var(--text-meta);
+		color: var(--highlight);
+		letter-spacing: var(--tracking-wide);
 	}
 
 	.audio-progress-track {
 		inline-size: 100%;
 		block-size: 6px;
 		background: rgba(255, 255, 255, 0.1);
-		border-radius: 3px;
+		border-radius: var(--radius-full);
 		overflow: hidden;
-		margin-block-start: var(--space-3xs);
+		margin-block-start: var(--space-4xs);
 	}
 
-	/* Animated progress fill */
 	.audio-progress-fill {
 		inline-size: 0%;
 		block-size: 100%;
 		background: var(--accent);
-		box-shadow: 0 0 10px var(--accent);
+		border-radius: var(--radius-full);
 		transition: inline-size 0.3s ease;
 	}
 
 	.audio-progress-fill.is-playing {
-		inline-size: 38%;
-	}
-
-	@media (prefers-reduced-motion: no-preference) {
-		.audio-progress-fill.is-playing {
-			animation: audio-pulse 2s ease-in-out infinite alternate;
-		}
-	}
-
-	@keyframes audio-pulse {
-		0% {
-			opacity: 0.85;
-		}
-		100% {
-			opacity: 1;
-			box-shadow: 0 0 14px var(--accent);
-		}
+		inline-size: 42%;
+		box-shadow: 0 0 8px var(--accent);
 	}
 
 	.audio-native-player {
 		inline-size: 100%;
 		min-block-size: var(--control-size);
+	}
+
+	.audio-liner-notes {
+		padding-block: var(--space-xs);
+		padding-inline: var(--space-s);
+		background: rgba(255, 255, 255, 0.02);
+		border-radius: var(--radius-sm);
+		border-inline-start: 3px solid var(--accent);
+	}
+
+	.audio-liner-notes p {
+		color: #d4d0df;
+		font-size: var(--text-body);
+		line-height: var(--leading-body);
 	}
 </style>

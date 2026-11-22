@@ -56,13 +56,7 @@
 	<header class="cover-header">
 		<Cluster align="center" gap="xs">
 			{#each shell.chips as chip, i}
-				{#if i === 0}
-					<a href="#page-cover" class="header-chip-link" aria-label="Return to cover: {chip.label}">
-						<TypeLabel position={i} tone={chip.tone ?? 'plain'}>{chip.label}</TypeLabel>
-					</a>
-				{:else}
-					<TypeLabel position={i} tone={chip.tone ?? 'plain'}>{chip.label}</TypeLabel>
-				{/if}
+				<TypeLabel position={i} tone={chip.tone ?? 'plain'}>{chip.label}</TypeLabel>
 			{/each}
 		</Cluster>
 		<span class="text-muted type-face subtext-page">
