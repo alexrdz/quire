@@ -1,7 +1,8 @@
 <script lang="ts">
-	import ZineCover from '$lib/components/zine/ZineCover.svelte';
+	import StoryReader from '$lib/components/zine/story/StoryReader.svelte';
+	import StoryCover from '$lib/components/zine/story/StoryCover.svelte';
+	import StoryPhoto from '$lib/components/zine/story/StoryPhoto.svelte';
 	import SetlistPage from '$lib/components/zine/SetlistPage.svelte';
-	import PhotoPage from '$lib/components/zine/PhotoPage.svelte';
 	import AudioPage from '$lib/components/zine/AudioPage.svelte';
 	import VideoPage from '$lib/components/zine/VideoPage.svelte';
 	import TextPage from '$lib/components/zine/TextPage.svelte';
@@ -9,6 +10,7 @@
 	import Endpaper from '$lib/components/zine/Endpaper.svelte';
 	import AuthDrawer from '$lib/components/zine/AuthDrawer.svelte';
 	import {
+		contentPageId,
 		contentPageShell,
 		endpaperShell,
 		parseContent,
@@ -16,6 +18,8 @@
 		type AuthAction,
 		type PageSource
 	} from '$lib/components/zine/reader';
+	import { resolvePhotoEntries } from '$domain/photo-pile';
+	import type { StoryPageInfo } from '$domain/story';
 
 	let { data, form } = $props();
 
@@ -72,6 +76,25 @@
 		];
 	});
 
+	const isPhoto = (kind: string) => kind === 'photo' || kind === 'image';
+
+	// Each content page once, with its parsed content and, for a photo page, its photos.
+	let readerPages = $derived(
+		contentPages.map((page) => {
+			const content = parseContent(page.contentJson);
+			return { ...page, content, photos: isPhoto(page.kind) ? resolvePhotoEntries(content) : [] };
+		})
+	);
+
+	// The Stories reader's pages (ADR 0011): the Cover, the content pages (one
+	// segment per photo), the Wall and the Endpaper. The ids are also the URL hashes.
+	let storyPages = $derived<StoryPageInfo[]>([
+		{ id: 'page-cover', segments: 1 },
+		...readerPages.map((page, idx) => ({ id: contentPageId(idx), segments: Math.max(1, page.photos.length) })),
+		{ id: 'page-wall', segments: 1 },
+		{ id: 'page-endpaper', segments: 1 }
+	]);
+
 	function openAuthFor(action: AuthAction) {
 		pendingAuthAction = action;
 		if (typeof window !== 'undefined' && action === 'note' && noteBody.trim().length > 0) {
@@ -89,123 +112,95 @@
 	<title>{data.issue.city} @ {data.issue.venue} — {data.artist.displayName} | Quire</title>
 </svelte:head>
 
-<div
-	class="book-container {showTips ? 'has-floating-tip' : ''}"
-	style="--accent: {data.artist.accentColor || '#05D9E8'};"
+<StoryReader
+	pages={storyPages}
+	artist={data.artist}
+	issue={data.issue}
+	noteCount={data.notes.length}
+	{showTips}
+	tipPresets={data.tipPresets}
+	tipsOpenVenmo={data.features.tipsOpenVenmo}
 >
-	<!-- PAGE 1: The Cover -->
-	<ZineCover
-		artist={data.artist}
-		issue={data.issue}
-		contentCount={contentPages.length}
-		signedIn={Boolean(data.viewer)}
-		isScanVerified={data.isScanVerified}
-		isArtistClosed={data.isArtistClosed}
-		{showTips}
-		tipPresets={data.tipPresets}
-		tipsOpenVenmo={data.features.tipsOpenVenmo}
-		onSignIn={() => openAuthFor('')}
-	/>
-
-	<!-- BESPOKE & MASTER TEMPLATE PAGES (SPEC.md §5.2) -->
-	<!-- Keyed, so per-page state (an activated video) follows its page, as before. -->
-	{#each contentPages as page, idx (`${page.source}:${page.id}`)}
-		{@const content = parseContent(page.contentJson)}
-		{@const shell = contentPageShell(idx, contentPages.length, page, data.issue.city)}
-		{#if page.kind === 'setlist'}
-			<SetlistPage {shell} {content} venue={data.issue.venue} />
-		{:else if page.kind === 'photo' || page.kind === 'image'}
-			<PhotoPage {shell} {content} city={data.issue.city} />
-		{:else if page.kind === 'audio'}
-			<AudioPage
-				{shell}
-				{content}
-				playing={playingAudioId === page.id}
-				onToggle={() => toggleAudio(page.id)}
+	{#snippet page(index: number, part: number)}
+		{#if index === 0}
+			<StoryCover
+				artist={data.artist}
+				issue={data.issue}
+				signedIn={Boolean(data.viewer)}
+				isScanVerified={data.isScanVerified}
+				isArtistClosed={data.isArtistClosed}
+				{showTips}
+				tipPresets={data.tipPresets}
+				tipsOpenVenmo={data.features.tipsOpenVenmo}
+				onSignIn={() => openAuthFor('')}
 			/>
-		{:else if page.kind === 'video'}
-			<VideoPage {shell} {content} />
+		{:else if index <= readerPages.length}
+			<!-- Bespoke and Master Template pages (SPEC.md §5.2). -->
+			{@const idx = index - 1}
+			{@const entry = readerPages[idx]!}
+			{@const content = entry.content}
+			{@const shell = contentPageShell(idx, readerPages.length)}
+			{#if isPhoto(entry.kind)}
+				<StoryPhoto
+					id={shell.id}
+					photos={entry.photos}
+					{part}
+					title={content.title}
+					body={content.body}
+					city={data.issue.city}
+				/>
+			{:else if entry.kind === 'setlist'}
+				<SetlistPage {shell} {content} venue={data.issue.venue} />
+			{:else if entry.kind === 'audio'}
+				<AudioPage
+					{shell}
+					{content}
+					playing={playingAudioId === entry.id}
+					onToggle={() => toggleAudio(entry.id)}
+				/>
+			{:else if entry.kind === 'video'}
+				<VideoPage {shell} {content} />
+			{:else}
+				<TextPage {shell} {content} source={entry.source} artistName={data.artist.displayName} />
+			{/if}
+		{:else if index === readerPages.length + 1}
+			<!-- The Wall (public guestbook, SPEC.md §5.5); R-T04 restyles it. -->
+			<WallPage
+				shell={wallShell(readerPages.length)}
+				notes={data.notes}
+				artistId={data.artist.id}
+				artistName={data.artist.displayName}
+				issueId={data.issue.id}
+				signedIn={Boolean(data.viewer)}
+				isReadOnly={data.isReadOnly}
+				isArtistClosed={data.isArtistClosed}
+				formError={form?.error}
+				bind:noteBody
+				onSignInToPost={() => openAuthFor('note')}
+			/>
 		{:else}
-			<TextPage {shell} {content} source={page.source} artistName={data.artist.displayName} />
+			<!-- The Endpaper (final page, SPEC.md §5.6 and §7); R-T04 restyles it. -->
+			<Endpaper
+				shell={endpaperShell(readerPages.length)}
+				issue={data.issue}
+				artistName={data.artist.displayName}
+				artistSlug={data.artist.slug}
+				signedIn={Boolean(data.viewer)}
+				isScanVerified={data.isScanVerified}
+				stamped={data.collectionStatus === 'stamped' || Boolean(form?.stamped)}
+				saved={data.collectionStatus === 'saved' || Boolean(form?.saved)}
+				onSignIn={openAuthFor}
+			/>
 		{/if}
-	{/each}
+	{/snippet}
 
-	<!-- THE WALL (PUBLIC GUESTBOOK, SPEC.md §5.5) -->
-	<WallPage
-		shell={wallShell(contentPages.length)}
-		notes={data.notes}
-		artistId={data.artist.id}
-		artistName={data.artist.displayName}
-		issueId={data.issue.id}
-		signedIn={Boolean(data.viewer)}
-		isReadOnly={data.isReadOnly}
-		isArtistClosed={data.isArtistClosed}
-		formError={form?.error}
-		bind:noteBody
-		onSignInToPost={() => openAuthFor('note')}
-	/>
-
-	<!-- ENDPAPER (FINAL PAGE, SPEC.md §5.6 & §7) -->
-	<Endpaper
-		shell={endpaperShell(contentPages.length)}
-		issue={data.issue}
-		artistName={data.artist.displayName}
-		artistSlug={data.artist.slug}
-		signedIn={Boolean(data.viewer)}
-		isScanVerified={data.isScanVerified}
-		stamped={data.collectionStatus === 'stamped' || Boolean(form?.stamped)}
-		saved={data.collectionStatus === 'saved' || Boolean(form?.saved)}
-		onSignIn={openAuthFor}
-	/>
-</div>
-
-<!-- Persistent floating tip trigger: jumps to the Venmo tip buttons on the Cover (ADR 0008).
-     Every inner page's footer leaves room for it, so it never covers Prev or Next (Z-T08). -->
-{#if showTips && !authDrawerOpen}
-	<a href="#tip" class="btn-floating-tip" aria-label="Tip {data.artist.displayName} with Venmo">
-		<span>Tip</span>
-	</a>
-{/if}
-
-{#if authDrawerOpen}
-	<AuthDrawer
-		pendingAction={pendingAuthAction}
-		fanSignIn={data.features.fanSignIn}
-		mode={data.features.mode}
-		fanSignInError={form?.fanSignInError}
-		onClose={() => (authDrawerOpen = false)}
-	/>
-{/if}
-
-<style>
-	/* Size and offset are shared with the footer's room for it (components.css, Z-T08). */
-	.btn-floating-tip {
-		position: fixed;
-		text-decoration: none;
-		inset-block-end: var(--reader-tip-offset);
-		inset-inline-end: var(--reader-tip-offset);
-		min-block-size: var(--reader-tip-size);
-		min-inline-size: var(--reader-tip-size);
-		z-index: 50;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		gap: var(--space-2xs);
-		padding-block: var(--space-xs);
-		padding-inline: var(--space-m);
-		border-radius: 12px;
-		background: var(--support);
-		color: #ffffff;
-		border: 1px solid rgba(255, 42, 109, 0.5);
-		font-size: var(--text-ui);
-		font-weight: var(--weight-heavy);
-		cursor: pointer;
-		box-shadow: 0 4px 20px rgba(255, 42, 109, 0.4);
-		transition: transform 0.15s ease, box-shadow 0.15s ease;
-	}
-
-	.btn-floating-tip:hover {
-		transform: translateY(-2px);
-		box-shadow: 0 8px 28px rgba(255, 42, 109, 0.65);
-	}
-</style>
+	{#if authDrawerOpen}
+		<AuthDrawer
+			pendingAction={pendingAuthAction}
+			fanSignIn={data.features.fanSignIn}
+			mode={data.features.mode}
+			fanSignInError={form?.fanSignInError}
+			onClose={() => (authDrawerOpen = false)}
+		/>
+	{/if}
+</StoryReader>

@@ -1,11 +1,15 @@
 import { test, expect, type Page } from '@playwright/test';
 import { signInAsFan } from './helpers/actions';
 import { addRepliedWallNote, createFan, resetRateLimits } from './helpers/db';
+import { goToStoryPage, openStoryAt } from './helpers/story';
 
 /**
  * Z-T06 (ADR 0009): the Wall's notes are taped-up scraps with ink "Was There"
  * stamps and marker replies, and the Endpaper is the back cover with an ink
  * Stamp. Posting, flagging, Save and Stamp still work in the new look.
+ *
+ * In the Stories reader (ADR 0011) each test opens the Wall or the Endpaper
+ * by its URL hash, as a shared link would; R-T04 restyles both pages.
  *
  * B1-T16: every test owns the state it checks, so the tests run in any order
  * and in parallel, including --repeat-each copies of themselves. A test that
@@ -55,9 +59,8 @@ test('the Wall: taped-up notes with "Was There" stamps and marker replies; post 
 	const { fanName } = await addRepliedWallNote(BROOKLYN, replied);
 
 	await signInAsDemoFan(page);
-	await page.goto(`/i/${BROOKLYN}`);
+	await openStoryAt(page, `/i/${BROOKLYN}`, 'page-wall');
 	const wall = page.locator('#page-wall');
-	await wall.scrollIntoViewIfNeeded();
 
 	// The note this test added: taped up, stamped "Was There" (its Fan is stamped
 	// at this show), with the Artist's reply in marker stuck under it.
@@ -90,8 +93,8 @@ test('the Endpaper: claim the Stamp after a scan, and it is pressed on as an ink
 	await page.goto(SCAN);
 	await expect(page).toHaveURL(new RegExp(BROOKLYN));
 
+	await goToStoryPage(page, 'page-endpaper');
 	const endpaper = page.locator('#page-endpaper');
-	await endpaper.scrollIntoViewIfNeeded();
 	await endpaper.getByRole('button', { name: 'Claim Attendance Stamp' }).click();
 
 	const stamp = endpaper.locator('.ink-stamp');
@@ -109,8 +112,8 @@ test('the ink Stamp does not move with reduced motion', async ({ page }) => {
 	await page.goto(SCAN);
 	await expect(page).toHaveURL(new RegExp(BROOKLYN));
 
+	await goToStoryPage(page, 'page-endpaper');
 	const endpaper = page.locator('#page-endpaper');
-	await endpaper.scrollIntoViewIfNeeded();
 	await endpaper.getByRole('button', { name: 'Claim Attendance Stamp' }).click();
 	const stamp = endpaper.locator('.ink-stamp');
 	await expect(stamp).toContainText('OFFICIAL ATTENDANCE STAMPED');
@@ -119,9 +122,8 @@ test('the ink Stamp does not move with reduced motion', async ({ page }) => {
 
 test('the Endpaper: Save without a scan shows the Saved stamp', async ({ page }) => {
 	await signInAsNewFan(page, 'Save Fan');
-	await page.goto(`/i/${PHILLY}`);
+	await openStoryAt(page, `/i/${PHILLY}`, 'page-endpaper');
 	const endpaper = page.locator('#page-endpaper');
-	await endpaper.scrollIntoViewIfNeeded();
 	await endpaper.getByRole('button', { name: '+ Save Issue to My Stubs' }).click();
 	await expect(endpaper.locator('.stamp', { hasText: 'Saved to Bookmarks' })).toBeVisible();
 	await expect(endpaper.getByRole('link', { name: 'Open My Stubs →' })).toBeVisible();
@@ -133,13 +135,12 @@ test('at 320 px the Wall and the back cover fit, with 44 px controls', async ({ 
 	await signInAsDemoFan(page);
 	await page.goto(`/i/${BROOKLYN}`);
 	for (const id of ['page-wall', 'page-endpaper']) {
-		await page.locator(`#${id}`).scrollIntoViewIfNeeded();
+		await goToStoryPage(page, id);
 		await noHorizontalScroll(page);
 	}
-	// Layout sizes (offset*), which ignore the scroll-driven page-turn transform.
+	// Layout sizes (offset*), which ignore the page's slide transform.
 	const small = await page.evaluate(() =>
 		[...document.querySelectorAll('#page-wall button, #page-wall a, #page-endpaper button, #page-endpaper a')]
-			.filter((el) => !el.closest('.page-footer'))
 			.map((el) => ({ text: (el.textContent ?? '').trim(), w: (el as HTMLElement).offsetWidth, h: (el as HTMLElement).offsetHeight }))
 			.filter((t) => t.w < 44 || t.h < 44)
 	);

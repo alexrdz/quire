@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Locator } from '@playwright/test';
 import { seedVideoFileIssue } from './helpers/db';
+import { goToPageTitled } from './helpers/story';
 
 /**
  * B1-T20: an uploaded video sits in a taped screen (ADR 0009). The portrait
@@ -28,14 +29,6 @@ async function open(page: Page, width: number) {
 	await page.route('**/uploads/videos/**', (route) => route.fulfill({ status: 404, body: '' }));
 	await page.goto(`/i/${SLUG}`);
 	await page.evaluate(() => document.fonts.ready);
-}
-
-/** Scroll a page into the book and wait until it sits flat at the left edge. */
-async function settle(section: Locator) {
-	await section.scrollIntoViewIfNeeded();
-	await expect
-		.poll(() => section.evaluate((el) => Math.round(el.getBoundingClientRect().left)), { message: 'page settles flat' })
-		.toBe(0);
 }
 
 /** Every element of the section that reaches past its left or right edge. */
@@ -78,8 +71,8 @@ function tapeOverControls(section: Locator) {
 for (const width of [390, 320]) {
 	test(`a portrait video page stays inside the page at ${width} px`, async ({ page }) => {
 		await open(page, width);
+		await goToPageTitled(page, 'Portrait Clip');
 		const portrait = pageTitled(page, 'Portrait Clip');
-		await settle(portrait);
 
 		// Still a 9:16 screen, taped at both top corners, tilted a little.
 		const screen = portrait.locator('.video-screen.is-portrait');
@@ -106,8 +99,8 @@ for (const width of [390, 320]) {
 
 	test(`a landscape video page is still a full-width 16:9 screen at ${width} px`, async ({ page }) => {
 		await open(page, width);
+		await goToPageTitled(page, 'Landscape Clip');
 		const landscape = pageTitled(page, 'Landscape Clip');
-		await settle(landscape);
 
 		const screen = landscape.locator('.video-screen');
 		await expect(screen).not.toHaveClass(/is-portrait/);

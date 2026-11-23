@@ -1,5 +1,6 @@
 import { chromium, test, expect, type Page } from '@playwright/test';
 import { E2E_MEDIA_ORIGIN, latestPhotoUrlForCity, seedEmbedIssue } from './helpers/db';
+import { goToPageTitled } from './helpers/story';
 
 /**
  * PRODUCTION_PLAN 3.4: security headers on real responses from the production
@@ -116,18 +117,18 @@ test.describe('Security headers', () => {
 		expect(res?.status()).toBe(200);
 		await page.waitForLoadState('networkidle');
 
-		const poster = page.locator('img.video-poster-img');
-		await poster.scrollIntoViewIfNeeded();
+		// The Stories reader (ADR 0011) shows one page at a time: open each embed's page.
+		await goToPageTitled(page, 'YouTube Clip');
 		await expect.poll(() => loaded.some((url) => url.startsWith('https://i.ytimg.com/'))).toBe(true);
-
 		await page.locator('button[aria-label="Play YouTube Clip"]').click();
-		await page.locator('button[aria-label="Play Vimeo Clip"]').click();
+		await expect(page.locator('iframe[title="YouTube Clip"]')).toBeVisible();
 
-		for (const title of ['YouTube Clip', 'Vimeo Clip', 'Bandcamp Player']) {
-			const frame = page.locator(`iframe[title="${title}"]`);
-			await frame.scrollIntoViewIfNeeded();
-			await expect(frame).toBeVisible();
-		}
+		await goToPageTitled(page, 'Vimeo Clip');
+		await page.locator('button[aria-label="Play Vimeo Clip"]').click();
+		await expect(page.locator('iframe[title="Vimeo Clip"]')).toBeVisible();
+
+		await goToPageTitled(page, 'Bandcamp Player');
+		await expect(page.locator('iframe[title="Bandcamp Player"]')).toBeVisible();
 		await expect(page.frameLocator('iframe[title="YouTube Clip"]').locator('p')).toHaveText('YouTube stub');
 		await expect(page.frameLocator('iframe[title="Vimeo Clip"]').locator('p')).toHaveText('Vimeo stub');
 		await expect(page.frameLocator('iframe[title="Bandcamp Player"]').locator('p')).toHaveText(

@@ -649,7 +649,8 @@
 
 /* ==========================================================================
    Issue reader: cut-and-paste on dark (ADR 0009)
-   Only the reader (/i/[slug] and its Bookbinder preview) uses these.
+   Kept only for the pages R-T02 to R-T04 have not restyled yet; the Stories
+   reader (ADR 0011) styles its own components in src/lib/components/zine/story/.
    ========================================================================== */
 
 /* Dark paper with a photocopy grain and soft mottling, on every reader page. */
@@ -662,60 +663,6 @@
 	background-size: 160px 160px, 420px 420px, auto;
 }
 
-/* Page turn: each page swings in as it is swiped into view and out as it
-   leaves. Scroll-driven, so it is still when a page is snapped and costs no
-   script; browsers without scroll timelines just slide. */
-.zine-page {
-	view-timeline: --zine-page inline;
-}
-
-@supports (animation-timeline: view()) {
-	@media (prefers-reduced-motion: no-preference) {
-		.zine-page > .page-inner {
-			animation: zine-page-turn linear both;
-			animation-timeline: --zine-page;
-			animation-range: cover 0% cover 100%;
-		}
-	}
-
-	/* Reduced motion: no swing, only a fade. */
-	@media (prefers-reduced-motion: reduce) {
-		.zine-page > .page-inner {
-			animation: zine-page-fade linear both;
-			animation-timeline: --zine-page;
-			animation-range: cover 0% cover 100%;
-		}
-	}
-}
-
-@keyframes zine-page-turn {
-	0% {
-		opacity: 0.3;
-		transform: perspective(1400px) rotateY(-30deg) scale(0.94);
-		transform-origin: 0% 50%;
-	}
-	50% {
-		opacity: 1;
-		transform: none;
-		transform-origin: 0% 50%;
-	}
-	100% {
-		opacity: 0.3;
-		transform: perspective(1400px) rotateY(30deg) scale(0.94);
-		transform-origin: 100% 50%;
-	}
-}
-
-@keyframes zine-page-fade {
-	0%,
-	100% {
-		opacity: 0.25;
-	}
-	50% {
-		opacity: 1;
-	}
-}
-
 /* The typewriter face for labels, page numbers and typed notes. */
 .type-face {
 	font-family: var(--font-type);
@@ -724,24 +671,4 @@
 
 .marker-face {
 	font-family: var(--font-marker);
-}
-
-
-/* ---------------------------------------------------------------------------
-   Issue reader: the floating Tip button and the page footer (Z-T08)
-   ---------------------------------------------------------------------------
-   The Tip button is fixed at the reader's bottom end corner on every page. On
-   phones it used to sit on top of the footer's Next button (ADR 0009: nothing
-   covers a control). When it shows, each inner page's footer leaves room under
-   its row for the button, so Prev and Next sit just above it and keep the full
-   width. The Cover's own footer and tip panel are unchanged. */
-:root {
-	/* The Tip button's block size (3rem, never under 44 px) and its distance from the edges. */
-	--reader-tip-size: var(--space-xl);
-	--reader-tip-offset: var(--space-m);
-}
-
-.book-container.has-floating-tip .zine-page:not(.cover) .page-footer {
-	/* Always positive: the button and its offset are taller than the page's own bottom padding. */
-	padding-block-end: calc(var(--reader-tip-size) + var(--reader-tip-offset) + var(--space-2xs) - var(--page-padding-block));
 }
