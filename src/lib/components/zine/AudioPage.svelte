@@ -1,273 +1,382 @@
 <script lang="ts">
-	import { Stack, Cluster } from '$lib/components/layout';
-	import TypeLabel from './TypeLabel.svelte';
-	import Tape from './Tape.svelte';
-	import ZinePageShell from './ZinePageShell.svelte';
-	import { zineTilt, type PageContent, type PageShell } from './reader';
+	import { initialsOf } from './story/context';
+	import { resolveVideoEmbed, type PageContent, type PageShell } from './reader';
 
+	/**
+	 * An audio page in the Stories reader (ADR 0011): the cover art large and centred,
+	 * the track title, and a clean player (a 56 px play button, a scrubber and the time),
+	 * all keyboard-operable and labelled. A Bandcamp embed is centred instead of the
+	 * player. Leaving the page pauses the track.
+	 *
+	 * A page with no audio file is the sample "demo preview": the same player, with a
+	 * position that moves while it plays but no sound.
+	 */
 	interface Props {
 		shell: PageShell;
 		content: PageContent;
-		/** The mock player (a page without an audio URL) is playing; only one plays at a time. */
-		playing: boolean;
-		onToggle: () => void;
+		/** Whether this is the page on screen, from the reader: leaving it pauses the track. */
+		current?: boolean;
+		/** The Artist's cover art, shown large; initials on the accent colour when there is none. */
+		coverArtUrl?: string | null;
+		artistName?: string;
 	}
 
-	let { shell, content, playing, onToggle }: Props = $props();
+	let { shell, content, current = false, coverArtUrl = null, artistName = '' }: Props = $props();
 
-	/** A real track's playing state, from the native player, so the reels turn with it. */
-	let nativePlaying = $state(false);
-	const spinning = $derived(content.audioUrl ? nativePlaying : playing);
-	/** The cassette lies at a small angle; its label is text, so it stays within about 2 degrees. */
-	const tilt = $derived(zineTilt(shell.pageNumber + 1));
+	const heading = $derived(content.title || (content.audioUrl ? 'Audio Track' : 'Studio Session Bounce'));
+	const titleId = $derived(`${shell.id}-title`);
+	const embed = $derived(resolveVideoEmbed(content.audioUrl || content.embedUrl));
+	const isBandcamp = $derived(embed.kind === 'bandcamp-embed');
+	const isMock = $derived(!content.audioUrl);
+
+	/** `03:42` or `3:42` as seconds; `fallback` when it doesn't parse. */
+	function parseDuration(text: string | undefined, fallback: number): number {
+		const match = /^(\d{1,3}):([0-5]\d)$/.exec(text?.trim() ?? '');
+		return match ? Number(match[1]) * 60 + Number(match[2]) : fallback;
+	}
+
+	/** Seconds as `m:ss`. */
+	function clock(seconds: number): string {
+		const s = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0));
+		return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+	}
+
+	// The real track, through the browser's audio element (no native controls: the player below drives it).
+	let audioEl = $state<HTMLAudioElement | null>(null);
+	let paused = $state(true);
+	let position = $state(0);
+	let mediaDuration = $state(Number.NaN);
+
+	// The demo preview: a position that moves while "playing".
+	let mockPlaying = $state(false);
+
+	const total = $derived(
+		isMock
+			? parseDuration(content.duration, 222)
+			: Number.isFinite(mediaDuration) && mediaDuration > 0
+				? mediaDuration
+				: parseDuration(content.duration, 0)
+	);
+	const playing = $derived(isMock ? mockPlaying : !paused);
+	const playedPercent = $derived(total > 0 ? Math.min(100, (position / total) * 100) : 0);
+
+	$effect(() => {
+		if (!isMock || !mockPlaying) return;
+		const timer = setInterval(() => {
+			if (position + 0.25 >= total) {
+				position = 0;
+				mockPlaying = false;
+			} else {
+				position += 0.25;
+			}
+		}, 250);
+		return () => clearInterval(timer);
+	});
+
+	// Leaving the page pauses the track.
+	$effect(() => {
+		if (current) return;
+		audioEl?.pause();
+		mockPlaying = false;
+	});
+
+	function toggle() {
+		if (isMock) {
+			mockPlaying = !mockPlaying;
+			return;
+		}
+		if (!audioEl) return;
+		if (audioEl.paused) audioEl.play().catch(() => {});
+		else audioEl.pause();
+	}
+
+	function seek(event: Event) {
+		const value = Number((event.currentTarget as HTMLInputElement).value);
+		position = value;
+		if (audioEl && !isMock) audioEl.currentTime = value;
+	}
 </script>
 
-<ZinePageShell {shell}>
-	<Stack gap="md">
-		<Cluster justify="between" align="center">
-			<TypeLabel position={shell.pageNumber} tone="accent">
-				{content.audioUrl ? 'AUDIO TRACK' : 'UNRELEASED DEMO'}
-			</TypeLabel>
-			{#if content.audioUrl}
-				{#if content.duration}
-					<span class="text-accent type-face">{content.duration}</span>
-				{/if}
-			{:else}
-				<span class="text-accent type-face">
-					{playing ? '01:14' : '00:00'} / {content.duration || '03:42'}
-				</span>
+<section id={shell.id} class="story-audio" aria-labelledby={titleId}>
+	<div class="story-audio-stage">
+		{#if isBandcamp}
+			<iframe
+				src={embed.kind === 'bandcamp-embed' ? embed.embedSrc : undefined}
+				title={content.title || 'Bandcamp player'}
+				class="story-bandcamp"
+				loading="lazy"
+				seamless
+			></iframe>
+		{:else if coverArtUrl}
+			<img class="story-audio-art" src={coverArtUrl} alt="Cover art for {artistName || heading}" />
+		{:else}
+			<div class="story-audio-art story-audio-initials" aria-hidden="true">{initialsOf(artistName || heading)}</div>
+		{/if}
+
+		<div class="story-audio-text">
+			{#if isMock && !isBandcamp}
+				<span class="story-audio-kind">Demo preview</span>
 			{/if}
-		</Cluster>
-
-		<h2 class="bespoke-heading">{content.title || 'Studio Session Bounce'}</h2>
-
-		<!-- A cassette: a typed label over a window with two reels. The controls below it are the standard ones. -->
-		<div class="cassette audio-card" class:is-spinning={spinning} style="--cassette-tilt: {tilt}deg;">
-			<Tape placement="top-right" position={shell.pageNumber + 2} />
-			<div class="cassette-label">
-				<div class="cassette-label-row">
-					<span class="cassette-side type-face" aria-hidden="true">A</span>
-					<span class="cassette-title type-face">{content.title || (content.audioUrl ? 'Audio Track' : 'Rough Mix')}</span>
-					<span class="cassette-length type-face" aria-hidden="true">{content.duration || (content.audioUrl ? '' : '03:42')}</span>
-				</div>
-				<div class="cassette-window" aria-hidden="true">
-					<span class="cassette-reel"></span>
-					<span class="cassette-tape"></span>
-					<span class="cassette-reel"></span>
-				</div>
-			</div>
-
-			{#if content.audioUrl}
-				<audio
-					controls
-					preload="metadata"
-					src={content.audioUrl}
-					class="audio-native-player"
-					onplay={() => (nativePlaying = true)}
-					onpause={() => (nativePlaying = false)}
-					onended={() => (nativePlaying = false)}
-				></audio>
-			{:else}
-				<Cluster justify="between" align="center" gap="md">
-					<button
-						type="button"
-						class="audio-play-btn {playing ? 'is-playing' : ''}"
-						onclick={onToggle}
-						aria-label={playing ? 'Pause track' : 'Play track'}
-					>
-						{playing ? 'PAUSE' : 'PLAY'}
-					</button>
-					<Stack gap="3xs" class="audio-meta-stack">
-						<span class="audio-track-label">
-							{playing ? 'Playing 4-Track Tape Bounce...' : 'Tap to preview rough mix'}
-						</span>
-						<div class="audio-progress-track">
-							<div class="audio-progress-fill {playing ? 'is-playing' : ''}"></div>
-						</div>
-					</Stack>
-				</Cluster>
+			<h2 id={titleId} class="story-audio-title" tabindex="-1">{heading}</h2>
+			{#if artistName}
+				<p class="story-audio-artist">{artistName}</p>
 			{/if}
 		</div>
 
-		{#if content.body}
-			<p class="bespoke-body-text">{content.body}</p>
+		{#if !isBandcamp}
+			{#if content.audioUrl}
+				<audio
+					bind:this={audioEl}
+					bind:paused
+					bind:currentTime={position}
+					bind:duration={mediaDuration}
+					src={content.audioUrl}
+					preload="metadata"
+				></audio>
+			{/if}
+			<div class="story-player">
+				<button
+					type="button"
+					class="story-play"
+					onclick={toggle}
+					aria-label="{playing ? 'Pause' : 'Play'} {heading}"
+				>
+					{#if playing}
+						<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /></svg>
+					{:else}
+						<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+					{/if}
+				</button>
+				<div class="story-scrub">
+					<input
+						type="range"
+						class="story-scrubber"
+						min="0"
+						max={Math.max(1, Math.floor(total))}
+						step="1"
+						value={Math.floor(position)}
+						oninput={seek}
+						aria-label="Seek in {heading}"
+						aria-valuetext="{clock(position)} of {clock(total)}"
+						style="--played: {playedPercent}%;"
+					/>
+					<div class="story-time" aria-hidden="true">
+						<span>{clock(position)}</span>
+						<span>{clock(total)}</span>
+					</div>
+				</div>
+			</div>
 		{/if}
-	</Stack>
-</ZinePageShell>
+
+		{#if content.body}
+			<p class="story-audio-body">{content.body}</p>
+		{/if}
+	</div>
+</section>
 
 <style>
-	/* The cassette shell: dark plastic with screw holes, lying at a small angle. */
-	.cassette {
-		position: relative;
-		/* Inset so the corner tape lands on the page, clear of its edge gutter. */
-		margin-inline: var(--space-s);
+	.story-audio {
+		position: absolute;
+		inset: 0;
+		overflow: hidden;
+		background: var(--bg-void);
+		color: #ffffff;
+	}
+
+	/* Everything centred between the header and the bottom bar; long words scroll inside. */
+	.story-audio-stage {
+		position: absolute;
+		inset-inline: 0;
+		inset-block: var(--story-top-space) var(--story-bottom-space);
 		display: flex;
 		flex-direction: column;
+		justify-content: safe center;
+		align-items: center;
 		gap: var(--space-s);
-		max-inline-size: 30rem;
-		padding-block: var(--space-s);
-		padding-inline: var(--space-s);
-		background-color: #1d1924;
-		background-image:
-			var(--zine-grain),
-			radial-gradient(circle at 0.9rem 0.9rem, #0d0b11 0.22rem, transparent 0.24rem),
-			radial-gradient(circle at calc(100% - 0.9rem) 0.9rem, #0d0b11 0.22rem, transparent 0.24rem),
-			radial-gradient(circle at 0.9rem calc(100% - 0.9rem), #0d0b11 0.22rem, transparent 0.24rem),
-			radial-gradient(circle at calc(100% - 0.9rem) calc(100% - 0.9rem), #0d0b11 0.22rem, transparent 0.24rem);
-		background-size: 160px 160px, auto, auto, auto, auto;
-		border: 1px solid rgba(255, 255, 255, 0.08);
-		border-radius: 10px;
-		box-shadow:
-			inset 0 1px 0 rgba(255, 255, 255, 0.06),
-			0 14px 26px -12px rgba(0, 0, 0, 0.85);
-		transform: rotate(var(--cassette-tilt, 0deg));
+		overflow-y: auto;
+		padding-inline: var(--space-m);
 	}
 
-	/* The paper label, typed on, with the accent stripe a real tape label has. */
-	.cassette-label {
+	.story-audio-art {
+		inline-size: min(100%, 20rem, 42dvh);
+		aspect-ratio: 1;
+		flex-shrink: 0;
+		border-radius: 12px;
+		object-fit: cover;
+		background-color: var(--bg-surface);
+	}
+
+	.story-audio-initials {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background-color: var(--accent);
+		color: var(--on-accent);
+		font-size: var(--text-display, var(--text-title));
+		font-weight: var(--weight-heavy);
+	}
+
+	.story-bandcamp {
+		inline-size: 100%;
+		max-inline-size: 22rem;
+		block-size: 30rem;
+		max-block-size: 100%;
+		flex-shrink: 0;
+		border: 0;
+		border-radius: 12px;
+	}
+
+	.story-audio-text {
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-2xs);
-		padding-block: var(--space-2xs) var(--space-xs);
-		padding-inline: var(--space-xs);
-		background-color: var(--zine-scrap-light);
-		background-image: var(--zine-mottle);
-		background-size: 420px 420px;
-		color: var(--zine-scrap-light-ink);
-		border-radius: 4px;
+		align-items: center;
+		gap: var(--space-3xs);
+		inline-size: 100%;
+		text-align: center;
 	}
 
-	/* Side, title and length on one typed line, over the accent stripe a real tape label has. */
-	.cassette-label-row {
-		display: flex;
-		align-items: baseline;
-		gap: var(--space-2xs);
-		padding-block-end: var(--space-3xs);
-		border-block-end: 3px solid var(--accent);
-	}
-
-	.cassette-side {
-		flex-shrink: 0;
-		font-size: var(--text-lead);
-		line-height: 1;
-	}
-
-	.cassette-title {
-		flex: 1 1 auto;
-		min-inline-size: 0;
-		font-size: var(--text-small);
-		text-transform: uppercase;
+	.story-audio-kind {
+		font-size: var(--text-meta);
+		font-weight: var(--weight-bold);
 		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: rgba(255, 255, 255, 0.78);
+	}
+
+	.story-audio-title {
+		margin: 0;
+		font-family: var(--story-heading-font, inherit);
+		font-size: var(--text-heading-sm);
+		font-weight: var(--weight-bold);
+		line-height: var(--leading-heading);
 		overflow-wrap: anywhere;
 	}
 
-	.cassette-length {
-		flex-shrink: 0;
-		font-size: var(--text-meta);
-		color: #5b5466;
+	.story-audio-title:focus {
+		outline: none;
 	}
 
-	/* The window: two reels joined by a strip of tape. */
-	.cassette-window {
+	.story-audio-artist {
+		margin: 0;
+		font-size: var(--text-small);
+		color: rgba(255, 255, 255, 0.78);
+	}
+
+	/* The player: a 56 px play button beside the scrubber and the time. */
+	.story-player {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		gap: var(--space-xs);
-		padding-block: var(--space-2xs);
-		padding-inline: var(--space-s);
-		background-color: #2a2433;
-		border-radius: 999px;
-		box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+		gap: var(--space-s);
+		inline-size: 100%;
+		max-inline-size: 24rem;
 	}
 
-	.cassette-reel {
-		flex-shrink: 0;
-		inline-size: 2.6rem;
-		block-size: 2.6rem;
-		border-radius: 50%;
-		background:
-			radial-gradient(circle, #ebe5d5 0 22%, transparent 23%),
-			conic-gradient(#1a1620 0 10%, #3a3245 10% 23%, #1a1620 23% 43%, #3a3245 43% 56%, #1a1620 56% 76%, #3a3245 76% 90%, #1a1620 90%);
-		box-shadow: 0 0 0 3px #4a3f37;
-	}
-
-	.cassette-tape {
-		flex: 1 1 auto;
-		block-size: 0.5rem;
-		background-color: #4a3f37;
-		border-radius: 2px;
-	}
-
-	@media (prefers-reduced-motion: no-preference) {
-		.cassette.is-spinning .cassette-reel {
-			animation: cassette-spin 2.4s linear infinite;
-		}
-	}
-
-	@keyframes cassette-spin {
-		to {
-			transform: rotate(-360deg);
-		}
-	}
-
-	/* The standard controls, unchanged in behaviour. */
-	.audio-play-btn {
-		inline-size: 3.5rem;
-		block-size: 3.5rem;
-		border-radius: 50%;
-		border: 1px solid var(--accent);
-		background: rgba(5, 217, 232, 0.14);
-		color: #ffffff;
-		font-family: var(--font-mono);
-		font-size: var(--text-meta);
-		font-weight: var(--weight-heavy);
-		letter-spacing: var(--tracking-label);
-		cursor: pointer;
+	.story-play {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
 		flex-shrink: 0;
-		transition: transform 0.15s ease, background-color 0.15s ease;
+		inline-size: 56px;
+		block-size: 56px;
+		padding: 0;
+		border: none;
+		border-radius: 999px;
+		background-color: var(--accent);
+		color: var(--on-accent);
+		cursor: pointer;
 	}
 
-	.audio-play-btn.is-playing {
-		background: var(--accent);
-		color: #090710;
+	.story-play svg {
+		inline-size: 1.625rem;
+		block-size: 1.625rem;
+		fill: currentColor;
 	}
 
-	:global(.audio-meta-stack) {
+	.story-play:focus-visible {
+		outline: 2px solid #ffffff;
+		outline-offset: 3px;
+	}
+
+	.story-scrub {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3xs);
 		flex: 1;
+		min-inline-size: 0;
 	}
 
-	.audio-track-label {
-		font-size: var(--text-small);
-		font-weight: var(--weight-semibold);
-		color: #ffffff;
-	}
-
-	.audio-progress-track {
+	/* A plain range input, so arrows, Home and End work; the played part is in the accent colour.
+	   Its box is 44 px tall for the finger, the track itself thin. */
+	.story-scrubber {
 		inline-size: 100%;
-		block-size: 6px;
-		background: rgba(255, 255, 255, 0.1);
-		border-radius: 4px;
-		overflow: hidden;
-		margin-block-start: var(--space-3xs);
+		block-size: 44px;
+		margin: 0;
+		background: transparent;
+		appearance: none;
+		cursor: pointer;
 	}
 
-	/* The mock player's progress: a class, not an inline style (CLAUDE.md). */
-	.audio-progress-fill {
-		inline-size: 0%;
-		block-size: 100%;
+	/* The track box is as tall as the thumb, so the thumb centres itself; the 4 px line is
+	   drawn through its middle. */
+	.story-scrubber::-webkit-slider-runnable-track {
+		block-size: 16px;
+		background: linear-gradient(
+				to right,
+				var(--accent) var(--played, 0%),
+				rgba(255, 255, 255, 0.28) var(--played, 0%)
+			)
+			center / 100% 4px no-repeat;
+	}
+
+	.story-scrubber::-moz-range-track {
+		block-size: 4px;
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.28);
+	}
+
+	.story-scrubber::-moz-range-progress {
+		block-size: 4px;
+		border-radius: 999px;
 		background: var(--accent);
-		transition: inline-size 0.3s ease;
 	}
 
-	.audio-progress-fill.is-playing {
-		inline-size: 38%;
+	.story-scrubber::-webkit-slider-thumb {
+		appearance: none;
+		inline-size: 16px;
+		block-size: 16px;
+		border-radius: 999px;
+		background: #ffffff;
 	}
 
-	.audio-native-player {
+	.story-scrubber::-moz-range-thumb {
+		inline-size: 16px;
+		block-size: 16px;
+		border: none;
+		border-radius: 999px;
+		background: #ffffff;
+	}
+
+	.story-scrubber:focus-visible {
+		outline: 2px solid #ffffff;
+		outline-offset: 2px;
+		border-radius: 4px;
+	}
+
+	.story-time {
+		display: flex;
+		justify-content: space-between;
+		font-size: var(--text-meta);
+		font-variant-numeric: tabular-nums;
+		color: rgba(255, 255, 255, 0.78);
+	}
+
+	.story-audio-body {
+		margin: 0;
 		inline-size: 100%;
-		min-block-size: var(--control-size);
+		max-inline-size: 60ch;
+		font-size: var(--text-body);
+		line-height: var(--leading-body);
+		color: #ffffff;
+		overflow-wrap: anywhere;
 	}
 </style>

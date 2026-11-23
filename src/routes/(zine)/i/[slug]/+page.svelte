@@ -30,9 +30,6 @@
 	let authDrawerOpen = $state(false);
 	let pendingAuthAction = $state<AuthAction>('');
 
-	// Mock audio player: only one page plays at a time.
-	let playingAudioId = $state<string | null>(null);
-
 	// Wall note draft, kept here so it survives Google sign-in (SPEC.md §5.5)
 	let noteBody = $state('');
 
@@ -102,10 +99,6 @@
 		}
 		authDrawerOpen = true;
 	}
-
-	function toggleAudio(id: string) {
-		playingAudioId = playingAudioId === id ? null : id;
-	}
 </script>
 
 <svelte:head>
@@ -121,7 +114,7 @@
 	tipPresets={data.tipPresets}
 	tipsOpenVenmo={data.features.tipsOpenVenmo}
 >
-	{#snippet page(index: number, part: number)}
+	{#snippet page(index: number, part: number, current: boolean)}
 		{#if index === 0}
 			<StoryCover
 				artist={data.artist}
@@ -155,11 +148,12 @@
 				<AudioPage
 					{shell}
 					{content}
-					playing={playingAudioId === entry.id}
-					onToggle={() => toggleAudio(entry.id)}
+					{current}
+					coverArtUrl={data.artist.coverArtUrl}
+					artistName={data.artist.displayName}
 				/>
 			{:else if entry.kind === 'video'}
-				<VideoPage {shell} {content} />
+				<VideoPage {shell} {content} {current} />
 			{:else}
 				<TextPage {shell} {content} source={entry.source} artistName={data.artist.displayName} />
 			{/if}
