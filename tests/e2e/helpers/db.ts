@@ -224,6 +224,44 @@ export async function seedZineContentIssue(slug: string): Promise<string> {
 	}
 }
 
+/**
+ * B1-T20: a published Issue for the sample Artist with an uploaded portrait
+ * video page and an uploaded landscape one, under its own slug, so the taped
+ * screen can be checked at phone widths for both orientations.
+ */
+export async function seedVideoFileIssue(slug: string): Promise<string> {
+	const db = await waitingClient();
+	try {
+		const artist = await db.execute({ sql: 'SELECT id FROM artists WHERE slug = ?', args: ['the-neon-velvet'] });
+		const artistId = artist.rows[0]?.id;
+		if (!artistId) throw new Error('Sample artist missing: the server seeds it on first request.');
+
+		const issueId = `e2e-video-${slug}`;
+		const now = Math.floor(Date.now() / 1000);
+		const pages: Array<Record<string, unknown>> = [
+			{ title: 'Portrait Clip', videoUrl: '/uploads/videos/e2e-portrait.mp4', orientation: 'portrait' },
+			{ title: 'Landscape Clip', videoUrl: '/uploads/videos/e2e-landscape.mp4', orientation: 'landscape' }
+		];
+		await db.batch(
+			[
+				{
+					sql: `INSERT INTO issues (id, artist_id, slug, city, venue, date, timezone, cover_note, secret_key, status, approve_first, published_at, created_at, updated_at)
+					      VALUES (?, ?, ?, 'Screenville', 'The Monitor', '2026-11-22', 'America/New_York', '', 'e2e_video_secret', 'published', 0, ?, ?, ?)`,
+					args: [issueId, artistId, slug, now, now, now]
+				},
+				...pages.map((content, index) => ({
+					sql: 'INSERT INTO issue_pages (id, issue_id, position, kind, content_json, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+					args: [`${issueId}-p${index}`, issueId, index, 'video', JSON.stringify(content), now]
+				}))
+			],
+			'write'
+		);
+		return slug;
+	} finally {
+		db.close();
+	}
+}
+
 export interface E2eFan {
 	id: string;
 	name: string;
