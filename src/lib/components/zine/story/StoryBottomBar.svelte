@@ -88,6 +88,7 @@
 	.story-tip {
 		background: var(--support);
 		color: var(--bg-void);
+		font-weight: var(--weight-heavy);
 	}
 
 	/* A dark pill, so its white text passes AA over any photo behind the bar. */

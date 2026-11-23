@@ -23,6 +23,12 @@
 		presets?: number[];
 		/** `features.tipsOpenVenmo`: true only in production. */
 		opensVenmo: boolean;
+		/**
+		 * The Issue's tip sheet: a short title ("Tip The Band"), "with Venmo" in
+		 * the line below, and the custom button saying what it needs while no
+		 * amount is entered. Copy only; what a tap does is the same.
+		 */
+		compact?: boolean;
 		id?: string;
 		class?: string;
 	}
@@ -34,6 +40,7 @@
 		issueSlug = null,
 		presets = [3, 5, 10],
 		opensVenmo,
+		compact = false,
 		id = 'tip',
 		class: className = ''
 	}: Props = $props();
@@ -71,10 +78,17 @@
 	<Box as="section" {id} padding="md" radius="lg" class="venmo-tip-panel {className}" aria-label="Tip {artistName} with Venmo">
 		<Stack gap="sm">
 			<Stack gap="3xs">
-				<h2 class="venmo-tip-title">Tip {artistName} with Venmo</h2>
-				<p class="venmo-tip-hint">
-					Opens Venmo to pay <span class="font-mono">@{username}</span>. You confirm the payment in Venmo; Quire takes no cut.
-				</p>
+				{#if compact}
+					<h2 class="venmo-tip-title">Tip {artistName}</h2>
+					<p class="venmo-tip-hint">
+						With Venmo: opens Venmo to pay <span class="font-mono">@{username}</span>. You confirm the payment in Venmo; Quire takes no cut.
+					</p>
+				{:else}
+					<h2 class="venmo-tip-title">Tip {artistName} with Venmo</h2>
+					<p class="venmo-tip-hint">
+						Opens Venmo to pay <span class="font-mono">@{username}</span>. You confirm the payment in Venmo; Quire takes no cut.
+					</p>
+				{/if}
 			</Stack>
 
 			<TipPresetButtons
@@ -108,7 +122,9 @@
 					</p>
 				</Stack>
 				{#if customCents === null}
-					<span class="venmo-tip-go" aria-disabled="true" data-testid="venmo-custom-disabled">Tip with Venmo</span>
+					<span class="venmo-tip-go" aria-disabled="true" data-testid="venmo-custom-disabled">
+						{compact ? 'Enter an amount' : 'Tip with Venmo'}
+					</span>
 				{:else if opensVenmo}
 					<a
 						class="venmo-tip-go"
