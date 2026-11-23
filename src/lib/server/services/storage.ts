@@ -1,27 +1,60 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import {
+	S3Client,
+	PutObjectCommand,
+	HeadObjectCommand,
+	GetObjectCommand,
+	CopyObjectCommand,
+	DeleteObjectCommand
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { fileTypeFromBuffer } from 'file-type';
 import sharp from 'sharp';
 import { type Result, type DomainError, ok, err } from '$domain/types';
 
-import { allowsStandIn, getConfig } from '$lib/server/config';
+import { allowsStandIn, getConfig, type Integrations } from '$lib/server/config';
 
 import { featureUnavailableMessage } from '$lib/features';
 
-const r2 = getConfig().integrations.r2;
+type R2Settings = NonNullable<Integrations['r2']>;
 
-const s3Client: S3Client | null = r2
-	? new S3Client({
-			region: 'auto',
-			endpoint: `https://${r2.accountId}.r2.cloudflarestorage.com`,
-			credentials: {
-				accessKeyId: r2.accessKeyId,
-				secretAccessKey: r2.secretAccessKey
-			}
-		})
-	: null;
+let cachedClient: { id: string; settings: R2Settings; client: S3Client } | null = null;
+
+/**
+ * The R2 settings and an S3 client for them, or null without R2. Built on first
+ * use from the current config. Path-style, so a presigned PUT goes to the account
+ * endpoint (`r2UploadOrigin` in security-headers.ts, the CSP's connect-src).
+ * Checksums only when an operation requires one: otherwise the SDK would pin a
+ * presigned PUT to the checksum of an empty body.
+ */
+function r2Target(): { settings: R2Settings; client: S3Client } | null {
+	const settings = getConfig().integrations.r2;
+	if (!settings) return null;
+	const id = `${settings.accountId}\u0000${settings.accessKeyId}\u0000${settings.secretAccessKey}`;
+	if (cachedClient?.id !== id) {
+		cachedClient = {
+			id,
+			settings,
+			client: new S3Client({
+				region: 'auto',
+				endpoint: `https://${settings.accountId}.r2.cloudflarestorage.com`,
+				forcePathStyle: true,
+				requestChecksumCalculation: 'WHEN_REQUIRED',
+				credentials: {
+					accessKeyId: settings.accessKeyId,
+					secretAccessKey: settings.secretAccessKey
+				}
+			})
+		};
+	}
+	return { settings, client: cachedClient.client };
+}
+
+function r2PublicUrl(settings: R2Settings, key: string): string {
+	return settings.publicUrl ? `${settings.publicUrl}/${key}` : `https://${settings.bucketName}.r2.dev/${key}`;
+}
 
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 export const MAX_AUDIO_BYTES = 25 * 1024 * 1024; // 25 MB
@@ -320,22 +353,19 @@ export async function uploadMedia(
 	const uniqueKey = `${crypto.randomUUID()}${ext}`;
 
 	// 1. Cloudflare R2 Upload
-	if (r2 && s3Client) {
+	const r2 = r2Target();
+	if (r2) {
 		try {
-			await s3Client.send(
+			await r2.client.send(
 				new PutObjectCommand({
-					Bucket: r2.bucketName,
+					Bucket: r2.settings.bucketName,
 					Key: uniqueKey,
 					Body: finalBuffer,
 					ContentType: finalMime
 				})
 			);
 
-			const publicUrl = r2.publicUrl
-				? `${r2.publicUrl}/${uniqueKey}`
-				: `https://${r2.bucketName}.r2.dev/${uniqueKey}`;
-
-			return ok({ url: publicUrl, key: uniqueKey });
+			return ok({ url: r2PublicUrl(r2.settings, uniqueKey), key: uniqueKey });
 		} catch (error) {
 			return err({
 				code: 'R2_UPLOAD_FAILED',
@@ -402,4 +432,205 @@ export async function uploadFormFile(
 
 	const buffer = Buffer.from(await file.arrayBuffer());
 	return uploadMedia({ buffer, allowedKind });
+}
+
+/* ---------------------------------------------------------------------------
+   Direct video uploads (ADR 0010): where the bytes go and how they move
+   --------------------------------------------------------------------------- */
+
+/** What a HEAD of a stored object says. */
+export interface StoredObject {
+	size: number;
+	contentType: string | null;
+}
+
+/**
+ * The storage operations the direct video upload needs, the same for R2 and the
+ * local stand-in, so the browser flow is identical everywhere (ADR 0010).
+ * Keys are relative to the bucket (R2) or to static/uploads (local).
+ */
+export interface MediaStore {
+	kind: 'r2' | 'local';
+	/** A URL the browser PUTs exactly `size` bytes of `contentType` to, valid for `expiresInSeconds`. */
+	presignPut(key: string, contentType: string, size: number, expiresInSeconds: number): Promise<string>;
+	/** Null when there is no such object. */
+	head(key: string): Promise<StoredObject | null>;
+	/** Up to the first `bytes` bytes of the object. */
+	readStart(key: string, bytes: number): Promise<Buffer>;
+	/** Copies `fromKey` to `toKey`, stored as `contentType`. */
+	copy(fromKey: string, toKey: string, contentType: string): Promise<void>;
+	/** Deletes the object; a missing object is not an error. */
+	delete(key: string): Promise<void>;
+	publicUrl(key: string): string;
+}
+
+/** Path-safe keys only: no `..`, no leading slash, nothing but `[A-Za-z0-9._-]` segments. */
+const SAFE_KEY = /^(?:[A-Za-z0-9_-][A-Za-z0-9._-]*\/)*[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
+
+function assertSafeKey(key: string): void {
+	if (!SAFE_KEY.test(key) || key.split('/').includes('..')) throw new Error(`Unsafe storage key: ${key}`);
+}
+
+function isNotFound(error: unknown): boolean {
+	const e = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+	return e?.name === 'NotFound' || e?.name === 'NoSuchKey' || e?.$metadata?.httpStatusCode === 404;
+}
+
+function r2Store(r2: { settings: R2Settings; client: S3Client }): MediaStore {
+	const Bucket = r2.settings.bucketName;
+	return {
+		kind: 'r2',
+		async presignPut(key, contentType, size, expiresInSeconds) {
+			assertSafeKey(key);
+			// Content-Type and Content-Length are signed, so R2 refuses any other type or size.
+			return getSignedUrl(
+				r2.client,
+				new PutObjectCommand({ Bucket, Key: key, ContentType: contentType, ContentLength: size }),
+				{ expiresIn: expiresInSeconds, signableHeaders: new Set(['content-type', 'content-length']) }
+			);
+		},
+		async head(key) {
+			assertSafeKey(key);
+			try {
+				const head = await r2.client.send(new HeadObjectCommand({ Bucket, Key: key }));
+				return { size: Number(head.ContentLength ?? 0), contentType: head.ContentType ?? null };
+			} catch (error) {
+				if (isNotFound(error)) return null;
+				throw error;
+			}
+		},
+		async readStart(key, bytes) {
+			assertSafeKey(key);
+			const object = await r2.client.send(new GetObjectCommand({ Bucket, Key: key, Range: `bytes=0-${bytes - 1}` }));
+			const body = object.Body ? await object.Body.transformToByteArray() : new Uint8Array();
+			return Buffer.from(body).subarray(0, bytes);
+		},
+		async copy(fromKey, toKey, contentType) {
+			assertSafeKey(fromKey);
+			assertSafeKey(toKey);
+			await r2.client.send(
+				new CopyObjectCommand({
+					Bucket,
+					Key: toKey,
+					CopySource: `${Bucket}/${fromKey}`,
+					ContentType: contentType,
+					MetadataDirective: 'REPLACE'
+				})
+			);
+		},
+		async delete(key) {
+			assertSafeKey(key);
+			await r2.client.send(new DeleteObjectCommand({ Bucket, Key: key }));
+		},
+		publicUrl: (key) => r2PublicUrl(r2.settings, key)
+	};
+}
+
+/** The URL path the local stand-in accepts PUTs on (`src/routes/api/uploads/local/[...key]`). */
+export const LOCAL_PUT_PATH = '/api/uploads/local';
+
+/** static/uploads, where the local stand-in keeps every file, pending or public. */
+export function localUploadsDir(): string {
+	return path.resolve(process.cwd(), 'static/uploads');
+}
+
+/** The file for `key` inside static/uploads; throws for any key that could leave it. */
+export function localPathFor(key: string): string {
+	assertSafeKey(key);
+	const dir = localUploadsDir();
+	const file = path.resolve(dir, key);
+	if (!file.startsWith(dir + path.sep)) throw new Error(`Unsafe storage key: ${key}`);
+	return file;
+}
+
+/** What a local PUT URL promises: the key, type, exact size and expiry, signed with the cookie secret. */
+export interface LocalPutGrant {
+	key: string;
+	contentType: string;
+	size: number;
+	/** Unix seconds. */
+	expires: number;
+}
+
+function localPutSignature(grant: LocalPutGrant): string {
+	return crypto
+		.createHmac('sha256', getConfig().core.cookieSecret)
+		.update(`local-video-put\u0000${grant.key}\u0000${grant.contentType}\u0000${grant.size}\u0000${grant.expires}`)
+		.digest('base64url');
+}
+
+/**
+ * Reads and checks a local PUT URL's grant: a valid signature for this key, not
+ * expired. The caller still checks the request's own type and length against it.
+ */
+export function verifyLocalPutGrant(key: string, params: URLSearchParams, now = new Date()): LocalPutGrant | null {
+	const contentType = params.get('type') ?? '';
+	const size = Number(params.get('size'));
+	const expires = Number(params.get('expires'));
+	const given = params.get('sig') ?? '';
+	if (!Number.isSafeInteger(size) || size <= 0 || !Number.isSafeInteger(expires)) return null;
+	const grant = { key, contentType, size, expires };
+	const expected = Buffer.from(localPutSignature(grant));
+	const actual = Buffer.from(given);
+	if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) return null;
+	if (expires * 1000 <= now.getTime()) return null;
+	return grant;
+}
+
+/**
+ * The local stand-in (development, test and a local Demo; never deployed): files
+ * in static/uploads, and "presigned" PUTs to Quire's own LOCAL_PUT_PATH, signed
+ * so only the Artist who asked can write that one key, at that type and size.
+ */
+function localStore(): MediaStore {
+	return {
+		kind: 'local',
+		async presignPut(key, contentType, size, expiresInSeconds) {
+			assertSafeKey(key);
+			const expires = Math.floor(Date.now() / 1000) + expiresInSeconds;
+			const params = new URLSearchParams({ type: contentType, size: String(size), expires: String(expires) });
+			params.set('sig', localPutSignature({ key, contentType, size, expires }));
+			return `${LOCAL_PUT_PATH}/${key}?${params}`;
+		},
+		async head(key) {
+			try {
+				const stat = await fs.stat(localPathFor(key));
+				return stat.isFile() ? { size: stat.size, contentType: null } : null;
+			} catch {
+				return null;
+			}
+		},
+		async readStart(key, bytes) {
+			const handle = await fs.open(localPathFor(key), 'r');
+			try {
+				const buffer = Buffer.alloc(bytes);
+				const { bytesRead } = await handle.read(buffer, 0, bytes, 0);
+				return buffer.subarray(0, bytesRead);
+			} finally {
+				await handle.close();
+			}
+		},
+		async copy(fromKey, toKey) {
+			const to = localPathFor(toKey);
+			await fs.mkdir(path.dirname(to), { recursive: true });
+			await fs.copyFile(localPathFor(fromKey), to);
+		},
+		async delete(key) {
+			await fs.rm(localPathFor(key), { force: true });
+		},
+		publicUrl: (key) => `/uploads/${key}`
+	};
+}
+
+/** True when this server is the local upload stand-in: no R2, and a mode that allows it. */
+export function usesLocalUploadStandIn(): boolean {
+	const config = getConfig();
+	return !r2Target() && allowsStandIn('uploads', config.mode) && config.localUploads === 'local';
+}
+
+/** R2 when configured, else the local stand-in where allowed, else null (uploads are off). */
+export function mediaStore(): MediaStore | null {
+	const r2 = r2Target();
+	if (r2) return r2Store(r2);
+	return usesLocalUploadStandIn() ? localStore() : null;
 }

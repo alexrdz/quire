@@ -1,10 +1,26 @@
-import { describe, expect, it } from 'vitest';
-import {
-	buildCspDirectives,
-	buildCspHeader,
-	kitScriptSources,
-	withSecurityHeaders
-} from '$lib/server/http/security-headers';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { Config } from '$lib/server/config';
+
+const state = vi.hoisted(() => ({ override: null as null | ((base: Config) => Config) }));
+
+vi.mock('$lib/server/config', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('$lib/server/config')>();
+	return {
+		...actual,
+		getConfig: () => {
+			const base = actual.getConfig();
+			return state.override ? state.override(base) : base;
+		}
+	};
+});
+
+const { buildCspDirectives, buildCspHeader, kitScriptSources, r2UploadOrigin, withSecurityHeaders } = await import(
+	'$lib/server/http/security-headers'
+);
+
+afterEach(() => {
+	state.override = null;
+});
 
 const R2 = 'https://media.quire.live';
 
@@ -73,6 +89,52 @@ describe('CSP directives', () => {
 		for (const mode of ['test', 'demo', 'production'] as const) {
 			expect(buildCspDirectives({ mode, mediaOrigin: null })['connect-src']).toEqual(["'self'"]);
 		}
+	});
+});
+
+describe('CSP connect-src for direct video uploads (ADR 0010)', () => {
+	const ACCOUNT = '0123456789abcdef0123456789abcdef';
+	const UPLOAD = `https://${ACCOUNT}.r2.cloudflarestorage.com`;
+
+	it('allows the R2 upload origin, and only that, when there is one', () => {
+		for (const mode of ['test', 'demo', 'production'] as const) {
+			expect(buildCspDirectives({ mode, mediaOrigin: R2, uploadOrigin: UPLOAD })['connect-src']).toEqual([
+				"'self'",
+				UPLOAD
+			]);
+		}
+		expect(buildCspDirectives({ mode: 'development', mediaOrigin: null, uploadOrigin: UPLOAD })['connect-src']).toEqual([
+			"'self'",
+			'ws:',
+			'wss:',
+			UPLOAD
+		]);
+		const header = buildCspHeader({ mode: 'production', mediaOrigin: R2, uploadOrigin: UPLOAD });
+		expect(header).not.toContain('*.r2.cloudflarestorage.com');
+		expect(header).not.toMatch(/connect-src[^;]*https:\/\/media\.quire\.live/);
+	});
+
+	it('builds the upload origin from the R2 account id, and refuses a malformed one', () => {
+		expect(r2UploadOrigin(ACCOUNT)).toBe(UPLOAD);
+		expect(r2UploadOrigin(ACCOUNT.toUpperCase())).toBe(UPLOAD);
+		for (const bad of ['', 'abc', `${ACCOUNT}; script-src *`, `${ACCOUNT}.evil.test`, 'x'.repeat(32)]) {
+			expect(r2UploadOrigin(bad), bad).toBeNull();
+		}
+	});
+
+	it('withSecurityHeaders reads the upload origin from the R2 config', () => {
+		const r2 = { accountId: ACCOUNT, accessKeyId: 'id', secretAccessKey: 'key', bucketName: 'quire-media', publicUrl: R2 };
+		state.override = (base) => ({ ...base, integrations: { ...base.integrations, r2 } });
+		const csp = withSecurityHeaders(new Response('ok'), { mode: 'production', mediaOrigin: R2 }).headers.get(
+			'content-security-policy'
+		);
+		expect(csp).toContain(`connect-src 'self' ${UPLOAD};`);
+
+		state.override = (base) => ({ ...base, integrations: { ...base.integrations, r2: null } });
+		const without = withSecurityHeaders(new Response('ok'), { mode: 'production', mediaOrigin: null }).headers.get(
+			'content-security-policy'
+		);
+		expect(without).toContain("connect-src 'self';");
 	});
 });
 
