@@ -11,7 +11,14 @@ import {
 	S3Client
 } from '@aws-sdk/client-s3';
 import type { Config } from '$lib/server/config';
+import { readFileSync } from 'node:fs';
 import { TINY_MP3, TINY_PNG, tinyWebmVideo } from '../helpers/media';
+import {
+	findVideoLocations,
+	stripVideoLocations,
+	UNREADABLE_VIDEO_MESSAGE,
+	VIDEO_HAS_LOCATION_MESSAGE
+} from '$domain/video-location';
 
 /**
  * ADR 0010 (B1-T21): direct-to-storage video uploads. Presign refuses before any
@@ -140,8 +147,8 @@ function mockBucket(objects: Record<string, Buffer>, options: { failCopy?: boole
 		}
 		if (command instanceof GetObjectCommand) {
 			calls.push({ op: 'get', input });
-			const [, end] = /bytes=0-(\d+)/.exec(String(input.Range))!;
-			const bytes = objects[key]!.subarray(0, Number(end) + 1);
+			const [, start, end] = /bytes=(\d+)-(\d+)/.exec(String(input.Range))!;
+			const bytes = objects[key]!.subarray(Number(start), Number(end) + 1);
 			return { Body: { transformToByteArray: async () => new Uint8Array(bytes) } };
 		}
 		if (command instanceof CopyObjectCommand) {
@@ -538,5 +545,186 @@ describe('the local stand-in (development, test, a local Demo)', () => {
 			expect(response.status).toBe(404);
 		}
 		await expect(fs.stat(path.join(uploadsDir, presigned.value.key))).rejects.toThrow();
+	});
+});
+
+describe('finalize refuses a video that still has a location (B1-T23)', () => {
+	const FIXTURES = path.resolve('tests/fixtures/video');
+	const fixture = (name: string) => readFileSync(path.join(FIXTURES, name));
+	const WITH_LOCATION = [
+		'xyz-faststart.mov',
+		'xyz-moov-at-end.mov',
+		'ilst-xyz.mp4',
+		'keys-moov-meta.mov',
+		'keys-udta-loci-faststart.mp4',
+		'keys-udta-moov-at-end.mov',
+		'xmp-gps.mp4'
+	];
+	const extOf = (name: string) => (name.endsWith('.mov') ? 'mov' : name.endsWith('.webm') ? 'webm' : 'mp4');
+
+	async function finalizeBytes(bytes: Buffer, ext: string) {
+		state.override = withR2;
+		const { user, artistId } = await createArtist();
+		const pendingKey = pendingKeyFor(artistId, ext);
+		const objects: Record<string, Buffer> = { [pendingKey]: bytes };
+		const calls = mockBucket(objects);
+		const result = await finalizeVideoUpload(user, { key: pendingKey });
+		vi.restoreAllMocks();
+		return { result, calls, objects, pendingKey };
+	}
+
+	it.each([...WITH_LOCATION, 'tagged-location.webm'])('%s: refused with the location message, and the pending file is deleted', async (name) => {
+		const { result, calls, objects } = await finalizeBytes(fixture(name), extOf(name));
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.error).toEqual({ code: 'VIDEO_HAS_LOCATION', message: VIDEO_HAS_LOCATION_MESSAGE });
+		expect(calls.some((c) => c.op === 'copy')).toBe(false);
+		expect(calls.at(-1)?.op).toBe('delete');
+		expect(objects).toEqual({});
+	});
+
+	it.each(WITH_LOCATION)('%s, stripped as the browser does: accepted and published', async (name) => {
+		const stripped = Buffer.from(stripVideoLocations(new Uint8Array(fixture(name))).bytes);
+		const { result, objects } = await finalizeBytes(stripped, extOf(name));
+		expect(result.ok).toBe(true);
+		const [published] = Object.values(objects);
+		expect(findVideoLocations(new Uint8Array(published))).toEqual([]);
+	});
+
+	it('accepts a clean file, reading only box headers and the metadata, never the media data', async () => {
+		const file = fixture('xyz-moov-at-end.mov');
+		const clean = Buffer.from(stripVideoLocations(new Uint8Array(file)).bytes);
+		const { result, calls } = await finalizeBytes(clean, 'mov');
+		expect(result.ok).toBe(true);
+		const reads = calls
+			.filter((c) => c.op === 'get')
+			.map((c) => /bytes=(\d+)-(\d+)/.exec(String(c.input.Range))!.slice(1).map(Number) as [number, number]);
+		// mdat runs from 28 for 7123 bytes. Past the type sniff, the only reads that touch it
+		// are 16-byte header probes; nothing reads its media data.
+		const mdat = { start: 28 + 16, end: 28 + 7123 };
+		for (const [start, end] of reads.slice(1)) {
+			const isHeaderProbe = end - start + 1 <= 16;
+			expect(isHeaderProbe || end < mdat.start || start >= mdat.end, `read ${start}-${end}`).toBe(true);
+		}
+		expect(reads.length).toBeLessThan(10);
+	});
+
+	it('accepts the clean fixture as is', async () => {
+		const { result } = await finalizeBytes(fixture('clean.mp4'), 'mp4');
+		expect(result.ok).toBe(true);
+	});
+
+	/** A real ftyp (so the file is detected as MP4) followed by the given boxes. */
+	const ftyp = () => fixture('clean.mp4').subarray(0, 32);
+	const box = (type: string, payload: Buffer | Uint8Array = Buffer.alloc(0)) => {
+		const out = Buffer.alloc(8 + payload.length);
+		out.writeUInt32BE(out.length, 0);
+		out.write(type, 4, 'latin1');
+		Buffer.from(payload).copy(out, 8);
+		return out;
+	};
+	const xyz = () => box('\u00a9xyz', Buffer.from([0, 8, 0x15, 0xc7, ...Buffer.from('+40.7-74')]));
+	const moovWithLocation = () => box('moov', box('udta', xyz()));
+
+	it('walks past a 64-bit box to a moov after it', async () => {
+		const mdat64 = Buffer.alloc(16 + 100);
+		mdat64.writeUInt32BE(1, 0);
+		mdat64.write('mdat', 4, 'latin1');
+		mdat64.writeUInt32BE(0, 8);
+		mdat64.writeUInt32BE(mdat64.length, 12);
+		const refused = await finalizeBytes(Buffer.concat([ftyp(), mdat64, moovWithLocation()]), 'mp4');
+		expect(!refused.result.ok && refused.result.error.code).toBe('VIDEO_HAS_LOCATION');
+		const clean = await finalizeBytes(Buffer.concat([ftyp(), mdat64, box('moov', box('udta'))]), 'mp4');
+		expect(clean.result.ok).toBe(true);
+	});
+
+	it('reads a size-0 box as running to the end of the file', async () => {
+		const toEnd = box('mdat', Buffer.alloc(64));
+		toEnd.writeUInt32BE(0, 0);
+		const refused = await finalizeBytes(Buffer.concat([ftyp(), moovWithLocation(), toEnd]), 'mp4');
+		expect(!refused.result.ok && refused.result.error.code).toBe('VIDEO_HAS_LOCATION');
+		const clean = await finalizeBytes(Buffer.concat([ftyp(), box('moov'), toEnd]), 'mp4');
+		expect(clean.result.ok).toBe(true);
+	});
+
+	it('refuses, as unreadable, more top-level boxes than the cap, a moov over 8 MB, and malformed sizes', async () => {
+		const cases: Array<[string, Buffer]> = [
+			['65 top-level boxes', Buffer.concat([ftyp(), ...Array.from({ length: 64 }, () => box('free'))])],
+			['a 9 MB moov', Buffer.concat([ftyp(), box('moov', Buffer.alloc(9 * 1024 * 1024))])],
+			['a box past the end', (() => { const b = box('moov', Buffer.alloc(16)); b.writeUInt32BE(4096, 0); return Buffer.concat([ftyp(), b]); })()],
+			['a box smaller than its header', (() => { const b = box('moov', Buffer.alloc(16)); b.writeUInt32BE(4, 0); return Buffer.concat([ftyp(), b]); })()],
+			['trailing bytes after the last box', Buffer.concat([ftyp(), box('moov'), Buffer.from([1, 2, 3])])],
+			['a malformed box inside moov', Buffer.concat([ftyp(), box('moov', Buffer.from([0, 0, 0, 99, 0x75, 0x64, 0x74, 0x61]))])]
+		];
+		for (const [label, bytes] of cases) {
+			const { result, calls, objects } = await finalizeBytes(bytes, 'mp4');
+			expect(result.ok, label).toBe(false);
+			if (result.ok) continue;
+			expect(result.error, label).toEqual({ code: 'UNREADABLE_VIDEO', message: UNREADABLE_VIDEO_MESSAGE });
+			expect(calls.some((c) => c.op === 'copy'), label).toBe(false);
+			expect(objects, label).toEqual({});
+		}
+	});
+});
+
+describe('upload requests are read with a size cap (B1-T23, from the #48 review)', () => {
+	const url = new URL('http://localhost/api/uploads/video/presign');
+	const post = (request: Request) => presignRoute.POST({ request, locals: {}, url } as never);
+
+	it('refuses a declared content-length over 2 KB before reading the body', async () => {
+		state.override = withR2;
+		let pulled = 0;
+		const body = new ReadableStream<Uint8Array>({
+			pull(controller) {
+				pulled += 1;
+				controller.enqueue(new Uint8Array(1024));
+				if (pulled > 4) controller.close();
+			}
+		});
+		const request = new Request(url, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', 'content-length': String(5 * 1024) },
+			body,
+			duplex: 'half'
+		} as RequestInit);
+		const response = await post(request);
+		expect(response.status).toBe(413);
+		expect((await response.json()).error.code).toBe('REQUEST_TOO_LARGE');
+		expect(pulled).toBeLessThanOrEqual(1);
+	});
+
+	it('stops reading a body with no content-length as soon as it passes 2 KB', async () => {
+		state.override = withR2;
+		let pulled = 0;
+		const body = new ReadableStream<Uint8Array>({
+			pull(controller) {
+				pulled += 1;
+				controller.enqueue(new Uint8Array(1024).fill(0x20));
+				if (pulled > 1000) controller.close();
+			}
+		});
+		const request = new Request(url, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body,
+			duplex: 'half'
+		} as RequestInit);
+		const response = await post(request);
+		expect(response.status).toBe(413);
+		expect((await response.json()).error.code).toBe('REQUEST_TOO_LARGE');
+		expect(pulled).toBeLessThan(10);
+	});
+
+	it('still reads a normal request', async () => {
+		state.override = withR2;
+		const response = await post(
+			new Request(url, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ contentType: 'video/mp4', size: 1000 })
+			})
+		);
+		// Signed out, so the gate answers: the body was read and parsed.
+		expect(response.status).toBe(401);
 	});
 });

@@ -1,8 +1,23 @@
 /**
- * Direct video uploads from the browser (ADR 0010): presign, PUT the bytes straight
- * to storage with progress, then finalize. The form sends only the finalized upload
- * id, never the file, so a clip never travels through a server function.
+ * Direct video uploads from the browser (ADR 0010): strip any location, presign, PUT
+ * the bytes straight to storage with progress, then finalize. The form sends only the
+ * finalized upload id, never the file, so a clip never travels through a server function.
  */
+
+import {
+	mayHoldLocation,
+	readBoxHeader,
+	stripVideoLocations,
+	UNREADABLE_VIDEO_MESSAGE,
+	VIDEO_HAS_LOCATION_MESSAGE,
+	VideoStructureError,
+	webmHasLocationTag
+} from '$domain/video-location';
+
+export { VIDEO_HAS_LOCATION_MESSAGE, UNREADABLE_VIDEO_MESSAGE };
+
+/** The largest metadata box read whole in the browser; real ones are well under 1 MB. */
+const MAX_METADATA_BOX_BYTES = 32 * 1024 * 1024;
 
 /** Where a clip is: no new clip, uploading, failed, or uploaded and finalized. */
 export type VideoUploadStatus = 'none' | 'uploading' | 'error' | 'ready';
@@ -34,6 +49,7 @@ const FINAL_CODES = new Set([
 	'FILE_TOO_LARGE',
 	'FORBIDDEN_UPLOAD_KEY',
 	'VIDEO_HAS_LOCATION',
+	'UNREADABLE_VIDEO',
 	'UPLOADS_UNAVAILABLE',
 	'EMAIL_NOT_CONFIRMED',
 	'ARTIST_REQUIRED',
@@ -78,6 +94,59 @@ export function videoContentTypeOf(file: { type: string; name?: string }): Video
 	return null;
 }
 
+async function bytesOf(blob: Blob): Promise<Uint8Array> {
+	return new Uint8Array(await blob.arrayBuffer());
+}
+
+/**
+ * A copy of an MP4 or MOV with every location blanked in place (decision 27): same size,
+ * same offsets, still plays. Only the top-level boxes that can hold metadata are read
+ * (never `mdat`), so even a 50 MB clip costs a few small reads. A WebM with a location
+ * tag is refused: WebM can't be blanked in place as safely, and recordings never have one.
+ */
+export async function prepareVideoForUpload(
+	file: Blob & { name?: string },
+	contentType: VideoContentType
+): Promise<Blob> {
+	try {
+		if (contentType === 'video/webm') {
+			if (webmHasLocationTag(await bytesOf(file))) {
+				throw new VideoUploadError(VIDEO_HAS_LOCATION_MESSAGE, 'VIDEO_HAS_LOCATION', false);
+			}
+			return file;
+		}
+		const parts: BlobPart[] = [];
+		let changed = false;
+		let at = 0;
+		for (let boxes = 0; at < file.size; boxes++) {
+			if (boxes > 1000) throw new VideoStructureError('Too many top-level boxes.');
+			const head = await bytesOf(file.slice(at, at + 16));
+			const header = readBoxHeader(head, 0, file.size - at);
+			if (!header) throw new VideoStructureError('Trailing bytes after the last box.');
+			const end = at + header.size;
+			if (mayHoldLocation(header.type)) {
+				if (header.size > MAX_METADATA_BOX_BYTES) throw new VideoStructureError(`'${header.type}' is too large to check.`);
+				const box = await bytesOf(file.slice(at, end));
+				const { bytes, removed } = stripVideoLocations(box, at);
+				if (removed.length > 0) {
+					changed = true;
+					parts.push(bytes as Uint8Array<ArrayBuffer>);
+				} else {
+					parts.push(file.slice(at, end));
+				}
+			} else {
+				parts.push(file.slice(at, end));
+			}
+			at = end;
+		}
+		if (!changed) return file;
+		return Object.assign(new Blob(parts, { type: file.type || contentType }), { name: file.name });
+	} catch (error) {
+		if (error instanceof VideoStructureError) throw new VideoUploadError(UNREADABLE_VIDEO_MESSAGE, 'UNREADABLE_VIDEO', false);
+		throw error;
+	}
+}
+
 async function postJson<T>(url: string, body: unknown, signal: AbortSignal): Promise<T> {
 	let response: Response;
 	try {
@@ -101,10 +170,15 @@ async function postJson<T>(url: string, body: unknown, signal: AbortSignal): Pro
 	return data as T;
 }
 
-/** PUTs the bytes with progress. XMLHttpRequest, because fetch can't report upload progress. */
+/**
+ * PUTs the bytes with progress. XMLHttpRequest, because fetch can't report upload progress.
+ * R2's CORS rule allows only PUT with Content-Type (and the browser's own Content-Length),
+ * so this sends exactly the Content-Type presign signed, nothing else, and no credentials.
+ * Any CORS or network failure lands in onerror and is shown with Retry, never silently.
+ */
 function putWithProgress(
 	url: string,
-	headers: Record<string, string>,
+	contentType: string,
 	file: Blob,
 	onProgress: (fraction: number) => void,
 	signal: AbortSignal
@@ -112,7 +186,8 @@ function putWithProgress(
 	return new Promise((resolve, reject) => {
 		const xhr = new XMLHttpRequest();
 		xhr.open('PUT', url);
-		for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value);
+		xhr.withCredentials = false;
+		xhr.setRequestHeader('Content-Type', contentType);
 		xhr.upload.onprogress = (event) => {
 			if (event.lengthComputable && event.total > 0) onProgress(event.loaded / event.total);
 		};
@@ -146,12 +221,16 @@ export async function uploadVideo(
 		throw new VideoUploadError('Choose an MP4, WebM or MOV video.', 'UNSUPPORTED_MEDIA_TYPE', false);
 	}
 	onProgress(0);
+	// Location comes off on the phone, before anything leaves it (ADR 0010).
+	const upload = await prepareVideoForUpload(file, contentType);
+	if (signal.aborted) throw new DOMException('The upload was cancelled.', 'AbortError');
 	const slot = await postJson<{ uploadUrl: string; headers: Record<string, string>; key: string }>(
 		`${endpoint}/presign`,
-		{ contentType, size: file.size },
+		{ contentType, size: upload.size },
 		signal
 	);
-	await putWithProgress(slot.uploadUrl, slot.headers, file, onProgress, signal);
+	// The signed type: presign echoes it in headers['content-type'] and it must match exactly.
+	await putWithProgress(slot.uploadUrl, slot.headers['content-type'] ?? contentType, upload, onProgress, signal);
 	return postJson<FinalizedVideo>(`${endpoint}/finalize`, { key: slot.key }, signal);
 }
 

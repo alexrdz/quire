@@ -457,6 +457,8 @@ export interface MediaStore {
 	head(key: string): Promise<StoredObject | null>;
 	/** Up to the first `bytes` bytes of the object. */
 	readStart(key: string, bytes: number): Promise<Buffer>;
+	/** Up to `length` bytes starting at `start` (fewer at the end of the object). */
+	readRange(key: string, start: number, length: number): Promise<Buffer>;
 	/** Copies `fromKey` to `toKey`, stored as `contentType`. */
 	copy(fromKey: string, toKey: string, contentType: string): Promise<void>;
 	/** Deletes the object; a missing object is not an error. */
@@ -504,6 +506,15 @@ function r2Store(r2: { settings: R2Settings; client: S3Client }): MediaStore {
 			const object = await r2.client.send(new GetObjectCommand({ Bucket, Key: key, Range: `bytes=0-${bytes - 1}` }));
 			const body = object.Body ? await object.Body.transformToByteArray() : new Uint8Array();
 			return Buffer.from(body).subarray(0, bytes);
+		},
+		async readRange(key, start, length) {
+			assertSafeKey(key);
+			if (length <= 0) return Buffer.alloc(0);
+			const object = await r2.client.send(
+				new GetObjectCommand({ Bucket, Key: key, Range: `bytes=${start}-${start + length - 1}` })
+			);
+			const body = object.Body ? await object.Body.transformToByteArray() : new Uint8Array();
+			return Buffer.from(body).subarray(0, length);
 		},
 		async copy(fromKey, toKey, contentType) {
 			assertSafeKey(fromKey);
@@ -605,6 +616,17 @@ function localStore(): MediaStore {
 			try {
 				const buffer = Buffer.alloc(bytes);
 				const { bytesRead } = await handle.read(buffer, 0, bytes, 0);
+				return buffer.subarray(0, bytesRead);
+			} finally {
+				await handle.close();
+			}
+		},
+		async readRange(key, start, length) {
+			if (length <= 0) return Buffer.alloc(0);
+			const handle = await fs.open(localPathFor(key), 'r');
+			try {
+				const buffer = Buffer.alloc(length);
+				const { bytesRead } = await handle.read(buffer, 0, length, start);
 				return buffer.subarray(0, bytesRead);
 			} finally {
 				await handle.close();
