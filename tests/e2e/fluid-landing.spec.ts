@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { build } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'node:url';
@@ -67,10 +67,24 @@ test('real landing and simulator remain usable at narrow, intermediate, and wide
 	}
 });
 
+/**
+ * Waits for web fonts and for every finite animation and transition to finish. Enlarging
+ * the root font starts 0.2 s `transition: all` runs on the landing's buttons and tabs, and
+ * measuring mid-run reads a layout that is still moving (B1-T24).
+ */
+async function settle(page: Page) {
+	await page.evaluate(async () => {
+		await document.fonts.ready;
+		const finite = document.getAnimations().filter((a) => a.effect?.getTiming().iterations !== Infinity);
+		await Promise.all(finite.map((a) => a.finished.catch(() => undefined)));
+	});
+}
+
 test('enlarged landing text reflows without clipping core content', async ({ page }) => {
 	await page.setViewportSize({ width: 320, height: 1000 });
 	await page.addStyleTag({ content: 'html { font-size: 200%; }' });
 	await expect(page.locator('h1')).toBeVisible();
+	await settle(page);
 	expect(await page.locator('.hero-headline').evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
 	const bounds = await page.locator('.card-headline').evaluate((el) => {
 		const card = el.closest('.card-page')!.getBoundingClientRect();
@@ -80,6 +94,7 @@ test('enlarged landing text reflows without clipping core content', async ({ pag
 	expect(bounds).toEqual({ top: true, bottom: true });
 	await page.getByRole('button', { name: 'Notes', exact: true }).click();
 	await expect(page.locator('.notes-scrollable-area')).toBeVisible();
+	await settle(page);
 	expect(await page.locator('.notes-scrollable-area').evaluate((el) =>
 		el.clientHeight > 0 && el.scrollWidth <= el.clientWidth)).toBe(true);
 });
