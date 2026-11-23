@@ -694,6 +694,44 @@
 		border-color: rgba(255, 255, 255, 0.3);
 	}
 
+	/* The pages' button classes are scoped to the pages, so the recorder styles its own:
+	   without these the idle buttons were browser-default light grey with light text. */
+	.btn-action-highlight,
+	.btn-action-accent {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: var(--space-2xs);
+		min-block-size: 44px;
+		padding-block: var(--space-2xs);
+		padding-inline: var(--space-s);
+		border-radius: 8px;
+		font-size: var(--text-small);
+		font-weight: var(--weight-bold);
+		cursor: pointer;
+		transition: background-color 0.15s ease;
+	}
+
+	.btn-action-highlight {
+		background: rgba(1, 255, 195, 0.14);
+		color: var(--highlight);
+		border: 1px solid rgba(1, 255, 195, 0.4);
+	}
+
+	.btn-action-highlight:hover:not(:disabled) {
+		background: rgba(1, 255, 195, 0.24);
+	}
+
+	.btn-action-accent {
+		background: rgba(5, 217, 232, 0.12);
+		color: var(--accent);
+		border: 1px solid rgba(5, 217, 232, 0.35);
+	}
+
+	.btn-action-accent:hover:not(:disabled) {
+		background: rgba(5, 217, 232, 0.22);
+	}
+
 	.btn-action-subtle:disabled,
 	.video-recorder-root button:disabled {
 		opacity: 0.5;
