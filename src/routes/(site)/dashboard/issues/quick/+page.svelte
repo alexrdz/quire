@@ -332,6 +332,8 @@
 										name="videoFile"
 										orientationName="videoOrientation"
 										maxDurationSeconds={60}
+										uploadsEnabled={data.features.uploads}
+										mode={data.features.mode}
 									/>
 									<Split ratio="1-1" gap="md" collapse="sm">
 										<Stack gap="xs">
