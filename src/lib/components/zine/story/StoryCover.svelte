@@ -1,5 +1,6 @@
 <script lang="ts">
 	import TipPresetButtons from '$lib/components/tips/TipPresetButtons.svelte';
+	import { formatIssueDate } from '$domain/issue-date';
 	import { getStoryNav } from './context';
 
 	/**
@@ -9,7 +10,15 @@
 	 */
 	interface Props {
 		artist: { slug: string; displayName: string; coverArtUrl?: string | null; venmoUsername?: string | null };
-		issue: { slug: string; date: string; city: string; venue: string; status: string; coverNote?: string | null };
+		issue: {
+			slug: string;
+			date: string;
+			timezone?: string | null;
+			city: string;
+			venue: string;
+			status: string;
+			coverNote?: string | null;
+		};
 		signedIn: boolean;
 		isScanVerified: boolean;
 		isArtistClosed: boolean;
@@ -59,7 +68,7 @@
 			<span aria-hidden="true">·</span>
 			<span>{issue.city}</span>
 			<span aria-hidden="true">·</span>
-			<time datetime={issue.date}>{issue.date}</time>
+			<time datetime={issue.date}>{formatIssueDate(issue.date, issue.timezone, 'long')}</time>
 		</p>
 
 		{#if issue.coverNote}

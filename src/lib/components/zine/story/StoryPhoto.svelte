@@ -43,7 +43,8 @@
 	});
 </script>
 
-<section {id} class="story-photo" aria-labelledby="{id}-title">
+<section {id} class="story-photo" class:is-landscape={landscape[part]} aria-labelledby="{id}-title">
+	<div class="story-photo-stage">
 	{#each photos as photo, i (i)}
 		<img
 			class="story-photo-img"
@@ -58,6 +59,7 @@
 	{#if photos.length === 0}
 		<div class="story-photo-empty" aria-hidden="true">{city}</div>
 	{/if}
+	</div>
 
 	<div class="story-caption-wrap">
 	<div class="story-caption" data-scrim>
@@ -76,12 +78,42 @@
 </section>
 
 <style>
+	/* A portrait photo fills the whole page, behind the header and the caption. */
 	.story-photo {
 		position: absolute;
 		inset: 0;
+		display: flex;
+		flex-direction: column;
 		overflow: hidden;
 		background: #000000;
 		color: #ffffff;
+	}
+
+	.story-photo-stage {
+		position: absolute;
+		inset: 0;
+	}
+
+	/* A landscape photo is shown whole with its caption right under it, the two
+	   together centred between the header and the bottom bar. */
+	.story-photo.is-landscape {
+		justify-content: center;
+		padding-block-start: var(--story-top-space);
+	}
+
+	.story-photo.is-landscape .story-photo-stage {
+		position: relative;
+		flex: none;
+	}
+
+	.story-photo.is-landscape .story-photo-img.is-current {
+		position: static;
+		display: block;
+		block-size: auto;
+	}
+
+	.story-photo.is-landscape .story-caption-wrap {
+		margin-block-start: 0;
 	}
 
 	.story-photo-img {
@@ -115,9 +147,14 @@
 	/* The scrim: at least 62% black under every word, so white text passes AA over any photo.
 	   It sits above the bottom bar, which brings its own scrim. */
 	.story-caption-wrap {
-		position: absolute;
-		inset-inline: 0;
-		inset-block-end: 0;
+		position: relative;
+		margin-block-start: auto;
+		flex: none;
+	}
+
+	/* Under a landscape photo the caption sits on the black page: no fade up into the photo. */
+	.story-photo.is-landscape .story-caption-wrap::before {
+		display: none;
 	}
 
 	.story-caption {

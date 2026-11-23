@@ -22,7 +22,7 @@
 </script>
 
 <BottomSheet {open} {onclose} label="Tip {artistName} with Venmo" class="tip-sheet">
-	<VenmoTipPanel {artistSlug} {artistName} {venmoUsername} {issueSlug} {presets} {opensVenmo} />
+	<VenmoTipPanel {artistSlug} {artistName} {venmoUsername} {issueSlug} {presets} {opensVenmo} compact />
 </BottomSheet>
 
 <style>
@@ -46,23 +46,48 @@
 		color: #c4c0cc;
 	}
 
-	/* Amounts are pills; the pay button is the --support colour. */
-	:global(.tip-sheet .venmo-tip-preset) {
+	/* The same pills as the Cover: solid --support, bold dark text (about 5.7:1). */
+	:global(.tip-sheet .venmo-tip-preset),
+	:global(.tip-sheet .venmo-tip-go) {
 		min-block-size: var(--control-size);
+		border: 0;
 		border-radius: 999px;
-		background: rgba(255, 255, 255, 0.08);
-		border: 1px solid rgba(255, 255, 255, 0.16);
+		background: var(--support);
+		color: var(--bg-void);
+		font-weight: var(--weight-heavy);
+	}
+
+	:global(.tip-sheet .venmo-tip-preset) {
+		font-size: var(--text-body);
 	}
 
 	:global(.tip-sheet .venmo-tip-preset:hover),
-	:global(.tip-sheet .venmo-tip-preset:focus-visible) {
-		background: var(--support);
-		border-color: var(--support);
+	:global(.tip-sheet .venmo-tip-preset:focus-visible),
+	:global(.tip-sheet .venmo-tip-go:hover),
+	:global(.tip-sheet .venmo-tip-go:focus-visible) {
+		filter: brightness(1.08);
+		outline: 2px solid #ffffff;
+		outline-offset: 2px;
 	}
 
-	:global(.tip-sheet .venmo-tip-go) {
-		min-block-size: var(--control-size);
-		border-radius: 999px;
+	/* No amount yet: not a faded pay button, but a quiet outline that says what it needs. */
+	:global(.tip-sheet .venmo-tip-go[aria-disabled='true']) {
+		opacity: 1;
+		background: transparent;
+		box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+		color: #ffffff;
+		font-weight: var(--weight-semibold);
+		cursor: default;
+	}
+
+	/* A bad amount reads as an error: the field and the hint under it turn pink (about 8:1 on the sheet). */
+	:global(.tip-sheet .venmo-tip-input[aria-invalid='true']) {
+		border-color: var(--support);
+		box-shadow: 0 0 0 1px var(--support);
+	}
+
+	:global(.tip-sheet .venmo-tip-input[aria-invalid='true'] ~ .venmo-tip-hint) {
+		color: #ff8fb2;
 	}
 
 	:global(.tip-sheet .venmo-tip-input) {

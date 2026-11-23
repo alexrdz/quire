@@ -9,6 +9,7 @@ const { default: SetlistPage } = await import('$lib/components/zine/SetlistPage.
 const { default: StoryPhoto } = await import('$lib/components/zine/story/StoryPhoto.svelte');
 const { default: StoryCover } = await import('$lib/components/zine/story/StoryCover.svelte');
 const { default: StoryReader } = await import('$lib/components/zine/story/StoryReader.svelte');
+const { default: VenmoTipPanel } = await import('$lib/components/tips/VenmoTipPanel.svelte');
 const { default: AudioPage } = await import('$lib/components/zine/AudioPage.svelte');
 const { default: VideoPage } = await import('$lib/components/zine/VideoPage.svelte');
 const { default: TextPage } = await import('$lib/components/zine/TextPage.svelte');
@@ -101,6 +102,7 @@ describe('Issue reader page components', () => {
 		const { body } = render(StoryCover, { props });
 		expect(body).toMatch(/<h1[^>]*class="story-cover-title[^"]*"[^>]*>The Neon Velvet<\/h1>/);
 		expect(body).toContain("Baby's All Right");
+		expect(body).toMatch(/<time datetime="2026-10-12"[^>]*>Oct 12, 2026<\/time>/);
 		expect(body).toContain('Thank you');
 		// Tip-first: each pill is the real Venmo link, with the same classes as the tip panel's presets.
 		const pills = [...body.matchAll(/<a[^>]*class="venmo-tip-preset story-tip-pill"[^>]*href="([^"]+)"/g)];
@@ -116,6 +118,18 @@ describe('Issue reader page components', () => {
 		const noUsername = render(StoryCover, { props: { ...props, artist: { ...props.artist, venmoUsername: null } } }).body;
 		expect(noUsername).not.toContain('story-tip-pill');
 		expect(render(StoryCover, { props: { ...props, isScanVerified: true } }).body).toContain('Attended Stamp Eligible');
+	});
+
+	it('the tip sheet panel has a short title, "with Venmo" below, and says what the custom button needs', () => {
+		const props = { artistSlug: 'nv', artistName: 'The Neon Velvet', venmoUsername: 'neon-velvet', issueSlug: 'x', presets: [3, 5, 10], opensVenmo: true };
+		const sheet = render(VenmoTipPanel, { props: { ...props, compact: true } }).body;
+		expect(sheet).toMatch(/<h2 class="venmo-tip-title">Tip The Neon Velvet<\/h2>/);
+		expect(sheet).toMatch(/With Venmo: opens Venmo to pay/);
+		expect(sheet).toMatch(/data-testid="venmo-custom-disabled">\s*Enter an amount\s*</);
+		// The Back Page keeps its panel copy.
+		const backPage = render(VenmoTipPanel, { props }).body;
+		expect(backPage).toMatch(/<h2 class="venmo-tip-title">Tip The Neon Velvet with Venmo<\/h2>/);
+		expect(backPage).toMatch(/data-testid="venmo-custom-disabled">\s*Tip with Venmo\s*</);
 	});
 
 	it('the reader renders every page, only the first current, with a bar per segment and the Wall count', () => {
@@ -143,7 +157,9 @@ describe('Issue reader page components', () => {
 		expect(body.match(/data-place="current"/g)).toHaveLength(1);
 		expect(body).toMatch(/data-place="current" data-page-id="page-cover"/);
 		expect(body.match(/data-place="after"/g)).toHaveLength(3);
-		expect(body).toContain('Brooklyn · 2026-10-12');
+		// The header's date is for people, in the Issue's own calendar day.
+		expect(body).toContain('Brooklyn · Oct 12');
+		expect(body).not.toContain('2026-10-12<');
 		expect(body).toContain('href="/a/the-neon-velvet"');
 		// The bottom bar is not on the Cover.
 		expect(body).not.toContain('story-bar');
