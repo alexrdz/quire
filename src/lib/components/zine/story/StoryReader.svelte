@@ -13,7 +13,6 @@
 		progressStates,
 		segmentHash,
 		stepSegment,
-		formatIssueDate,
 		type StoryDirection,
 		type StoryPageInfo
 	} from '$domain/story';
@@ -44,7 +43,7 @@
 			typePairing?: string | null;
 			venmoUsername?: string | null;
 		};
-		issue: { slug: string; city: string; date: string; timezone?: string | null };
+		issue: { slug: string; city: string; date: string };
 		noteCount: number;
 		/** Venmo tips are on (the Artist has a username and has not left). */
 		showTips: boolean;
@@ -272,7 +271,7 @@
 			artistSlug={artist.slug}
 			avatarUrl={artist.coverArtUrl}
 			city={issue.city}
-			date={formatIssueDate(issue.date, issue.timezone, 'short')}
+			date={issue.date}
 		/>
 
 		<div class="story-pages">

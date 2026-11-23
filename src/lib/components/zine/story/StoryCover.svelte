@@ -1,6 +1,6 @@
 <script lang="ts">
 	import TipPresetButtons from '$lib/components/tips/TipPresetButtons.svelte';
-	import { formatIssueDate } from '$domain/story';
+	import { formatIssueDate } from '$domain/issue-date';
 	import { getStoryNav } from './context';
 
 	/**

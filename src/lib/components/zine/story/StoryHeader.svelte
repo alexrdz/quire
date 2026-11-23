@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatIssueDate } from '$domain/issue-date';
 	import { initialsOf } from './context';
 
 	/**
@@ -12,6 +13,7 @@
 		artistSlug: string;
 		avatarUrl?: string | null;
 		city: string;
+		/** The Issue's stored YYYY-MM-DD date; shown as "Oct 12". */
 		date: string;
 	}
 
@@ -32,7 +34,7 @@
 		{/if}
 		<div class="story-header-text">
 			<span class="story-header-name">{artistName}</span>
-			<span class="story-header-meta">{city} · {date}</span>
+			<span class="story-header-meta">{city} · {formatIssueDate(date, null, 'short')}</span>
 		</div>
 		<a class="story-close" href="/a/{artistSlug}" aria-label="Close and go to {artistName}'s page">
 			<svg viewBox="0 0 24 24" aria-hidden="true" class="story-icon">

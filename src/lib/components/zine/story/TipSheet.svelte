@@ -80,6 +80,16 @@
 		cursor: default;
 	}
 
+	/* A bad amount reads as an error: the field and the hint under it turn pink (about 8:1 on the sheet). */
+	:global(.tip-sheet .venmo-tip-input[aria-invalid='true']) {
+		border-color: var(--support);
+		box-shadow: 0 0 0 1px var(--support);
+	}
+
+	:global(.tip-sheet .venmo-tip-input[aria-invalid='true'] ~ .venmo-tip-hint) {
+		color: #ff8fb2;
+	}
+
 	:global(.tip-sheet .venmo-tip-input) {
 		min-block-size: var(--control-size);
 		border-radius: 12px;

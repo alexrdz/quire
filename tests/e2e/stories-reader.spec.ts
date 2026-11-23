@@ -494,3 +494,115 @@ test('in production the tip sheet opens the exact Venmo link and records a Tip T
 		.toContainEqual({ issueId: artist.issueId, amountSelectedCents: 500 });
 	await context.close();
 });
+
+/* ---------------------------------------------------------------------------
+   R-T01b (B1-T31): the polish
+   --------------------------------------------------------------------------- */
+
+/** A 4 by 2 px PNG: a landscape photo. */
+const LANDSCAPE_PNG = Buffer.from(
+	'iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAIAAADwyuo0AAAAEElEQVR4nGNwaDgARwzIHACYGgwBy6ZeBwAAAABJRU5ErkJggg==',
+	'base64'
+);
+
+test('no ISO date shows in the reader: the header and Cover read like a person wrote them', async ({ browser, baseURL }) => {
+	const { page, close } = await readerAt(browser, baseURL, { width: 390, height: 844 });
+	await page.goto(BROOKLYN);
+	const ids = await pageIds(page);
+	await expectCurrent(page, 'page-cover');
+	await expect(page.locator('.story-header-meta')).toHaveText('Brooklyn · Oct 12');
+	await expect(page.locator('.story-cover-meta')).toHaveText(/^Baby.s All Right\s*·\s*Brooklyn\s*·\s*Oct 12, 2026$/);
+
+	const iso = /\b\d{4}-\d{2}-\d{2}\b/;
+	// The header, the Cover, every content page and the Wall. R-T04 (B1-T29) rewrites
+	// the Endpaper with formatIssueDate and extends this check to it.
+	for (const id of ids.filter((pageId) => pageId !== 'page-endpaper')) {
+		await goToStoryPage(page, id);
+		const shown = await page.evaluate(
+			(pageId) =>
+				[document.querySelector('.story-header'), document.querySelector(`.story-page[data-page-id="${pageId}"]`)]
+					.map((el) => (el as HTMLElement | null)?.innerText ?? '')
+					.join('\n'),
+			id
+		);
+		expect(shown, `${id} shows no ISO date`).not.toMatch(iso);
+	}
+	await openTipSheet(page);
+	expect(await page.locator('dialog[open]').innerText()).not.toMatch(iso);
+	await close();
+});
+
+test('the tip pills look the same on the Cover, in the tip sheet and in the bottom bar', async ({ browser, baseURL }) => {
+	const { page, close } = await readerAt(browser, baseURL, { width: 390, height: 844 });
+	const look = (locator: Locator) =>
+		locator.first().evaluate((el) => {
+			const s = getComputedStyle(el);
+			return { background: s.backgroundColor, color: s.color, weight: s.fontWeight, radius: s.borderTopLeftRadius };
+		});
+	await page.goto(BROOKLYN);
+	await expectCurrent(page, 'page-cover');
+	const cover = await look(page.locator('#page-cover .story-tip-pill'));
+	await openTipSheet(page);
+	const sheet = await look(page.locator('dialog[open] .venmo-tip-preset'));
+	await page.keyboard.press('Escape');
+	const ids = await pageIds(page);
+	await goToStoryPage(page, ids[1]!);
+	const bar = await look(page.locator('.story-bar .story-tip'));
+
+	expect(sheet).toEqual(cover);
+	expect(bar).toEqual(cover);
+	await close();
+});
+
+test('a landscape photo has its caption directly under it at 390 px', async ({ browser, baseURL }) => {
+	const { page, close } = await readerAt(browser, baseURL, { width: 390, height: 844 });
+	await page.route('https://images.unsplash.com/**', (route) =>
+		route.fulfill({ status: 200, contentType: 'image/png', body: LANDSCAPE_PNG })
+	);
+	await page.goto(BROOKLYN);
+	const frame = page.locator('.story-page').filter({ has: page.locator('section.story-photo') }).first();
+	await goToStoryPage(page, (await frame.getAttribute('data-page-id'))!);
+	await expect(frame.locator('section.story-photo')).toHaveClass(/is-landscape/);
+
+	const photo = (await frame.locator('img.story-photo-img.is-current').boundingBox())!;
+	const caption = (await frame.locator('.story-caption').boundingBox())!;
+	const header = (await page.locator('.story-header-row').boundingBox())!;
+	const column = (await page.locator('.story-column').boundingBox())!;
+	// Shown whole, full width, at its own shape.
+	expect(Math.round(photo.width)).toBe(Math.round(column.width));
+	expect(photo.width / photo.height).toBeCloseTo(2, 1);
+	// The caption starts where the photo ends, and the photo clears the header.
+	expect(Math.abs(caption.y - (photo.y + photo.height))).toBeLessThanOrEqual(1);
+	expect(photo.y).toBeGreaterThanOrEqual(header.y + header.height);
+	await close();
+});
+
+test('the tip sheet title fits on one line at 390 px, and an empty or bad amount says what it needs', async ({ browser, baseURL }) => {
+	const { page, close } = await readerAt(browser, baseURL, { width: 390, height: 844 });
+	await page.goto(BROOKLYN);
+	await expectCurrent(page, 'page-cover');
+	const panel = await openTipSheet(page);
+
+	const title = panel.locator('.venmo-tip-title');
+	await expect(title).toHaveText('Tip The Neon Velvet');
+	const lines = await title.evaluate((el) => {
+		const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || parseFloat(getComputedStyle(el).fontSize) * 1.2;
+		return Math.round((el as HTMLElement).getBoundingClientRect().height / lineHeight);
+	});
+	expect(lines).toBe(1);
+	await expect(panel.locator('.venmo-tip-hint').first()).toContainText('With Venmo');
+
+	// No amount: the button says what it needs, and is plainly not a broken pay button.
+	const empty = panel.getByTestId('venmo-custom-disabled');
+	await expect(empty).toHaveText('Enter an amount');
+	await expect(empty).toHaveAttribute('aria-disabled', 'true');
+	expect(Number(await empty.evaluate((el) => getComputedStyle(el).opacity))).toBe(1);
+
+	// A bad amount: the field is marked invalid and the hint under it says why.
+	await panel.locator('.venmo-tip-input').fill('600');
+	await expect(panel.locator('.venmo-tip-input')).toHaveAttribute('aria-invalid', 'true');
+	await expect(panel.getByTestId('venmo-custom-hint')).toHaveText('Enter an amount from $2 to $500, with at most two decimal places.');
+	// It looks like an error, not like the help text it replaces.
+	await expect(panel.getByTestId('venmo-custom-hint')).toHaveCSS('color', 'rgb(255, 143, 178)');
+	await close();
+});
