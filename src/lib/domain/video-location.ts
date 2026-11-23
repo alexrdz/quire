@@ -172,7 +172,10 @@ function walk(
 		const hit = (kind: VideoLocationKind, label = here) =>
 			found.push({ kind, offset: baseOffset + at, size, headerSize, path: label });
 
-		if (type === '©xyz') {
+		if (type === 'cmov') {
+			// A compressed QuickTime movie header can't be checked without inflating it: refuse it.
+			throw new VideoStructureError("Compressed movie headers ('cmov') can't be checked.");
+		} else if (type === '©xyz') {
 			hit('xyz');
 		} else if (type === 'loci') {
 			hit('loci');

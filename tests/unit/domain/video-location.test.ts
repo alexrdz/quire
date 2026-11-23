@@ -132,6 +132,11 @@ describe('MP4 and MOV location stripping', () => {
 		expect(() => findVideoLocations(bad)).toThrow(VideoStructureError);
 	});
 
+	it('refuses a compressed movie header (cmov), which it cannot check', () => {
+		const cmov = new Uint8Array([0, 0, 0, 24, ...Buffer.from('moov'), 0, 0, 0, 16, ...Buffer.from('cmov'), 1, 2, 3, 4, 5, 6, 7, 8]);
+		expect(() => findVideoLocations(cmov)).toThrow(VideoStructureError);
+	});
+
 	it('knows which metadata keys are locations', () => {
 		for (const key of [
 			'com.apple.quicktime.location.ISO6709',
