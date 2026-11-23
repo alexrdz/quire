@@ -419,6 +419,8 @@
 										orientationName="videoOrientation"
 										existingVideoUrl={parsed.videoUrl || ''}
 										maxDurationSeconds={60}
+										uploadsEnabled={data.features.uploads}
+										mode={data.features.mode}
 									/>
 								</Stack>
 								<Stack gap="xs">
@@ -618,6 +620,8 @@
 									name="videoFile"
 									orientationName="videoOrientation"
 									maxDurationSeconds={60}
+									uploadsEnabled={data.features.uploads}
+									mode={data.features.mode}
 								/>
 							</Stack>
 							<Stack gap="xs" class="w-full">

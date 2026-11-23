@@ -1,12 +1,18 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { Box, Stack, Cluster, Frame } from '$lib/components/layout';
+	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
+	import type { Mode } from '$lib/features';
 
 	interface Props {
 		name?: string;
 		orientationName?: string;
 		maxDurationSeconds?: number;
 		existingVideoUrl?: string;
+		/** False when uploads are off (decision 30): every file input and camera control is disabled. */
+		uploadsEnabled?: boolean;
+		/** Picks the wording of the uploads-off notice. */
+		mode?: Mode;
 		onrecorded?: (blob: Blob, orientation: 'portrait' | 'landscape') => void;
 		oncleared?: () => void;
 	}
@@ -16,6 +22,8 @@
 		orientationName = 'videoOrientation',
 		maxDurationSeconds = 60,
 		existingVideoUrl = '',
+		uploadsEnabled = true,
+		mode,
 		onrecorded,
 		oncleared
 	}: Props = $props();
@@ -275,6 +283,14 @@
 		const url = URL.createObjectURL(file);
 		objectUrlToRevoke = url;
 		previewUrl = url;
+		// The picker has no name, so the form never sends it. The chosen file goes on the
+		// one named input, exactly as a recording does; the preview's metadata sets the orientation.
+		recordedChunks = [];
+		if (fileInputEl && typeof DataTransfer !== 'undefined') {
+			const dt = new DataTransfer();
+			dt.items.add(file);
+			fileInputEl.files = dt.files;
+		}
 		recorderPhase = 'preview';
 	}
 
@@ -297,6 +313,7 @@
 		class="hidden-file-input"
 		tabindex="-1"
 		aria-hidden="true"
+		disabled={!uploadsEnabled}
 	/>
 	<input type="hidden" name={orientationName} value={orientation} />
 
@@ -304,6 +321,10 @@
 		<Box variant="subtle" padding="sm" radius="md" class="recorder-error-box">
 			<span class="error-text">{errorMessage}</span>
 		</Box>
+	{/if}
+
+	{#if !uploadsEnabled}
+		<FeatureNotice feature="uploads" {mode} />
 	{/if}
 
 	{#if recorderPhase === 'idle'}
@@ -314,7 +335,7 @@
 					<span class="recorder-prompt-subtext">Record up to 60 seconds directly from your camera</span>
 				</Stack>
 				<Cluster gap="sm" justify="center">
-					<button type="button" class="btn-action-highlight" onclick={startCamera}>
+					<button type="button" class="btn-action-highlight" disabled={!uploadsEnabled} onclick={startCamera}>
 						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" aria-hidden="true">
 							<circle cx="12" cy="12" r="10" />
 							<polygon points="10 8 16 12 10 16 10 8" fill="currentColor" />
@@ -324,13 +345,14 @@
 					<button
 						type="button"
 						class="btn-action-accent"
+						disabled={!uploadsEnabled}
 						onclick={() => (fallbackMode = !fallbackMode)}
 					>
 						<span>{fallbackMode ? 'Hide File Upload' : 'Upload Video File'}</span>
 					</button>
 				</Cluster>
 
-				{#if fallbackMode}
+				{#if fallbackMode && uploadsEnabled}
 					<Stack gap="xs" class="fallback-upload-pane">
 						<label for="fallback-video-input" class="input-label-sm">Choose Video File (MP4, WebM, MOV)</label>
 						<input
@@ -338,6 +360,7 @@
 							type="file"
 							accept="video/mp4,video/webm,video/quicktime,video/*"
 							capture="environment"
+							disabled={!uploadsEnabled}
 							onchange={handleFileSelected}
 							class="recorder-native-input"
 						/>
@@ -425,7 +448,7 @@
 						<span class="meta-chip meta-highlight">Recorded Video Ready</span>
 						<span class="meta-chip">{orientation === 'portrait' ? 'Vertical (9:16)' : 'Landscape (16:9)'}</span>
 					</Cluster>
-					<button type="button" class="btn-action-subtle" onclick={retake}>
+					<button type="button" class="btn-action-subtle" disabled={!uploadsEnabled} onclick={retake}>
 						Retake / Record Again
 					</button>
 				</Cluster>
@@ -672,7 +695,8 @@
 		border-color: rgba(255, 255, 255, 0.3);
 	}
 
-	.btn-action-subtle:disabled {
+	.btn-action-subtle:disabled,
+	.video-recorder-root button:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
 	}
