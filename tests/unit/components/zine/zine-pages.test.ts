@@ -168,14 +168,33 @@ describe('Issue reader page components', () => {
 		expectOnlyCustomProperties(body);
 	});
 
-	it('the mock audio player shows progress with a class, not an inline style', () => {
-		const idle = render(AudioPage, { props: { shell: shell('audio'), content: {}, playing: false, onToggle() {} } });
-		const playing = render(AudioPage, { props: { shell: shell('audio'), content: {}, playing: true, onToggle() {} } });
-		expect(idle.body).toContain('Play track');
-		expect(playing.body).toContain('Pause track');
-		expect(playing.body).toMatch(/class="audio-progress-fill is-playing/);
-		expectOnlyCustomProperties(idle.body);
-		expectOnlyCustomProperties(playing.body);
+	it('the audio page: cover art, title and a labelled player; the demo preview starts at 0:00 of 3:42', () => {
+		const { body } = render(AudioPage, {
+			props: { shell: shell('audio'), content: {}, coverArtUrl: '/art.webp', artistName: 'The Neon Velvet' }
+		});
+		expect(body).toContain('src="/art.webp"');
+		expect(body).toContain('alt="Cover art for The Neon Velvet"');
+		expect(body).toContain('Demo preview');
+		expect(body).toContain('aria-label="Play Studio Session Bounce"');
+		expect(body).toMatch(/<input[^>]*type="range"[^>]*aria-label="Seek in Studio Session Bounce"/);
+		expect(body).toContain('aria-valuetext="0:00 of 3:42"');
+		expect(body).not.toMatch(/tape|scrap|cassette|--zine-|rotate\(/i);
+		expectOnlyCustomProperties(body);
+	});
+
+	it('an audio page without cover art shows the initials; a real track has an audio element and no demo label', () => {
+		const { body } = render(AudioPage, {
+			props: {
+				shell: shell('audio'),
+				content: { title: 'Night Drive', audioUrl: '/uploads/a.mp3', duration: '02:10' },
+				artistName: 'The Neon Velvet'
+			}
+		});
+		expect(body).toMatch(/story-audio-initials[^>]*>NV</);
+		expect(body).toContain('<audio');
+		expect(body).toContain('src="/uploads/a.mp3"');
+		expect(body).not.toContain('Demo preview');
+		expect(body).toContain('aria-valuetext="0:00 of 2:10"');
 	});
 
 	it('a YouTube page starts as a facade, with no iframe until tapped', () => {
@@ -183,8 +202,38 @@ describe('Issue reader page components', () => {
 			props: { shell: shell('video'), content: { videoUrl: 'https://youtu.be/dQw4w9WgXcQ' } }
 		});
 		expect(body).toContain('i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg');
-		expect(body).toContain('Play Video');
+		expect(body).toContain('aria-label="Play YouTube video"');
+		expect(body).toContain('Watch on YouTube');
 		expect(body).not.toContain('<iframe');
+	});
+
+	it('an uploaded clip fills the page, plays inline, loops, and has an Unmute button and a scrim caption', () => {
+		const portrait = render(VideoPage, {
+			props: { shell: shell('video'), content: { title: 'Soundcheck', videoUrl: '/uploads/clip.mp4', orientation: 'portrait' } }
+		}).body;
+		expect(portrait).toMatch(/<video[^>]*class="story-video-clip[^"]*"/);
+		expect(portrait).toMatch(/<video[^>]*playsinline/);
+		expect(portrait).toMatch(/<video[^>]*loop/);
+		expect(portrait).toMatch(/<video[^>]*controls/);
+		expect(portrait).not.toMatch(/story-video-clip[^"]*is-landscape/);
+		expect(portrait).toContain('aria-label="Unmute video"');
+		expect(portrait).toMatch(/class="story-video-caption[^"]*"[\s\S]*Soundcheck/);
+		const landscape = render(VideoPage, {
+			props: { shell: shell('video'), content: { videoUrl: '/uploads/clip.mp4', orientation: 'landscape' } }
+		}).body;
+		expect(landscape).toMatch(/story-video-clip[^"]*is-landscape/);
+		for (const body of [portrait, landscape]) {
+			expect(body).not.toMatch(/tape|scrap|bezel|video-screen|rotate\(/i);
+			expectOnlyCustomProperties(body);
+		}
+	});
+
+	it('a link-out video is a clean card with one button', () => {
+		const { body } = render(VideoPage, {
+			props: { shell: shell('video'), content: { title: 'Tour Doc', videoUrl: 'https://example.com/watch' } }
+		});
+		expect(body).toMatch(/class="story-link-card[^"]*"/);
+		expect(body).toMatch(/<a[^>]*href="https:\/\/example.com\/watch"[^>]*class="story-link-button[^"]*"[^>]*>\s*Open video/);
 	});
 
 	it('a template text page is about the Artist by default', () => {

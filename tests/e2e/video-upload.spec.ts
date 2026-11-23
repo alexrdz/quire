@@ -47,7 +47,7 @@ async function publishAndRead(page: Page, city: string): Promise<string> {
 	await page.getByRole('button', { name: /publish/i }).first().click();
 	await expect.poll(async () => (await issueForCity(city))?.slug ?? null, { timeout: 10000 }).not.toBeNull();
 	await page.goto(`/i/${(await issueForCity(city))!.slug}`);
-	const video = page.locator('.video-screen video');
+	const video = page.locator('video.story-video-clip');
 	await expect(video).toHaveCount(1);
 	return (await video.getAttribute('src'))!;
 }
@@ -74,7 +74,9 @@ test('a picked clip uploads straight to storage, and the Issue shows it', async 
 
 	const src = await publishAndRead(page, city);
 	expect(src).toMatch(/^\/uploads\/[0-9a-f-]{36}\.webm$/);
-	await expect(page.locator('.video-screen .video-frame')).toHaveClass(/video-frame-portrait/);
+	// Portrait: the clip fills the page (cropped to fill), not shown whole.
+	await expect(page.locator('video.story-video-clip')).not.toHaveClass(/is-landscape/);
+	await expect(page.locator('video.story-video-clip')).toHaveCSS('object-fit', 'cover');
 	expect(readFileSync(path.join(LOCAL_UPLOADS_DIR, path.basename(src))).equals(readFileSync(CLIP))).toBe(true);
 	expect(multipart, 'the clip never goes through the form action').toEqual([]);
 	// R2's CORS rule allows only Content-Type: the PUT sends the signed type and no x-amz-* or custom headers.

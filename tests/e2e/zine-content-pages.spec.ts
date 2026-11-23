@@ -6,8 +6,8 @@ import { goToPageTitled } from './helpers/story';
  * Z-T05's content pages inside the Stories reader (ADR 0011). R-T02 and R-T03
  * restyle them; until then each renders its current component in the reader's
  * full-screen frame. This checks what the pages hold and do, each while it is
- * the page on screen: the setlist, a photo, a text page, a mock and a real
- * audio track, and YouTube, Vimeo, Bandcamp and link-out video pages. It also
+ * the page on screen: the setlist, a photo and a text page. (The audio and video
+ * pages moved to stories-media.spec.ts with R-T02.) It also
  * keeps the rules that still apply: no horizontal scroll at 320 px, no
  * decoration covering a control, 44 px targets, AA text and no CSP problems.
  *
@@ -108,19 +108,7 @@ test.describe('content pages', () => {
 			const text = await goToPageTitled(page, 'Zine Text');
 			await expect(text.locator('p.bespoke-body-text')).toHaveText('Words on a scrap.');
 
-			// Audio: the mock track has a player; the real track keeps the standard player.
-			const demo = await goToPageTitled(page, 'Zine Demo');
-			await expect(demo.locator('button.audio-play-btn')).toBeVisible();
-			const track = await goToPageTitled(page, 'Zine Track');
-			await expect(track.locator('audio[controls]')).toHaveAttribute('src', `${E2E_MEDIA_ORIGIN}/audio/zine.mp3`);
-
-			// Video: each embed sits in its screen; a link out is a link.
-			for (const title of ['Zine YouTube', 'Zine Vimeo', 'Zine Bandcamp']) {
-				const video = await goToPageTitled(page, title);
-				await expect(video.locator('.video-screen'), title).toBeVisible();
-			}
-			const link = await goToPageTitled(page, 'Zine Link');
-			await expect(link.locator('.video-link-card a.btn-action-highlight')).toBeVisible();
+			// Audio and video pages: stories-media.spec.ts (R-T02).
 
 			// No horizontal scroll: not the page, and not any page inside its own frame (corner tape at 320 px).
 			expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
@@ -132,7 +120,7 @@ test.describe('content pages', () => {
 			// AA contrast for the text on these pages.
 			for (const ratio of await contrastOf(
 				page,
-				'.song-title, .song-num, .song-tag, .cassette-title, .cassette-length, .text-scrap p, .video-link-title'
+				'.song-title, .song-num, .song-tag, .text-scrap p'
 			)) {
 				expect(ratio).toBeGreaterThanOrEqual(4.5);
 			}
@@ -158,65 +146,9 @@ test.describe('content pages', () => {
 			});
 			expect(overlaps).toEqual([]);
 
-			// Targets stay at least 44 px (layout size, which ignores the page's slide).
-			for (const [title, selector] of [
-				['Zine Demo', 'button.audio-play-btn'],
-				['Zine YouTube', 'button.video-facade-play'],
-				['Zine Vimeo', 'button.video-facade-play']
-			] as const) {
-				const size = await pageTitled(page, title)
-					.locator(selector)
-					.evaluate((el) => ({ w: (el as HTMLElement).offsetWidth, h: (el as HTMLElement).offsetHeight }));
-				expect(Math.min(size.w, size.h), `${title} ${selector}`).toBeGreaterThanOrEqual(44);
-			}
+			// 44 px targets on the audio and video pages: stories-media.spec.ts.
 
 			expect(problems).toEqual([]);
 		});
 	}
-
-	test('the mock cassette plays, and its reels turn', async ({ page }) => {
-		await open(page, 390, `/i/${SLUG}`);
-		const demo = await goToPageTitled(page, 'Zine Demo');
-		await demo.locator('button.audio-play-btn').click();
-		await expect(demo.locator('button.audio-play-btn')).toHaveAttribute('aria-label', 'Pause track');
-		// Svelte scopes the keyframes name with the component hash.
-		await expect(demo.locator('.cassette-reel').first()).toHaveCSS('animation-name', /cassette-spin$/);
-		await demo.locator('button.audio-play-btn').click();
-		await expect(demo.locator('.cassette-reel').first()).toHaveCSS('animation-name', 'none');
-	});
-
-	test('with reduced motion the reels stay still', async ({ page }) => {
-		await page.emulateMedia({ reducedMotion: 'reduce' });
-		await open(page, 390, `/i/${SLUG}`);
-		const demo = await goToPageTitled(page, 'Zine Demo');
-		await demo.locator('button.audio-play-btn').click();
-		await expect(demo.locator('button.audio-play-btn')).toHaveAttribute('aria-label', 'Pause track');
-		await expect(demo.locator('.cassette-reel').first()).toHaveCSS('animation-name', 'none');
-	});
-
-	test('videos in their screens still load only when tapped', async ({ page }) => {
-		const problems = await open(page, 390, `/i/${SLUG}`);
-		const youtube = await goToPageTitled(page, 'Zine YouTube');
-		await expect(youtube.locator('iframe')).toHaveCount(0);
-		await expect(youtube.locator('img.video-poster-img')).toHaveAttribute(
-			'src',
-			'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
-		);
-		await youtube.locator('button[aria-label="Play Zine YouTube"]').click();
-		await expect(youtube.locator('.video-screen iframe')).toHaveAttribute(
-			'src',
-			'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1'
-		);
-
-		const vimeo = await goToPageTitled(page, 'Zine Vimeo');
-		await expect(vimeo.locator('iframe')).toHaveCount(0);
-		await vimeo.locator('button[aria-label="Play Zine Vimeo"]').click();
-		await expect(vimeo.locator('.video-screen iframe')).toHaveAttribute(
-			'src',
-			'https://player.vimeo.com/video/76979871?autoplay=1'
-		);
-
-		await expect(pageTitled(page, 'Zine Bandcamp').locator('.video-screen iframe.bandcamp-iframe')).toBeAttached();
-		expect(problems).toEqual([]);
-	});
 });
