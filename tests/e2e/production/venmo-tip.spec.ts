@@ -5,6 +5,7 @@ import {
 	tipTapsFor,
 	type ProductionArtist
 } from '../helpers/production-db';
+import { openTipSheet } from '../helpers/story';
 
 /**
  * PRODUCTION_PLAN Phase 5 and V.4: in real production mode a tip tap opens a
@@ -41,12 +42,19 @@ async function interceptVenmo(page: Page): Promise<string[]> {
 	return opened;
 }
 
+/** The tip panel: in the Issue reader's tip sheet (ADR 0011), or inline on the Back Page. */
+async function tipPanel(page: Page, path: string) {
+	if (path.startsWith('/i/')) return openTipSheet(page);
+	const panel = page.locator('.venmo-tip-panel');
+	await expect(panel).toBeVisible();
+	return panel;
+}
+
 async function tapPreset(page: Page, path: string, label: string) {
 	const opened = await interceptVenmo(page);
 	await page.goto(path);
 	await expect(page.locator('[data-testid="demo-banner"]')).toHaveCount(0);
-	const panel = page.locator('.venmo-tip-panel');
-	await expect(panel).toBeVisible();
+	const panel = await tipPanel(page, path);
 	const preset = panel.locator('a.venmo-tip-preset', { hasText: label });
 
 	// A real link in production, with the exact pay URL.
@@ -71,7 +79,7 @@ test('no Stripe key is set for the production server, and payments are off', asy
 	expect(health.features).toMatchObject({ mode: 'production', payments: false, tipsOpenVenmo: true });
 });
 
-test('a preset on the Cover opens the exact Venmo link and records a Tip Tap', async ({ page }) => {
+test('a preset in the Issue tip sheet opens the exact Venmo link and records a Tip Tap', async ({ page }) => {
 	await tapPreset(page, `/i/${withVenmo.issueSlug}`, '$5');
 	await expect
 		.poll(async () => tipTapsFor(withVenmo.artistId))
@@ -88,7 +96,7 @@ test('a preset on the Back Page opens the exact Venmo link and records a General
 test('every preset carries the right amount', async ({ page }) => {
 	await interceptVenmo(page);
 	await page.goto(`/i/${withVenmo.issueSlug}`);
-	const panel = page.locator('.venmo-tip-panel');
+	const panel = await openTipSheet(page);
 	for (const [label, amount] of [
 		['$3', '3.00'],
 		['$5', '5.00'],
@@ -104,7 +112,7 @@ test('a custom amount carries the right amount', async ({ page }) => {
 	await interceptVenmo(page);
 	await page.goto(`/i/${withVenmo.issueSlug}`);
 	await page.waitForLoadState('networkidle');
-	const panel = page.locator('.venmo-tip-panel');
+	const panel = await openTipSheet(page);
 	await panel.locator('input.venmo-tip-input').fill('12.5');
 	await expect(panel.locator('a.venmo-tip-go')).toHaveAttribute('href', venmoUrl('12.50'), { timeout: 2000 });
 	expect(errors).toEqual([]);

@@ -1,10 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
 import { addLegacyQuickPhotoPage, issueForCity } from './helpers/db';
+import { goToPageTitled } from './helpers/story';
 
 /**
- * Z-T07: Quick Issue saves the photo caption on the back of the polaroid, so a
- * published Quick Issue photo flips to it. A photo without a caption is a still
- * card. Pages published before (caption saved as the page body) still render.
+ * Z-T07: Quick Issue saves the photo caption with the photo. In the Stories
+ * reader (ADR 0011) it shows over the photo's scrim; a photo without a caption
+ * shows none. Pages published before (caption saved as the page body) still
+ * render it, as the page's words.
  */
 
 const RUN = Date.now().toString(36);
@@ -36,12 +38,10 @@ async function publishQuickIssue(page: Page, city: string, caption: string): Pro
 	return (await issueForCity(city))!.slug;
 }
 
+/** Opens the reader at the photo page titled `title` and returns its section. */
 async function photoSection(page: Page, title: string) {
-	const section = page
-		.locator('section.content-page-canvas')
-		.filter({ has: page.locator('.bespoke-heading', { hasText: title }) });
-	await section.scrollIntoViewIfNeeded();
-	return section;
+	const frame = await goToPageTitled(page, title);
+	return frame.locator('section.story-photo');
 }
 
 test.beforeEach(async ({ page }) => {
@@ -51,36 +51,29 @@ test.beforeEach(async ({ page }) => {
 	);
 });
 
-test('publish a Quick Issue with a captioned photo, open it, and flip the polaroid to the caption', async ({ page }) => {
-	const city = `Flipton ${RUN}`;
+test('publish a Quick Issue with a captioned photo, open it, and read the caption over the photo', async ({ page }) => {
+	const city = `Captionton ${RUN}`;
 	const slug = await publishQuickIssue(page, city, CAPTION);
 
 	await page.goto(`/i/${slug}`);
 	const section = await photoSection(page, `${city} Photo`);
-	await expect(section.locator('.polaroid')).toHaveCount(1);
-	await expect(section.locator('.polaroid img')).toHaveAttribute('src', PHOTO_URL);
-	await expect(section.locator('.polaroid-note')).toHaveText(CAPTION);
-	// The caption is on the back of the card, not a paragraph under the photo.
-	await expect(section.locator('p.bespoke-body-text', { hasText: CAPTION })).toHaveCount(0);
-
-	const card = section.locator('button.polaroid-body');
-	await expect(card).toHaveAttribute('data-side', 'front');
-	await card.click();
-	await expect(card).toHaveAttribute('data-side', 'back');
-	await expect(section.locator('.polaroid-note')).toBeVisible();
-	await card.click();
-	await expect(card).toHaveAttribute('data-side', 'front');
+	await expect(section.locator('img.story-photo-img')).toHaveCount(1);
+	await expect(section.locator('img.story-photo-img')).toHaveAttribute('src', PHOTO_URL);
+	await expect(section.locator('.story-photo-caption')).toHaveText(CAPTION);
+	await expect(section.locator('.story-photo-caption')).toBeVisible();
+	// The caption is the photo's, shown once, not repeated as the page's words.
+	await expect(section.locator('.story-photo-body')).toHaveCount(0);
 });
 
-test('a Quick Issue photo without a caption is a single card that does not flip', async ({ page }) => {
+test('a Quick Issue photo without a caption shows no caption', async ({ page }) => {
 	const city = `Stillton ${RUN}`;
 	const slug = await publishQuickIssue(page, city, '');
 
 	await page.goto(`/i/${slug}`);
 	const section = await photoSection(page, `${city} Photo`);
-	await expect(section.locator('.polaroid')).toHaveCount(1);
-	await expect(section.locator('button.polaroid-body')).toHaveCount(0);
-	await expect(section.locator('.pile-controls')).toHaveCount(0);
+	await expect(section.locator('img.story-photo-img')).toHaveCount(1);
+	await expect(section.locator('.story-photo-caption')).toHaveCount(0);
+	await expect(section.locator('.story-photo-count')).toHaveCount(0);
 });
 
 test('an older Quick Issue page, with its caption as the body, still renders it', async ({ page }) => {
@@ -91,7 +84,7 @@ test('an older Quick Issue page, with its caption as the body, still renders it'
 
 	await page.goto(`/i/${slug}`);
 	const section = await photoSection(page, 'Older Quick Photo');
-	await expect(section.locator('.polaroid')).toHaveCount(1);
-	await expect(section.locator('.polaroid img')).toHaveAttribute('src', PHOTO_URL);
-	await expect(section.locator('p.bespoke-body-text')).toHaveText(CAPTION);
+	await expect(section.locator('img.story-photo-img')).toHaveCount(1);
+	await expect(section.locator('img.story-photo-img')).toHaveAttribute('src', PHOTO_URL);
+	await expect(section.locator('.story-photo-body')).toHaveText(CAPTION);
 });

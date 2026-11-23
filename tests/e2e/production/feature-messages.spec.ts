@@ -87,8 +87,8 @@ test.describe('Fan sign-in off', () => {
 		for (const path of [`/i/${artist.issueSlug}`, `/a/${artist.slug}`]) {
 			const response = await page.goto(path);
 			expect(response?.status(), path).toBe(200);
-			// The nav's sign-in button opens the drawer that holds the Google button.
-			await page.locator('.btn-nav-primary').first().click();
+			// The sign-in button (on the Issue Cover, or in the Back Page nav) opens the drawer that holds the Google button.
+			await page.locator(path.startsWith('/i/') ? '#page-cover .story-cover-account button' : '.btn-nav-primary').first().click();
 			await expect(page.locator('.feature-notice[data-feature="fanSignIn"]'), path).toHaveText(
 				FEATURE_UNAVAILABLE.fanSignIn
 			);

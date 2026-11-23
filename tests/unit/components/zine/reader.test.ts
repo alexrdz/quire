@@ -25,37 +25,14 @@ describe('reader page shells', () => {
 		expect(readerPageCount(4)).toBe(7);
 	});
 
-	it('numbers a content page from 2 and labels its chips by source', () => {
-		const bespoke = contentPageShell(0, 4, { kind: 'setlist', source: 'bespoke' }, 'Brooklyn');
-		expect(bespoke).toMatchObject({ id: 'page-content-0', pageNumber: 2, pageCount: 7 });
-		expect(bespoke.chips).toEqual([{ label: 'Brooklyn', tone: 'accent' }, { label: 'SETLIST' }]);
-
-		const template = contentPageShell(3, 4, { kind: 'text', source: 'template' }, 'Brooklyn');
-		expect(template.chips).toEqual([{ label: 'Band Liner Note', tone: 'highlight' }, { label: 'TEXT' }]);
-	});
-
-	it('links the first page back to the Cover and the last page on to the Wall', () => {
-		expect(contentPageShell(0, 3, { kind: 'text', source: 'bespoke' }, 'X').nav).toEqual([
-			{ target: 'page-cover', label: '← Prev' },
-			{ target: 'page-content-1', label: 'Next Page →', primary: true }
-		]);
-		expect(contentPageShell(2, 3, { kind: 'text', source: 'bespoke' }, 'X').nav).toEqual([
-			{ target: 'page-content-1', label: '← Prev' },
-			{ target: 'page-wall', label: 'Next: The Wall →', primary: true }
-		]);
-		// A one-page Issue: Cover on one side, Wall on the other.
-		expect(contentPageShell(0, 1, { kind: 'text', source: 'bespoke' }, 'X').nav.map((n) => n.target)).toEqual([
-			'page-cover',
-			'page-wall'
-		]);
+	it('numbers a content page from 2, after the Cover, and names it by position', () => {
+		expect(contentPageShell(0, 4)).toEqual({ id: 'page-content-0', pageNumber: 2, pageCount: 7 });
+		expect(contentPageShell(3, 4)).toEqual({ id: 'page-content-3', pageNumber: 5, pageCount: 7 });
 	});
 
 	it('places the Wall and the Endpaper last', () => {
-		expect(wallShell(4)).toMatchObject({ id: 'page-wall', pageNumber: 6, pageCount: 7 });
-		expect(wallShell(4).nav.map((n) => n.target)).toEqual(['page-content-3', 'page-endpaper']);
-		expect(endpaperShell(4)).toMatchObject({ id: 'page-endpaper', pageNumber: 7, pageCount: 7 });
-		expect(endpaperShell(4).nav.map((n) => n.target)).toEqual(['page-wall', 'page-cover']);
-		expect(endpaperShell(4).nav.some((n) => n.primary)).toBe(false);
+		expect(wallShell(4)).toEqual({ id: 'page-wall', pageNumber: 6, pageCount: 7 });
+		expect(endpaperShell(4)).toEqual({ id: 'page-endpaper', pageNumber: 7, pageCount: 7 });
 	});
 });
 

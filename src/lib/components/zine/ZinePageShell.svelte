@@ -1,100 +1,60 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { Stack, Cluster } from '$lib/components/layout';
-	import TypeLabel from './TypeLabel.svelte';
-	import { scrollToPage, type PageShell } from './reader';
+	import { Stack } from '$lib/components/layout';
+	import type { PageShell } from './reader';
 
+	/**
+	 * The frame the not-yet-restyled pages (setlist, text, audio, video, the Wall
+	 * and the Endpaper) sit in inside the Stories reader (ADR 0011). The reader
+	 * draws the header, progress and paging, so this is only the page itself;
+	 * R-T02 to R-T04 restyle what is inside.
+	 */
 	interface Props {
 		shell: PageShell;
 		/**
-		 * content: a content page (the body is centred, and a photo can back it).
+		 * content: a content page (the body is centred).
 		 * endpaper: the same layout on the Endpaper canvas.
-		 * wall: the Wall, whose header, body and footer share one Stack.
+		 * wall: the Wall, whose body fills the page.
 		 */
 		variant?: 'content' | 'wall' | 'endpaper';
-		/** The first photo of a photo page, shown dimmed behind it. */
-		photoUrl?: string;
 		children: Snippet;
 	}
 
-	let { shell, variant = 'content', photoUrl, children }: Props = $props();
+	let { shell, variant = 'content', children }: Props = $props();
 
 	const canvasClass = $derived(
 		variant === 'wall' ? 'wall-canvas' : variant === 'endpaper' ? 'endpaper-canvas' : 'content-page-canvas'
 	);
-	const safePhotoCssUrl = $derived(photoUrl ? photoUrl.replace(/'/g, '%27') : '');
-	const pageStyle = $derived(
-		variant === 'content'
-			? `--page-photo: ${
-					photoUrl
-						? `linear-gradient(to bottom, rgba(9, 7, 16, 0.72), rgba(9, 7, 16, 0.96)), url('${safePhotoCssUrl}')`
-						: 'none'
-				};`
-			: undefined
-	);
 </script>
 
-{#snippet header()}
-	<header class="cover-header">
-		<Cluster align="center" gap="xs">
-			{#each shell.chips as chip, i}
-				<TypeLabel position={i} tone={chip.tone ?? 'plain'}>{chip.label}</TypeLabel>
-			{/each}
-		</Cluster>
-		<span class="text-muted type-face subtext-page">
-			Page {shell.pageNumber} of {shell.pageCount}
-		</span>
-	</header>
-{/snippet}
-
-{#snippet footer()}
-	<footer class="page-footer">
-		{#each shell.nav as link}
-			<button
-				type="button"
-				class={link.primary ? 'btn-page-nav-primary' : 'btn-page-nav'}
-				onclick={() => scrollToPage(link.target)}
-			>
-				{link.label}
-			</button>
-		{/each}
-	</footer>
-{/snippet}
-
-<section
-	id={shell.id}
-	class="page zine-paper zine-page {canvasClass} {photoUrl ? 'has-photo-bg' : ''}"
-	style={pageStyle}
->
+<section id={shell.id} class="page zine-paper {canvasClass}">
 	{#if variant === 'wall'}
 		<Stack gap="md" class="page-inner wall-full-stack">
-			{@render header()}
 			{@render children()}
-			{@render footer()}
 		</Stack>
 	{:else}
 		<div class="page-inner">
-			{@render header()}
 			<Stack gap="lg" class="page-body margin-auto">
 				{@render children()}
 			</Stack>
-			{@render footer()}
 		</div>
 	{/if}
 </section>
 
 <style>
-	/* Dark paper and grain come from .zine-paper; a photo page keeps the grain over its dimmed photo.
-	   --page-photo is two layers (the dimming gradient, then the photo), so three sizes in all. */
-	.has-photo-bg {
-		background-image: var(--zine-grain), var(--page-photo, none);
-		background-size: 160px 160px, cover, cover;
-		background-position: 0 0, center, center;
-		background-repeat: repeat, no-repeat, no-repeat;
-	}
-
-	.subtext-page {
-		font-size: var(--text-small);
+	/* Inside the Stories reader (ADR 0011) the page fills its frame instead of the
+	   viewport, and leaves room for the reader's header and bottom bar. */
+	.page {
+		position: absolute;
+		inset: 0;
+		flex: none;
+		inline-size: 100%;
+		max-inline-size: none;
+		block-size: 100%;
+		max-block-size: none;
+		scroll-snap-align: none;
+		padding-block: var(--story-top-space, var(--page-padding-block)) var(--story-bottom-space, var(--page-padding-block));
+		overscroll-behavior: contain;
 	}
 
 	:global(.margin-auto) {
@@ -145,52 +105,5 @@
 	.page :global(.btn-action-highlight:hover) {
 		background: rgba(1, 255, 195, 0.24);
 		color: var(--highlight);
-	}
-
-	.btn-page-nav {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		/* Page buttons are tap targets: at least 44 px (Z-T08). */
-		min-block-size: 44px;
-		min-inline-size: 44px;
-		padding-block: var(--space-2xs);
-		padding-inline: var(--space-xs);
-		border-radius: 6px;
-		background: rgba(255, 255, 255, 0.05);
-		color: #e4e4e7;
-		border: 1px solid rgba(255, 255, 255, 0.12);
-		font-size: var(--text-meta);
-		font-weight: var(--weight-semibold);
-		cursor: pointer;
-		transition: background-color 0.15s ease;
-	}
-
-	.btn-page-nav:hover {
-		background: rgba(255, 255, 255, 0.1);
-		color: #ffffff;
-	}
-
-	.btn-page-nav-primary {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		/* Page buttons are tap targets: at least 44 px (Z-T08). */
-		min-block-size: 44px;
-		min-inline-size: 44px;
-		padding-block: var(--space-2xs);
-		padding-inline: var(--space-s);
-		border-radius: 6px;
-		background: rgba(1, 255, 195, 0.14);
-		color: var(--highlight);
-		border: 1px solid rgba(1, 255, 195, 0.4);
-		font-size: var(--text-meta);
-		font-weight: var(--weight-bold);
-		cursor: pointer;
-		transition: background-color 0.15s ease;
-	}
-
-	.btn-page-nav-primary:hover {
-		background: rgba(1, 255, 195, 0.24);
 	}
 </style>

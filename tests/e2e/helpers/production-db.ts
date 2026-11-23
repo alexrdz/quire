@@ -15,6 +15,9 @@ import { hashPassword } from 'better-auth/crypto';
  */
 export const PRODUCTION_DB_PATH = path.join(os.tmpdir(), 'quire-e2e', 'production.db');
 
+/** The production-mode server (playwright.config.ts), for specs that run in another project. */
+export const PRODUCTION_URL = 'http://localhost:4175';
+
 /** Port of the production-mode server with core config missing (playwright.config.ts). */
 export const CORE_MISSING_URL = 'http://localhost:4176';
 

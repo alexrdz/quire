@@ -24,7 +24,9 @@ test.describe('Physical QR Scan & Attendance Flow', () => {
 		await context.clearCookies();
 
 		await page.goto('/i/neon-velvet-brooklyn-2026-10-12');
-		await expect(page.locator('h1.cover-title')).toHaveText('Brooklyn');
+		// The Stories Cover (ADR 0011) leads with the Artist, then venue, city and date.
+		await expect(page.locator('h1.story-cover-title')).toHaveText('The Neon Velvet');
+		await expect(page.locator('.story-cover-meta')).toContainText('Brooklyn');
 
 		// "Attended Stamp Eligible" should NOT be present on direct link visit
 		await expect(page.locator('text=Attended Stamp Eligible')).not.toBeVisible();

@@ -57,7 +57,7 @@ test.describe('Demo banner in the Demo', () => {
 
 	test('at 360px it does not overlap the Issue Cover CTA or tip buttons', async ({ page }) => {
 		await page.goto(ISSUE_PATH);
-		await expectNoOverlap(page, page.locator('.btn-open-zine, .venmo-tip-preset, .venmo-tip-go'));
+		await expectNoOverlap(page, page.locator('.story-open, .story-tip-pill'));
 	});
 
 	test('the Full-Screen Case Display carries the compact banner', async ({ page }) => {

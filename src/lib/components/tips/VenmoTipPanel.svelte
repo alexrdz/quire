@@ -1,18 +1,15 @@
 <script lang="ts">
 	import { Box, Cluster, Stack } from '$lib/components/layout';
-	import { buildVenmoPayUrl, parseTipDollars, parseVenmoUsername, tipNote } from '$domain/venmo';
-	import { MAX_TIP_CENTS, MIN_TIP_CENTS } from '$domain/tipping';
-	import { CUSTOM_HINT, CUSTOM_HINT_INVALID, demoVenmoMessage } from './tip-taps';
+	import { parseTipDollars } from '$domain/venmo';
+	import { CUSTOM_HINT, CUSTOM_HINT_INVALID } from './tip-taps';
+	import TipPresetButtons, { createTipTapper, dollarsLabel } from './TipPresetButtons.svelte';
 
 	/**
-	 * Venmo tip buttons (ADR 0008, PRODUCTION_PLAN V.4).
-	 *
-	 * In production every amount is a real link to Venmo, so the Fan's own tap
-	 * opens the Venmo app or site, with or without JavaScript. With JavaScript the
-	 * tap is also reported to /api/tip-tap with a fire-and-forget beacon that never
-	 * delays the link. In the Demo, development and tests (`opensVenmo` false) the
-	 * buttons never navigate: the tap is recorded and a Demo message is shown. The
-	 * would-be Venmo URL is exposed as `data-venmo-url`.
+	 * Venmo tip buttons (ADR 0008, PRODUCTION_PLAN V.4): the presets and a custom
+	 * amount. What a tap does (a real venmo.com link in production, the Tip Tap
+	 * beacon, the double-tap guard and the Demo message elsewhere) lives in
+	 * TipPresetButtons' `createTipTapper`, shared with the Issue Cover's pills.
+	 * The would-be Venmo URL is exposed as `data-venmo-url`.
 	 *
 	 * Copy never says a payment happened: Quire cannot see it.
 	 */
@@ -41,19 +38,18 @@
 		class: className = ''
 	}: Props = $props();
 
-	/** Taps on the same amount within this window open Venmo once and count once. */
-	const DOUBLE_TAP_MS = 2000;
+	let message = $state<string | null>(null);
 
-	const username = $derived.by(() => {
-		const parsed = parseVenmoUsername(venmoUsername);
-		return parsed.ok ? parsed.value : null;
-	});
-	const note = $derived(tipNote(artistName));
-	const presetCents = $derived(
-		presets
-			.map((dollars) => Math.round(dollars * 100))
-			.filter((cents) => cents >= MIN_TIP_CENTS && cents <= MAX_TIP_CENTS)
-	);
+	/** One tapper for the presets and the custom amount, so one double-tap guard covers both. */
+	const tips = createTipTapper(() => ({
+		artistSlug,
+		artistName,
+		venmoUsername,
+		issueSlug,
+		opensVenmo,
+		onMessage: (text) => (message = text)
+	}));
+	const username = $derived(tips.username);
 
 	// A type="number" input binds a number, or null when the field is empty or
 	// not a number. parseTipDollars handles both and never throws.
@@ -62,52 +58,12 @@
 	/** Something typed that isn't a usable amount: say why the button is off. */
 	const customInvalid = $derived(customDollars !== null && customCents === null);
 
-	let message = $state<string | null>(null);
-	let lastTap: { cents: number; at: number } | null = null;
-
 	function payUrl(cents: number): string {
-		return username ? buildVenmoPayUrl({ username, amountCents: cents, note }) : '';
-	}
-
-	function dollarsLabel(cents: number): string {
-		return cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`;
-	}
-
-	/** Fire-and-forget. Never awaited, never blocks the link. */
-	function reportTap(cents: number): void {
-		const body = JSON.stringify({ artistSlug, issueSlug, amountCents: cents });
-		try {
-			const blob = new Blob([body], { type: 'application/json' });
-			if (navigator.sendBeacon?.('/api/tip-tap', blob)) return;
-		} catch {
-			// Fall through to fetch.
-		}
-		try {
-			void fetch('/api/tip-tap', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body,
-				keepalive: true
-			}).catch(() => undefined);
-		} catch {
-			// The tap is just not counted.
-		}
+		return tips.payUrl(cents);
 	}
 
 	function onTap(event: MouseEvent, cents: number): void {
-		const now = Date.now();
-		if (lastTap && lastTap.cents === cents && now - lastTap.at < DOUBLE_TAP_MS) {
-			// Second tap of a double tap: no second Venmo open, no second count.
-			event.preventDefault();
-			return;
-		}
-		lastTap = { cents, at: now };
-		reportTap(cents);
-
-		if (!opensVenmo) {
-			event.preventDefault();
-			message = demoVenmoMessage(cents, username ?? venmoUsername);
-		}
+		tips.onTap(event, cents);
 	}
 </script>
 
@@ -121,31 +77,15 @@
 				</p>
 			</Stack>
 
-			<Cluster distributeEqually gap="xs" class="venmo-tip-presets">
-				{#each presetCents as cents (cents)}
-					{#if opensVenmo}
-						<a
-							class="venmo-tip-preset"
-							href={payUrl(cents)}
-							data-venmo-url={payUrl(cents)}
-							data-amount-cents={cents}
-							onclick={(event) => onTap(event, cents)}
-						>
-							{dollarsLabel(cents)}
-						</a>
-					{:else}
-						<button
-							type="button"
-							class="venmo-tip-preset"
-							data-venmo-url={payUrl(cents)}
-							data-amount-cents={cents}
-							onclick={(event) => onTap(event, cents)}
-						>
-							{dollarsLabel(cents)}
-						</button>
-					{/if}
-				{/each}
-			</Cluster>
+			<TipPresetButtons
+				{artistSlug}
+				{artistName}
+				{venmoUsername}
+				{issueSlug}
+				{presets}
+				{opensVenmo}
+				tapper={tips}
+			/>
 
 			<Cluster align="end" gap="xs" class="venmo-tip-custom">
 				<Stack gap="3xs" class="venmo-tip-custom-field">

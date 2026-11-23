@@ -2,8 +2,8 @@ import { pileTilt } from '$domain/photo-pile';
 
 /**
  * Shared, UI-free pieces of the Issue reader (/i/[slug]): the stored page
- * content, the shell every inner page sits in (chips, "Page n of m", footer
- * nav) and the video embed rules. The page components render these.
+ * content, each inner page's id and number, and the video embed rules. The
+ * Stories reader (ADR 0011, `story/`) does the paging.
  */
 
 export type PageSource = 'bespoke' | 'template';
@@ -33,24 +33,11 @@ export function parseContent(jsonStr: string): PageContent {
 	}
 }
 
-export interface ShellChip {
-	label: string;
-	tone?: ChipTone;
-}
-
-export interface ShellNav {
-	target: string;
-	label: string;
-	primary?: boolean;
-}
-
-/** What ZinePageShell needs for an inner page: its anchor, chips, page number and footer nav. */
+/** What an inner page needs from the reader: its id (also its URL hash) and its place in the Issue. */
 export interface PageShell {
 	id: string;
-	chips: ShellChip[];
 	pageNumber: number;
 	pageCount: number;
-	nav: ShellNav[];
 }
 
 /** A note on the Wall, as the Issue load returns it. */
@@ -72,63 +59,16 @@ export function contentPageId(index: number): string {
 }
 
 /** The shell of content page `index` (0-based) out of `contentCount`. */
-export function contentPageShell(
-	index: number,
-	contentCount: number,
-	page: { kind: string; source: PageSource },
-	city: string
-): PageShell {
-	const isLast = index + 1 >= contentCount;
-	return {
-		id: contentPageId(index),
-		chips: [
-			page.source === 'bespoke' ? { label: city, tone: 'accent' } : { label: 'Band Liner Note', tone: 'highlight' },
-			{ label: page.kind.toUpperCase() }
-		],
-		pageNumber: index + 2,
-		pageCount: readerPageCount(contentCount),
-		nav: [
-			{ target: index === 0 ? 'page-cover' : contentPageId(index - 1), label: '← Prev' },
-			{
-				target: isLast ? 'page-wall' : contentPageId(index + 1),
-				label: isLast ? 'Next: The Wall →' : 'Next Page →',
-				primary: true
-			}
-		]
-	};
+export function contentPageShell(index: number, contentCount: number): PageShell {
+	return { id: contentPageId(index), pageNumber: index + 2, pageCount: readerPageCount(contentCount) };
 }
 
 export function wallShell(contentCount: number): PageShell {
-	return {
-		id: 'page-wall',
-		chips: [{ label: 'COMMUNITY', tone: 'accent' }, { label: 'THE WALL' }],
-		pageNumber: contentCount + 2,
-		pageCount: readerPageCount(contentCount),
-		nav: [
-			{ target: contentPageId(contentCount - 1), label: '← Prev Page' },
-			{ target: 'page-endpaper', label: 'Next: Endpaper →', primary: true }
-		]
-	};
+	return { id: 'page-wall', pageNumber: contentCount + 2, pageCount: readerPageCount(contentCount) };
 }
 
 export function endpaperShell(contentCount: number): PageShell {
-	return {
-		id: 'page-endpaper',
-		chips: [{ label: 'ENDPAPER', tone: 'highlight' }, { label: 'ADMIT ONE' }],
-		pageNumber: contentCount + 3,
-		pageCount: readerPageCount(contentCount),
-		nav: [
-			{ target: 'page-wall', label: '← Back to Wall' },
-			{ target: 'page-cover', label: '↺ Back to Cover' }
-		]
-	};
-}
-
-/** Scrolls the reader's snap container to the page with this id (instantly under reduced motion). */
-export function scrollToPage(id: string): void {
-	const el = document.getElementById(id);
-	const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-	el?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest', inline: 'start' });
+	return { id: 'page-endpaper', pageNumber: contentCount + 3, pageCount: readerPageCount(contentCount) };
 }
 
 /* ---------------------------------------------------------------------------

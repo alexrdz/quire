@@ -1,8 +1,8 @@
 import { expect, type Page } from '@playwright/test';
 
 /**
- * B1-T03: checks for the sample Issues' photo piles, shared by the test-mode
- * and Demo-mode specs. Unsplash is stubbed with a tiny PNG (the e2e suite never
+ * B1-T03, now in the Stories reader (ADR 0011): checks for the sample Issues'
+ * multi-photo pages, shared by the test-mode and Demo-mode specs. Unsplash is stubbed with a tiny PNG (the e2e suite never
  * uses the network). The browser still applies the CSP to the real Unsplash
  * URL, so a missing img-src entry would show up as a violation.
  */
@@ -41,48 +41,45 @@ export async function watchPage(page: Page): Promise<() => Promise<string[]>> {
 	};
 }
 
-/** The photo page's pile on an Issue page. */
-export function pileOn(page: Page) {
-	return page.locator('.pile-stage');
+/** The first photo page of an Issue: its frame in the Stories reader (ADR 0011). */
+export function photoPageOn(page: Page) {
+	return page.locator('.story-page').filter({ has: page.locator('section.story-photo') }).first();
 }
 
 /**
- * Walks the pile from the top, checking that each photo loads and that the Flip
- * control matches its caption. Returns the caption (or null) of each photo in order.
+ * Opens the reader's first photo page and walks its photos the way a Fan does,
+ * one tap on the right of the page per photo. Each photo is its own segment:
+ * it must be the only photo showing, load, and be named in the URL hash and
+ * the announcement. Returns each photo's caption (or null) in order.
  */
-export async function walkPile(page: Page): Promise<Array<string | null>> {
-	const stage = pileOn(page);
-	const total = await stage.locator('.polaroid').count();
-	const controls = page.locator('.pile-controls');
-	const captions: Array<string | null> = [];
+export async function walkPhotos(page: Page): Promise<Array<string | null>> {
+	const frame = photoPageOn(page);
+	const id = (await frame.getAttribute('data-page-id'))!;
+	await page.evaluate((hash) => (location.hash = hash), id);
+	await expect(frame).toHaveAttribute('data-place', 'current');
 
+	const total = await frame.locator('img.story-photo-img').count();
+	const captions: Array<string | null> = [];
 	for (let i = 0; i < total; i++) {
-		const top = stage.locator('.polaroid[data-state="top"]');
-		await expect(top).toHaveCount(1);
-		const img = top.locator('img');
-		await expect(img).toHaveAttribute('src', /^https:\/\/images\.unsplash\.com\/photo-/);
+		const showing = frame.locator('img.story-photo-img.is-current');
+		await expect(showing).toHaveCount(1);
+		await expect(showing).toHaveAttribute('src', /^https:\/\/images\.unsplash\.com\/photo-/);
 		await expect
-			.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0), {
+			.poll(() => showing.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0), {
 				message: `photo ${i + 1} loads`
 			})
 			.toBe(true);
+		await expect(page).toHaveURL(new RegExp(`#${id}${i === 0 ? '$' : `-photo-${i + 1}$`}`));
+		if (total > 1) await expect(frame.locator('.story-photo-count')).toHaveText(`${i + 1} / ${total}`);
 
-		const caption = (await top.locator('.polaroid-note').textContent())?.trim() || null;
-		captions.push(caption);
-		const flip = controls.getByRole('button', { name: 'Flip' });
-		const body = top.locator('.polaroid-body');
-		if (caption) {
-			await expect(flip, `photo ${i + 1} flips`).toBeEnabled();
-			await flip.click();
-			await expect(body).toHaveAttribute('data-side', 'back');
-			await flip.click();
-			await expect(body).toHaveAttribute('data-side', 'front');
-		} else {
-			await expect(flip, `photo ${i + 1} has no caption to flip to`).toBeDisabled();
-		}
-		await controls.getByRole('button', { name: 'Toss' }).click();
+		const caption = frame.locator('.story-photo-caption');
+		captions.push((await caption.count()) ? (await caption.textContent())?.trim() || null : null);
+
+		// A tap on the right two-thirds of the page, clear of the bars.
+		const box = (await page.locator('.story-column').boundingBox())!;
+		await page.mouse.click(box.x + box.width * 0.8, box.y + box.height * 0.4);
 	}
-
-	await expect(stage.getByText('End of the pile')).toBeVisible();
+	// After the last photo the reader moved on to the next page.
+	await expect(frame).toHaveAttribute('data-place', 'before');
 	return captions;
 }

@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { resetRateLimits } from './helpers/db';
+import { openTipSheet } from './helpers/story';
 
 /**
  * Venmo tips in test mode (ADR 0008, PRODUCTION_PLAN V.4): a tap is recorded,
- * Venmo is never opened, and the Fan sees the Demo message.
+ * Venmo is never opened, and the Fan sees the Demo message. In the Stories
+ * reader (ADR 0011) the tip panel is in the tip sheet, opened from the Cover.
  */
 const ISSUE_PATH = '/i/neon-velvet-brooklyn-2026-10-12';
 
@@ -20,8 +22,7 @@ test.describe('Venmo tip button (test mode)', () => {
 		});
 
 		await page.goto(ISSUE_PATH);
-		const panel = page.locator('.venmo-tip-panel');
-		await expect(panel).toBeVisible();
+		const panel = await openTipSheet(page);
 
 		const preset = panel.locator('.venmo-tip-preset', { hasText: '$10' });
 		// No real link in test mode; the would-be Venmo URL is exposed for checking.
@@ -58,7 +59,7 @@ test.describe('Venmo tip button (test mode)', () => {
 		});
 
 		await page.goto(ISSUE_PATH);
-		const panel = page.locator('.venmo-tip-panel');
+		const panel = await openTipSheet(page);
 		const input = panel.getByLabel('Other amount ($2 to $500)');
 		const hint = panel.getByTestId('venmo-custom-hint');
 
@@ -89,7 +90,7 @@ test.describe('Venmo tip button (test mode)', () => {
 		page.on('pageerror', (error) => errors.push(error.message));
 
 		await page.goto(ISSUE_PATH);
-		const panel = page.locator('.venmo-tip-panel');
+		const panel = await openTipSheet(page);
 		const input = panel.getByLabel('Other amount ($2 to $500)');
 		const disabled = panel.getByTestId('venmo-custom-disabled');
 		const hint = panel.getByTestId('venmo-custom-hint');
@@ -116,7 +117,7 @@ test.describe('Venmo tip button (test mode)', () => {
 		page.on('request', (req) => {
 			if (req.url().endsWith('/api/tip-tap')) taps.push(req.url());
 		});
-		const preset = page.locator('.venmo-tip-panel .venmo-tip-preset', { hasText: '$5' });
+		const preset = (await openTipSheet(page)).locator('.venmo-tip-preset', { hasText: '$5' });
 		await preset.click();
 		await preset.click();
 		await expect(page.getByTestId('venmo-demo-message')).toBeVisible();
