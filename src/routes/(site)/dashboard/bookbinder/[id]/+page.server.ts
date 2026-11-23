@@ -4,7 +4,10 @@ import { db, schema } from '$lib/server/db';
 import { eq, and, asc } from 'drizzle-orm';
 import { requireArtist, requireArtistAction, type GuardEvent, isDenied } from '$lib/server/guards';
 import { buildIssueUrl, generateIssueScanQrSvg } from '$lib/server/services/qr';
-import { uploadFormFile } from '$lib/server/services/storage';
+import { mediaStore, uploadFormFile } from '$lib/server/services/storage';
+import { verifyVideoUploadId } from '$lib/server/services/video-upload';
+import { getConfig } from '$lib/server/config';
+import { featureUnavailableMessage } from '$lib/features';
 import { calculateStampWindow } from '$domain/stamping';
 import {
 	archiveIssue,
@@ -90,10 +93,60 @@ function toDomainIssue(
 	}
 }
 
+/** Whether a URL points into Quire's own upload storage (the local stand-in or the R2 public origin). */
+function isStoredUploadUrl(url: string): boolean {
+	if (url.startsWith('/uploads/')) return true;
+	const prefix = mediaStore()?.publicUrl('');
+	return Boolean(prefix && prefix !== '/uploads/' && url.startsWith(prefix));
+}
+
+/**
+ * A video page's video (ADR 0010). The browser uploads the file straight to storage
+ * and the form sends only the finalized upload id, which must be this Artist's. A
+ * pasted link is fine for YouTube, Vimeo, Bandcamp or any outside video, but a link
+ * into Quire's own uploads is refused unless it is the video the page already has, so
+ * no one can post another Artist's upload. A video file in the form itself is refused.
+ */
+function resolveVideoPageUrl(
+	formData: FormData,
+	artistId: string,
+	currentVideoUrl: string | undefined
+): { ok: true; url: string } | { ok: false; error: string } {
+	if (formData.get('videoFile') instanceof File) {
+		const config = getConfig();
+		return {
+			ok: false,
+			error: config.features.uploads
+				? 'Videos now upload before you save. Reload the page and add the video again.'
+				: featureUnavailableMessage('uploads', config.mode)
+		};
+	}
+	const uploadId = String(formData.get('videoUploadId') || '').trim();
+	if (uploadId) {
+		const store = mediaStore();
+		if (!store) return { ok: false, error: featureUnavailableMessage('uploads', getConfig().mode) };
+		const key = verifyVideoUploadId(uploadId, artistId);
+		if (!key) return { ok: false, error: "That video upload has expired or isn't yours. Add the video again." };
+		return { ok: true, url: store.publicUrl(key) };
+	}
+	const videoUrlRaw = String(formData.get('videoUrl') || formData.get('embedUrl') || '').trim();
+	if (!videoUrlRaw) return { ok: true, url: '' };
+	const urlCheck = mediaUrlSchema.safeParse(videoUrlRaw);
+	if (!urlCheck.success) {
+		return { ok: false, error: urlCheck.error.issues[0]?.message || 'Video link must be a valid http(s) URL' };
+	}
+	if (isStoredUploadUrl(urlCheck.data) && urlCheck.data !== currentVideoUrl) {
+		return { ok: false, error: 'To add an uploaded video, record or choose it here instead of pasting its link.' };
+	}
+	return { ok: true, url: urlCheck.data };
+}
+
 async function resolvePageContentJson(
 	formData: FormData,
 	kind: BookbinderPageKind,
-	isCreate: boolean
+	isCreate: boolean,
+	artistId: string,
+	currentContentJson?: string
 ): Promise<{ ok: true; contentJson: string } | { ok: false; error: string }> {
 	const title = String(formData.get('title') || '').trim();
 	const body = String(formData.get('body') || '').trim();
@@ -218,29 +271,17 @@ async function resolvePageContentJson(
 	}
 
 	if (kind === 'video') {
-		const videoFile = formData.get('videoFile');
-		const videoUrlRaw = String(formData.get('videoUrl') || formData.get('embedUrl') || '').trim();
 		const videoOrientation = String(formData.get('videoOrientation') || '').trim();
-		let resolvedVideoUrl = '';
-
-		if (videoFile instanceof File && videoFile.size > 0) {
-			const uploadRes = await uploadFormFile(videoFile, { kind: 'video' });
-			if (!uploadRes.ok) {
-				return { ok: false, error: uploadRes.error.message };
-			}
-			resolvedVideoUrl = uploadRes.value.url;
-		} else if (videoUrlRaw) {
-			const urlCheck = mediaUrlSchema.safeParse(videoUrlRaw);
-			if (!urlCheck.success) {
-				return {
-					ok: false,
-					error:
-						urlCheck.error.issues[0]?.message ||
-						'Video URL must be a valid http(s) URL or /uploads/ path'
-				};
-			}
-			resolvedVideoUrl = urlCheck.data;
+		let currentVideoUrl: string | undefined;
+		try {
+			const current = currentContentJson ? JSON.parse(currentContentJson) : null;
+			currentVideoUrl = typeof current?.videoUrl === 'string' ? current.videoUrl : undefined;
+		} catch {
+			currentVideoUrl = undefined;
 		}
+		const video = resolveVideoPageUrl(formData, artistId, currentVideoUrl);
+		if (!video.ok) return video;
+		const resolvedVideoUrl = video.url;
 
 		return {
 			ok: true,
@@ -409,7 +450,13 @@ export const actions: Actions = {
 			? (rawKind as BookbinderPageKind)
 			: (existingPage.kind as BookbinderPageKind);
 
-		const resolved = await resolvePageContentJson(formData, kind, false);
+		const resolved = await resolvePageContentJson(
+			formData,
+			kind,
+			false,
+			owned.artist.id,
+			existingPage.kind === 'video' ? existingPage.contentJson : undefined
+		);
 		if (!resolved.ok) {
 			return fail(400, { error: resolved.error });
 		}
@@ -476,7 +523,7 @@ export const actions: Actions = {
 		}
 		const kind = rawKind as BookbinderPageKind;
 
-		const resolved = await resolvePageContentJson(formData, kind, true);
+		const resolved = await resolvePageContentJson(formData, kind, true, owned.artist.id);
 		if (!resolved.ok) {
 			return fail(400, { error: resolved.error });
 		}

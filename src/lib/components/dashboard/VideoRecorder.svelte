@@ -1,11 +1,18 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onDestroy } from 'svelte';
 	import { Box, Stack, Cluster, Frame } from '$lib/components/layout';
 	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
 	import type { Mode } from '$lib/features';
+	import {
+		pickRecordingMimeType,
+		uploadVideo,
+		VideoUploadError,
+		type VideoUploadStatus
+	} from '$lib/utils/video-upload-client';
 
 	interface Props {
-		name?: string;
+		/** The hidden field that carries the finalized upload id (ADR 0010). The form never sends the file. */
+		uploadIdName?: string;
 		orientationName?: string;
 		maxDurationSeconds?: number;
 		existingVideoUrl?: string;
@@ -13,17 +20,23 @@
 		uploadsEnabled?: boolean;
 		/** Picks the wording of the uploads-off notice. */
 		mode?: Mode;
+		/** Bind it to keep the form's Submit disabled while a clip is uploading or has failed. */
+		uploadStatus?: VideoUploadStatus;
+		/** The same status as a callback, for forms that keep one status per page and can't bind. */
+		onuploadstatus?: (status: VideoUploadStatus) => void;
 		onrecorded?: (blob: Blob, orientation: 'portrait' | 'landscape') => void;
 		oncleared?: () => void;
 	}
 
 	let {
-		name = 'videoFile',
+		uploadIdName = 'videoUploadId',
 		orientationName = 'videoOrientation',
 		maxDurationSeconds = 60,
 		existingVideoUrl = '',
 		uploadsEnabled = true,
 		mode,
+		uploadStatus = $bindable('none'),
+		onuploadstatus,
 		onrecorded,
 		oncleared
 	}: Props = $props();
@@ -38,9 +51,20 @@
 	let previewUrl = $state('');
 	let fallbackMode = $state(false);
 
+	// The direct upload of the current clip (ADR 0010).
+	let uploadPercent = $state(0);
+	let uploadError = $state('');
+	let uploadRetryable = $state(true);
+	let uploadId = $state('');
+	let clip: (Blob & { name?: string }) | null = null;
+	let uploadAbort: AbortController | null = null;
+
 	let viewfinderEl: HTMLVideoElement | null = $state(null);
 	let previewVideoEl: HTMLVideoElement | null = $state(null);
-	let fileInputEl: HTMLInputElement | null = $state(null);
+
+	$effect(() => {
+		onuploadstatus?.(uploadStatus);
+	});
 
 	$effect(() => {
 		if (existingVideoUrl && !previewUrl) {
@@ -66,22 +90,6 @@
 		return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 	}
 
-	function getSupportedMimeType(): string {
-		const types = [
-			'video/webm;codecs=vp9,opus',
-			'video/webm;codecs=vp8,opus',
-			'video/webm',
-			'video/mp4;codecs=avc1,mp4a.40.2',
-			'video/mp4'
-		];
-		for (const type of types) {
-			if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) {
-				return type;
-			}
-		}
-		return '';
-	}
-
 	function stopStream() {
 		if (mediaStream) {
 			mediaStream.getTracks().forEach((track) => track.stop());
@@ -97,6 +105,60 @@
 			clearInterval(timerInterval);
 			timerInterval = null;
 		}
+	}
+
+	/** Uploads the current clip straight to storage, then finalizes it. */
+	async function startUpload() {
+		if (!clip) return;
+		uploadAbort?.abort();
+		const controller = new AbortController();
+		uploadAbort = controller;
+		uploadId = '';
+		uploadError = '';
+		uploadPercent = 0;
+		uploadStatus = 'uploading';
+		try {
+			const finalized = await uploadVideo(clip, {
+				signal: controller.signal,
+				onProgress: (fraction) => (uploadPercent = Math.round(fraction * 100))
+			});
+			if (controller.signal.aborted) return;
+			uploadId = finalized.uploadId;
+			uploadStatus = 'ready';
+		} catch (error) {
+			if (controller.signal.aborted) return;
+			uploadError =
+				error instanceof VideoUploadError
+					? error.message
+					: "The upload didn't finish. Check your connection and try again.";
+			uploadRetryable = error instanceof VideoUploadError ? error.retryable : true;
+			uploadStatus = 'error';
+		} finally {
+			if (uploadAbort === controller) uploadAbort = null;
+		}
+	}
+
+	/** Stops any upload and forgets the clip: nothing is submitted for it. */
+	function dropUpload() {
+		uploadAbort?.abort();
+		uploadAbort = null;
+		clip = null;
+		uploadId = '';
+		uploadError = '';
+		uploadPercent = 0;
+		uploadStatus = 'none';
+	}
+
+	function showClip(file: Blob & { name?: string }) {
+		if (objectUrlToRevoke) {
+			URL.revokeObjectURL(objectUrlToRevoke);
+		}
+		const url = URL.createObjectURL(file);
+		objectUrlToRevoke = url;
+		previewUrl = url;
+		recorderPhase = 'preview';
+		clip = file;
+		startUpload();
 	}
 
 	async function startCamera() {
@@ -153,7 +215,11 @@
 		recordedChunks = [];
 		elapsedSeconds = 0;
 
-		const mimeType = getSupportedMimeType();
+		// MP4/H.264 where the browser can record it, so the clip also plays on iPhones (ADR 0010).
+		const mimeType =
+			typeof MediaRecorder !== 'undefined'
+				? pickRecordingMimeType((type) => MediaRecorder.isTypeSupported(type))
+				: '';
 		try {
 			mediaRecorder = mimeType
 				? new MediaRecorder(mediaStream, { mimeType })
@@ -195,25 +261,8 @@
 		clearTimer();
 
 		const selectedMime = mediaRecorder?.mimeType || 'video/webm';
-		const blob = new Blob(recordedChunks, { type: selectedMime });
-
-		if (objectUrlToRevoke) {
-			URL.revokeObjectURL(objectUrlToRevoke);
-		}
-		const url = URL.createObjectURL(blob);
-		objectUrlToRevoke = url;
-		previewUrl = url;
-
 		const ext = selectedMime.includes('mp4') ? 'mp4' : 'webm';
-		const file = new File([blob], `zine-clip-${Date.now()}.${ext}`, { type: selectedMime });
-
-		if (fileInputEl && typeof DataTransfer !== 'undefined') {
-			const dt = new DataTransfer();
-			dt.items.add(file);
-			fileInputEl.files = dt.files;
-		}
-
-		recorderPhase = 'preview';
+		showClip(new File(recordedChunks, `zine-clip-${Date.now()}.${ext}`, { type: selectedMime }));
 	}
 
 	function handlePreviewMetadata() {
@@ -230,9 +279,10 @@
 		}
 	}
 
-	function retake() {
+	function clearClip() {
 		clearTimer();
 		stopStream();
+		dropUpload();
 		if (objectUrlToRevoke) {
 			URL.revokeObjectURL(objectUrlToRevoke);
 			objectUrlToRevoke = null;
@@ -240,63 +290,39 @@
 		previewUrl = '';
 		recordedChunks = [];
 		elapsedSeconds = 0;
-		if (fileInputEl) {
-			fileInputEl.value = '';
-		}
 		if (oncleared) {
 			oncleared();
 		}
+	}
+
+	function retake() {
+		clearClip();
 		startCamera();
 	}
 
 	function resetToIdle() {
-		clearTimer();
-		stopStream();
-		if (objectUrlToRevoke) {
-			URL.revokeObjectURL(objectUrlToRevoke);
-			objectUrlToRevoke = null;
-		}
-		previewUrl = '';
-		recordedChunks = [];
-		elapsedSeconds = 0;
-		if (fileInputEl) {
-			fileInputEl.value = '';
-		}
+		clearClip();
 		recorderPhase = 'idle';
 		fallbackMode = false;
-		if (oncleared) {
-			oncleared();
-		}
 	}
 
 	function handleFileSelected(event: Event) {
 		const target = event.target as HTMLInputElement;
 		const file = target.files?.[0];
+		target.value = '';
 		if (!file) return;
 
 		stopStream();
 		clearTimer();
-
-		if (objectUrlToRevoke) {
-			URL.revokeObjectURL(objectUrlToRevoke);
-		}
-		const url = URL.createObjectURL(file);
-		objectUrlToRevoke = url;
-		previewUrl = url;
-		// The picker has no name, so the form never sends it. The chosen file goes on the
-		// one named input, exactly as a recording does; the preview's metadata sets the orientation.
 		recordedChunks = [];
-		if (fileInputEl && typeof DataTransfer !== 'undefined') {
-			const dt = new DataTransfer();
-			dt.items.add(file);
-			fileInputEl.files = dt.files;
-		}
-		recorderPhase = 'preview';
+		// The preview's metadata sets the orientation, as for a recording.
+		showClip(file);
 	}
 
 	onDestroy(() => {
 		clearTimer();
 		stopStream();
+		uploadAbort?.abort();
 		if (objectUrlToRevoke) {
 			URL.revokeObjectURL(objectUrlToRevoke);
 		}
@@ -304,17 +330,10 @@
 </script>
 
 <div class="video-recorder-root">
-	<!-- Hidden Inputs to deliver values through regular HTML Form Post -->
-	<input
-		bind:this={fileInputEl}
-		type="file"
-		{name}
-		accept="video/mp4,video/webm,video/quicktime,video/*"
-		class="hidden-file-input"
-		tabindex="-1"
-		aria-hidden="true"
-		disabled={!uploadsEnabled}
-	/>
+	<!-- The form sends only the finalized upload id, never the file (ADR 0010). -->
+	{#if uploadStatus === 'ready' && uploadId}
+		<input type="hidden" name={uploadIdName} value={uploadId} />
+	{/if}
 	<input type="hidden" name={orientationName} value={orientation} />
 
 	{#if errorMessage}
@@ -352,7 +371,7 @@
 					</button>
 				</Cluster>
 
-				{#if fallbackMode && uploadsEnabled}
+				{#if fallbackMode || !uploadsEnabled}
 					<Stack gap="xs" class="fallback-upload-pane">
 						<label for="fallback-video-input" class="input-label-sm">Choose Video File (MP4, WebM, MOV)</label>
 						<input
@@ -444,13 +463,44 @@
 			<Stack gap="sm">
 				<Cluster justify="between" align="center">
 					<Cluster gap="xs" align="center">
-						<span class="meta-chip meta-highlight">Recorded Video Ready</span>
+						<span class="meta-chip meta-highlight">
+							{uploadStatus === 'ready' ? 'Video Uploaded' : uploadStatus === 'none' ? 'Current Video' : 'Video'}
+						</span>
 						<span class="meta-chip">{orientation === 'portrait' ? 'Vertical (9:16)' : 'Landscape (16:9)'}</span>
 					</Cluster>
-					<button type="button" class="btn-action-subtle" disabled={!uploadsEnabled} onclick={retake}>
+					<button
+						type="button"
+						class="btn-action-subtle"
+						disabled={!uploadsEnabled || uploadStatus === 'uploading'}
+						onclick={retake}
+					>
 						Retake / Record Again
 					</button>
 				</Cluster>
+
+				{#if uploadStatus === 'uploading'}
+					<Stack gap="2xs" class="upload-status">
+						<Cluster justify="between" align="center" gap="sm">
+							<label for="video-upload-progress" class="upload-status-text">
+								Uploading video… {uploadPercent}%
+							</label>
+							<button type="button" class="btn-action-subtle" onclick={resetToIdle}>Cancel Upload</button>
+						</Cluster>
+						<progress id="video-upload-progress" class="upload-progress" max="100" value={uploadPercent}>
+							{uploadPercent}%
+						</progress>
+					</Stack>
+				{:else if uploadStatus === 'error'}
+					<Stack gap="xs" class="upload-status">
+						<p class="upload-error-text" role="alert">{uploadError}</p>
+						<Cluster gap="sm">
+							{#if uploadRetryable}
+								<button type="button" class="btn-action-highlight" onclick={startUpload}>Retry Upload</button>
+							{/if}
+							<button type="button" class="btn-action-subtle" onclick={resetToIdle}>Remove Video</button>
+						</Cluster>
+					</Stack>
+				{/if}
 
 				<div class="preview-player-container">
 					<Frame ratio={orientation === 'portrait' ? '9-16' : '16-9'} class="preview-player-frame {orientation === 'portrait' ? 'is-portrait' : ''}">
@@ -476,16 +526,66 @@
 		display: block;
 	}
 
-	.hidden-file-input {
-		position: absolute;
-		inline-size: 1px;
-		block-size: 1px;
-		padding: 0;
-		margin: 0;
+	/* The clip's state and shape, as small chips (the pages' .meta-chip is scoped to them). */
+	.meta-chip {
+		display: inline-flex;
+		align-items: center;
+		padding-block: var(--space-3xs);
+		padding-inline: var(--space-2xs);
+		border-radius: 4px;
+		font-size: var(--text-meta);
+		font-weight: var(--weight-bold);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: var(--ink-muted);
+		background: color-mix(in srgb, var(--paper) 8%, transparent);
+	}
+
+	.meta-chip.meta-highlight {
+		color: var(--highlight);
+		background: color-mix(in srgb, var(--highlight) 12%, transparent);
+	}
+
+	/* The direct upload: progress, then Cancel, or an error with Retry (ADR 0010). */
+	.upload-status-text {
+		font-size: var(--text-small);
+		color: var(--paper);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.upload-progress {
+		inline-size: 100%;
+		block-size: 0.5rem;
+		appearance: none;
+		border: none;
+		border-radius: 999px;
 		overflow: hidden;
-		clip: rect(0, 0, 0, 0);
-		white-space: nowrap;
-		border-width: 0;
+		background: color-mix(in srgb, var(--paper) 12%, transparent);
+		accent-color: var(--highlight);
+	}
+
+	.upload-progress::-webkit-progress-bar {
+		background: color-mix(in srgb, var(--paper) 12%, transparent);
+		border-radius: 999px;
+	}
+
+	.upload-progress::-webkit-progress-value {
+		background: var(--highlight);
+		border-radius: 999px;
+		transition: inline-size 0.2s ease;
+	}
+
+	.upload-progress::-moz-progress-bar {
+		background: var(--highlight);
+		border-radius: 999px;
+	}
+
+	.upload-error-text {
+		margin: 0;
+		font-size: var(--text-small);
+		color: var(--paper);
+		border-inline-start: 3px solid var(--support);
+		padding-inline-start: var(--space-xs);
 	}
 
 	:global(.recorder-frame-box) {
@@ -713,23 +813,23 @@
 	}
 
 	.btn-action-highlight {
-		background: rgba(1, 255, 195, 0.14);
+		background: color-mix(in srgb, var(--highlight) 14%, transparent);
 		color: var(--highlight);
-		border: 1px solid rgba(1, 255, 195, 0.4);
+		border: 1px solid color-mix(in srgb, var(--highlight) 40%, transparent);
 	}
 
 	.btn-action-highlight:hover:not(:disabled) {
-		background: rgba(1, 255, 195, 0.24);
+		background: color-mix(in srgb, var(--highlight) 24%, transparent);
 	}
 
 	.btn-action-accent {
-		background: rgba(5, 217, 232, 0.12);
+		background: color-mix(in srgb, var(--accent) 12%, transparent);
 		color: var(--accent);
-		border: 1px solid rgba(5, 217, 232, 0.35);
+		border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
 	}
 
 	.btn-action-accent:hover:not(:disabled) {
-		background: rgba(5, 217, 232, 0.22);
+		background: color-mix(in srgb, var(--accent) 22%, transparent);
 	}
 
 	.btn-action-subtle:disabled,

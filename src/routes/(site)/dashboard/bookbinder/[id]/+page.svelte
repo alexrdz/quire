@@ -6,6 +6,7 @@
 	import PhotoPileEditor from '$lib/components/dashboard/PhotoPileEditor.svelte';
 	import { MAX_PHOTOS_PER_PAGE, resolvePhotoEntries } from '$domain/photo-pile';
 	import VideoRecorder from '$lib/components/dashboard/VideoRecorder.svelte';
+	import { videoSubmitBlockReason, type VideoUploadStatus } from '$lib/utils/video-upload-client';
 
 	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
 
@@ -15,6 +16,13 @@
 	let showQrSticker = $state(false);
 	let caseDisplayOpen = $state(false);
 	let newKind = $state<'text' | 'setlist' | 'photo' | 'audio' | 'video'>('text');
+	// Save waits for a video's direct upload to finish (ADR 0010): one status per video page form.
+	let pageVideoStatus = $state<Record<string, VideoUploadStatus>>({});
+	let newVideoStatus = $state<VideoUploadStatus>('none');
+	const newVideoBlock = $derived(newKind === 'video' ? videoSubmitBlockReason(newVideoStatus) : '');
+	function videoBlockFor(pageId: string): string {
+		return videoSubmitBlockReason(pageVideoStatus[pageId] ?? 'none');
+	}
 
 	function refreshPreview() {
 		if (previewIframe) {
@@ -415,24 +423,24 @@
 								<Stack gap="xs">
 									<span class="input-label-sm">Record Live Video Note</span>
 									<VideoRecorder
-										name="videoFile"
 										orientationName="videoOrientation"
 										existingVideoUrl={parsed.videoUrl || ''}
 										maxDurationSeconds={60}
+										onuploadstatus={(status) => (pageVideoStatus[page.id] = status)}
 										uploadsEnabled={data.features.uploads}
 										mode={data.features.mode}
 									/>
 								</Stack>
 								<Stack gap="xs">
 									<label for="video-url-{page.id}" class="input-label-sm">
-										Or Video / Embed URL (YouTube, Vimeo, Bandcamp, or /uploads/...)
+										Or paste a YouTube, Vimeo or Bandcamp link
 									</label>
 									<input
 										id="video-url-{page.id}"
 										type="text"
 										name="videoUrl"
 										value={parsed.videoUrl || parsed.embedUrl || ''}
-										placeholder="https://www.youtube.com/watch?v=... or /uploads/..."
+										placeholder="https://www.youtube.com/watch?v=..."
 										class="bookbinder-input"
 									/>
 								</Stack>
@@ -467,11 +475,19 @@
 								</Stack>
 							{/if}
 
-							<Cluster justify="end">
-								<button type="submit" class="btn-action-highlight">
+							<Stack gap="xs" align="end">
+								{#if videoBlockFor(page.id)}
+									<p id="video-block-{page.id}" class="video-submit-block" role="status">{videoBlockFor(page.id)}</p>
+								{/if}
+								<button
+									type="submit"
+									class="btn-action-highlight"
+									disabled={Boolean(videoBlockFor(page.id))}
+									aria-describedby={videoBlockFor(page.id) ? `video-block-${page.id}` : undefined}
+								>
 									Save Page Block
 								</button>
-							</Cluster>
+							</Stack>
 						</form>
 					</Stack>
 				</Box>
@@ -617,22 +633,22 @@
 							<Stack gap="xs" class="w-full">
 								<span class="input-label-sm">Record Live Video Note</span>
 								<VideoRecorder
-									name="videoFile"
 									orientationName="videoOrientation"
 									maxDurationSeconds={60}
+									bind:uploadStatus={newVideoStatus}
 									uploadsEnabled={data.features.uploads}
 									mode={data.features.mode}
 								/>
 							</Stack>
 							<Stack gap="xs" class="w-full">
 								<label for="new-video-url" class="input-label-sm">
-									Or Video / Embed URL (YouTube, Vimeo, Bandcamp, or /uploads/...)
+									Or paste a YouTube, Vimeo or Bandcamp link
 								</label>
 								<input
 									id="new-video-url"
 									type="text"
 									name="videoUrl"
-									placeholder="https://www.youtube.com/watch?v=... or /uploads/..."
+									placeholder="https://www.youtube.com/watch?v=..."
 									class="bookbinder-input"
 								/>
 							</Stack>
@@ -659,7 +675,15 @@
 							</Stack>
 						{/if}
 
-						<button type="submit" class="btn-action-highlight">
+						{#if newVideoBlock}
+							<p id="new-video-block" class="video-submit-block" role="status">{newVideoBlock}</p>
+						{/if}
+						<button
+							type="submit"
+							class="btn-action-highlight"
+							disabled={Boolean(newVideoBlock)}
+							aria-describedby={newVideoBlock ? 'new-video-block' : undefined}
+						>
 							+ Append Page to Zine
 						</button>
 					</form>
@@ -844,6 +868,20 @@
 	.btn-action-highlight:hover {
 		background: rgba(1, 255, 195, 0.24);
 		color: var(--highlight);
+	}
+
+	.btn-action-highlight:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	/* Why Save is disabled: the page's video is still uploading, or failed. */
+	.video-submit-block {
+		margin: 0;
+		font-size: var(--text-small);
+		color: var(--paper);
+		border-inline-start: 3px solid var(--highlight);
+		padding-inline-start: var(--space-xs);
 	}
 
 	.btn-action-support {

@@ -7,6 +7,7 @@
 	import { optimizeFileInputOnChange } from '$lib/utils/image-optimize';
 	import { MAX_PHOTO_CAPTION_LENGTH } from '$domain/photo-pile';
 	import VideoRecorder from '$lib/components/dashboard/VideoRecorder.svelte';
+	import { videoSubmitBlockReason, type VideoUploadStatus } from '$lib/utils/video-upload-client';
 
 	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
 
@@ -36,6 +37,9 @@
 	let photoUrl = $state('');
 	let photoCaption = $state('');
 	let approveFirst = $state(false);
+	// Submit waits for the video's direct upload to finish (ADR 0010).
+	let videoStatus = $state<VideoUploadStatus>('none');
+	const videoBlock = $derived(videoSubmitBlockReason(videoStatus));
 	let duplicatedBanner = $state(false);
 	let caseDisplayOpen = $state(false);
 
@@ -329,9 +333,9 @@
 								<Stack gap="sm">
 									<span class="input-label">Optional Video Dispatch (Record from phone or upload clip)</span>
 									<VideoRecorder
-										name="videoFile"
 										orientationName="videoOrientation"
 										maxDurationSeconds={60}
+										bind:uploadStatus={videoStatus}
 										uploadsEnabled={data.features.uploads}
 										mode={data.features.mode}
 									/>
@@ -376,11 +380,28 @@
 								</span>
 							</Cluster>
 
+							{#if videoBlock}
+								<p id="quick-video-block" class="video-submit-block" role="status">{videoBlock}</p>
+							{/if}
 							<Split ratio="2-1" gap="sm" collapse="sm">
-								<button type="submit" name="saveMode" value="published" class="btn-publish-submit">
+								<button
+									type="submit"
+									name="saveMode"
+									value="published"
+									class="btn-publish-submit"
+									disabled={Boolean(videoBlock)}
+									aria-describedby={videoBlock ? 'quick-video-block' : undefined}
+								>
 									Publish Issue & Generate Venue QR →
 								</button>
-								<button type="submit" name="saveMode" value="draft" class="btn-draft-submit">
+								<button
+									type="submit"
+									name="saveMode"
+									value="draft"
+									class="btn-draft-submit"
+									disabled={Boolean(videoBlock)}
+									aria-describedby={videoBlock ? 'quick-video-block' : undefined}
+								>
 									Save Draft & Open in Bookbinder →
 								</button>
 							</Split>
@@ -521,6 +542,23 @@
 	.btn-draft-submit:hover {
 		background: rgba(255, 255, 255, 0.12);
 		border-color: var(--accent);
+	}
+
+	.btn-publish-submit:disabled,
+	.btn-draft-submit:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+		transform: none;
+		box-shadow: none;
+	}
+
+	/* Why Publish and Save are disabled: the video is still uploading, or failed. */
+	.video-submit-block {
+		margin: 0;
+		font-size: var(--text-small);
+		color: var(--paper);
+		border-inline-start: 3px solid var(--highlight);
+		padding-inline-start: var(--space-xs);
 	}
 
 	:global(.photo-optional-box),

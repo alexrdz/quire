@@ -5,7 +5,10 @@ import { eq, desc, asc } from 'drizzle-orm';
 import { requireArtist, requireArtistAction, isDenied } from '$lib/server/guards';
 import { calculateStampWindow } from '$domain/stamping';
 import { buildIssueUrl, generateIssueScanQrSvg } from '$lib/server/services/qr';
-import { uploadFormFile } from '$lib/server/services/storage';
+import { mediaStore, uploadFormFile } from '$lib/server/services/storage';
+import { verifyVideoUploadId } from '$lib/server/services/video-upload';
+import { getConfig } from '$lib/server/config';
+import { featureUnavailableMessage } from '$lib/features';
 import { mediaUrlSchema, quickIssueSchema } from '$schemas/issue';
 import { MAX_PHOTO_CAPTION_LENGTH, type PhotoEntry } from '$domain/photo-pile';
 import {
@@ -13,6 +16,29 @@ import {
 	formHasFileUpload,
 	isEmailConfirmed
 } from '$lib/server/email/verification';
+
+/**
+ * The video for the Issue (ADR 0010): the browser uploads it straight to storage and
+ * the form sends only the finalized upload id, which must be this Artist's. A video
+ * file in the form itself is refused: it would not fit through the function in production.
+ */
+function resolveVideoUpload(formData: FormData, artistId: string): { url: string } | { error: string } | null {
+	if (formData.get('videoFile') instanceof File) {
+		const config = getConfig();
+		return {
+			error: config.features.uploads
+				? 'Videos now upload before you submit. Reload the page and add the video again.'
+				: featureUnavailableMessage('uploads', config.mode)
+		};
+	}
+	const uploadId = String(formData.get('videoUploadId') || '').trim();
+	if (!uploadId) return null;
+	const store = mediaStore();
+	if (!store) return { error: featureUnavailableMessage('uploads', getConfig().mode) };
+	const key = verifyVideoUploadId(uploadId, artistId);
+	if (!key) return { error: "That video upload has expired or isn't yours. Add the video again." };
+	return { url: store.publicUrl(key) };
+}
 
 export const load: ServerLoad = async (event) => {
 	const { artist } = await requireArtist(event);
@@ -87,7 +113,6 @@ export const actions: Actions = {
 		const photoUrlRaw = String(formData.get('photoUrl') || '').trim();
 		const photoCaption = String(formData.get('photoCaption') || '').trim();
 
-		const videoFile = formData.get('videoFile');
 		const videoTitle = String(formData.get('videoTitle') || '').trim();
 		const videoCaption = String(formData.get('videoCaption') || '').trim();
 		const videoOrientation = String(formData.get('videoOrientation') || 'portrait').trim();
@@ -116,6 +141,13 @@ export const actions: Actions = {
 			return fail(400, { error: windowResult.error.message });
 		}
 
+		// Checked before the photo upload, so a refused video leaves no stray photo.
+		const video = resolveVideoUpload(formData, artist.id);
+		if (video && 'error' in video) {
+			return fail(400, { error: video.error });
+		}
+		const resolvedVideoUrl = video?.url ?? '';
+
 		let resolvedPhotoUrl = '';
 		if (photoFile instanceof File && photoFile.size > 0) {
 			const uploadRes = await uploadFormFile(photoFile, { kind: 'image' });
@@ -131,15 +163,6 @@ export const actions: Actions = {
 				});
 			}
 			resolvedPhotoUrl = urlCheck.data;
-		}
-
-		let resolvedVideoUrl = '';
-		if (videoFile instanceof File && videoFile.size > 0) {
-			const uploadRes = await uploadFormFile(videoFile, { kind: 'video' });
-			if (!uploadRes.ok) {
-				return fail(400, { error: uploadRes.error.message });
-			}
-			resolvedVideoUrl = uploadRes.value.url;
 		}
 
 		const secretKey = crypto.randomBytes(16).toString('hex');

@@ -15,6 +15,7 @@ import * as __route3 from '../../../src/routes/(zine)/i/[slug]/+page.server';
 const { load: readerLoad } = withSessionModule(__route3);
 import { TINY_JPEG, TINY_MP3, TINY_PNG, tinyWebmVideo } from '../helpers/media';
 import { seedDatabase } from '$lib/server/seed';
+import { signVideoUploadId } from '$lib/server/services/video-upload';
 import { MAX_PHOTO_CAPTION_LENGTH, resolvePhotoEntries } from '$domain/photo-pile';
 import { photoEntriesSchema } from '$schemas/issue';
 
@@ -264,9 +265,8 @@ describe('P4 Quick Issue + Bookbinder + Reader', () => {
 		formData.set('videoCaption', 'Warmup riff before soundcheck');
 		formData.set('videoOrientation', 'portrait');
 
-		const videoBytes = tinyWebmVideo();
-		const videoFile = new File([Buffer.from(videoBytes)], 'live-note.webm', { type: 'video/webm' });
-		formData.set('videoFile', videoFile);
+		// The clip went straight to storage (ADR 0010); the form carries only the finalized upload id.
+		formData.set('videoUploadId', signVideoUploadId(fixture.artistId, 'quick-note.webm'));
 
 		const reqUrl = new URL('http://localhost:4173/dashboard/issues/quick');
 		const result = (await (quickActions.default as any)({
@@ -284,8 +284,7 @@ describe('P4 Quick Issue + Bookbinder + Reader', () => {
 		expect(issue?.issuePages[0].kind).toBe('video');
 
 		const videoContent = JSON.parse(issue!.issuePages[0].contentJson);
-		expect(videoContent.videoUrl).toMatch(/^\/uploads\/.+\.webm$/);
-		trackUploadUrl(videoContent.videoUrl);
+		expect(videoContent.videoUrl).toBe('/uploads/quick-note.webm');
 		expect(videoContent.title).toBe('Montreal Soundcheck');
 		expect(videoContent.body).toBe('Warmup riff before soundcheck');
 		expect(videoContent.orientation).toBe('portrait');
@@ -768,14 +767,13 @@ describe('Bookbinder photo pile pages', () => {
 		expect(await readPage(issueId)).toHaveLength(0);
 	});
 
-	it('adds and updates a video page with an uploaded video file in Bookbinder', async () => {
+	it('adds a video page from a finalized direct upload in Bookbinder', async () => {
 		const { fixture, issueId, baseUrl } = await createPublishedIssue('video-add');
 		const addForm = new FormData();
 		addForm.set('kind', 'video');
 		addForm.set('title', 'Gig Clip');
 		addForm.set('videoOrientation', 'landscape');
-		const videoBytes = tinyWebmVideo();
-		addForm.set('videoFile', new File([Buffer.from(videoBytes)], 'clip.webm', { type: 'video/webm' }));
+		addForm.set('videoUploadId', signVideoUploadId(fixture.artistId, 'gig-clip.webm'));
 
 		const res = (await (bookbinderActions.addPage as any)({
 			request: buildPostRequest(`${baseUrl}?/addPage`, fixture.cookie, addForm),
@@ -790,9 +788,139 @@ describe('Bookbinder photo pile pages', () => {
 		const videoPage = pages.find((p) => p.kind === 'video');
 		expect(videoPage).toBeDefined();
 		const content = JSON.parse(videoPage!.contentJson);
-		expect(content.videoUrl).toMatch(/^\/uploads\/.+\.webm$/);
-		trackUploadUrl(content.videoUrl);
+		expect(content.videoUrl).toBe('/uploads/gig-clip.webm');
 		expect(content.title).toBe('Gig Clip');
 		expect(content.orientation).toBe('landscape');
+	});
+});
+
+describe('Video uploads in the forms (ADR 0010, B1-T22)', () => {
+	async function issueFor(label: string) {
+		const fixture = await createTestArtistFixture(label);
+		const now = new Date();
+		const issueId = crypto.randomUUID();
+		await db.insert(schema.issues).values({
+			id: issueId,
+			artistId: fixture.artistId,
+			slug: `video-${issueId.slice(0, 8)}`,
+			city: 'Denver',
+			venue: 'Larimer Lounge',
+			date: '2026-12-03',
+			timezone: 'America/Denver',
+			coverNote: '',
+			secretKey: 'videokey',
+			status: 'published',
+			publishedAt: now,
+			createdAt: now,
+			updatedAt: now
+		});
+		return { fixture, issueId, baseUrl: `http://localhost:4173/dashboard/bookbinder/${issueId}` };
+	}
+
+	async function addVideoPage(fixture: TestArtistFixture, issueId: string, baseUrl: string, fields: Record<string, string | File>) {
+		const form = new FormData();
+		form.set('kind', 'video');
+		form.set('title', 'Clip');
+		for (const [k, v] of Object.entries(fields)) form.set(k, v);
+		return (await (bookbinderActions.addPage as any)({
+			request: buildPostRequest(`${baseUrl}?/addPage`, fixture.cookie, form),
+			params: { id: issueId }
+		})) as any;
+	}
+
+	async function quickIssue(fixture: TestArtistFixture, fields: Record<string, string | File>) {
+		const form = new FormData();
+		form.set('city', 'Boise');
+		form.set('venue', 'Neurolux');
+		form.set('date', '2026-12-04');
+		form.set('timezone', 'America/Boise');
+		form.set('saveMode', 'published');
+		for (const [k, v] of Object.entries(fields)) form.set(k, v);
+		const url = new URL('http://localhost:4173/dashboard/issues/quick');
+		return (await (quickActions.default as any)({
+			request: buildPostRequest(url.toString(), fixture.cookie, form),
+			url
+		})) as any;
+	}
+
+	async function videoPages(issueId: string) {
+		return (await db.query.issuePages.findMany({ where: eq(schema.issuePages.issueId, issueId) })).filter(
+			(p) => p.kind === 'video'
+		);
+	}
+
+	it("refuses an upload id finalized by another Artist, in Bookbinder and Quick Issue", async () => {
+		const { fixture, issueId, baseUrl } = await issueFor('video-owner');
+		const other = await createTestArtistFixture('video-other');
+		const othersUpload = signVideoUploadId(other.artistId, 'not-yours.mp4');
+
+		const added = await addVideoPage(fixture, issueId, baseUrl, { videoUploadId: othersUpload });
+		expect(added.status).toBe(400);
+		expect(added.data.error).toMatch(/expired or isn't yours/);
+		expect(await videoPages(issueId)).toHaveLength(0);
+
+		const issuesBefore = await db.query.issues.findMany({ where: eq(schema.issues.artistId, fixture.artistId) });
+		const quick = await quickIssue(fixture, { videoUploadId: othersUpload });
+		expect(quick.status).toBe(400);
+		expect(quick.data.error).toMatch(/expired or isn't yours/);
+		const issuesAfter = await db.query.issues.findMany({ where: eq(schema.issues.artistId, fixture.artistId) });
+		expect(issuesAfter).toHaveLength(issuesBefore.length);
+	});
+
+	it('refuses a forged or tampered upload id', async () => {
+		const { fixture, issueId, baseUrl } = await issueFor('video-forged');
+		const genuine = signVideoUploadId(fixture.artistId, 'mine.mp4');
+		const [payload, signature] = genuine.split('.');
+		const swapped = Buffer.from(JSON.stringify({ a: fixture.artistId, k: 'someone-elses.mp4', t: Math.floor(Date.now() / 1000) })).toString('base64url');
+		for (const id of [`${swapped}.${signature}`, `${payload}.AAAA`, 'not-an-id']) {
+			const res = await addVideoPage(fixture, issueId, baseUrl, { videoUploadId: id });
+			expect(res.status, id).toBe(400);
+		}
+		expect(await videoPages(issueId)).toHaveLength(0);
+	});
+
+	it('refuses a video file sent through the form (the old multipart path is gone)', async () => {
+		const { fixture, issueId, baseUrl } = await issueFor('video-multipart');
+		const file = new File([Buffer.from(tinyWebmVideo())], 'clip.webm', { type: 'video/webm' });
+		const added = await addVideoPage(fixture, issueId, baseUrl, { videoFile: file });
+		expect(added.status).toBe(400);
+		expect(added.data.error).toMatch(/upload before you save/);
+		expect(await videoPages(issueId)).toHaveLength(0);
+
+		const quick = await quickIssue(fixture, { videoFile: file });
+		expect(quick.status).toBe(400);
+		expect(quick.data.error).toMatch(/upload before you submit/);
+	});
+
+	it("refuses a pasted link to an uploaded file, but keeps a page's own video on save", async () => {
+		const { fixture, issueId, baseUrl } = await issueFor('video-paste');
+		const pasted = await addVideoPage(fixture, issueId, baseUrl, { videoUrl: '/uploads/someone-elses.mp4' });
+		expect(pasted.status).toBe(400);
+		expect(pasted.data.error).toMatch(/record or choose it here/);
+
+		// Outside links are still fine.
+		const vimeo = await addVideoPage(fixture, issueId, baseUrl, { videoUrl: 'https://vimeo.com/76979871' });
+		expect(vimeo.success).toBe(true);
+
+		// A page with an uploaded video re-saves with its own URL; another upload URL is refused.
+		const own = await addVideoPage(fixture, issueId, baseUrl, { videoUploadId: signVideoUploadId(fixture.artistId, 'own.mp4') });
+		expect(own.success).toBe(true);
+		const page = (await videoPages(issueId)).find((p) => JSON.parse(p.contentJson).videoUrl === '/uploads/own.mp4')!;
+		const save = async (videoUrl: string) => {
+			const form = new FormData();
+			form.set('pageId', page.id);
+			form.set('kind', 'video');
+			form.set('title', 'Renamed');
+			form.set('videoUrl', videoUrl);
+			return (await (bookbinderActions.updatePage as any)({
+				request: buildPostRequest(`${baseUrl}?/updatePage`, fixture.cookie, form),
+				params: { id: issueId }
+			})) as any;
+		};
+		expect((await save('/uploads/own.mp4')).success).toBe(true);
+		const kept = JSON.parse((await db.query.issuePages.findFirst({ where: eq(schema.issuePages.id, page.id) }))!.contentJson);
+		expect(kept).toMatchObject({ title: 'Renamed', videoUrl: '/uploads/own.mp4' });
+		const swapped = await save('/uploads/someone-elses.mp4');
+		expect(swapped.status).toBe(400);
 	});
 });
