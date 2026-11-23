@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createProductionArtist, resetProductionRateLimits, tipTapsFor } from '../helpers/production-db';
+import { goToStoryPage } from '../helpers/story';
 
 /**
  * ADR 0011 with decision 4 (tip-first Cover): in production a tip pill on the
@@ -37,4 +38,15 @@ test('a tip pill on the Cover opens the exact Venmo link and records a Tip Tap',
 	await expect
 		.poll(async () => tipTapsFor(artist.artistId))
 		.toContainEqual({ issueId: artist.issueId, amountSelectedCents: 1000 });
+});
+
+test('an Artist without a Venmo username has no tip pills on the Cover and no Tip in the bottom bar', async ({ page }) => {
+	const artist = await createProductionArtist({ displayName: 'The No Pill Band', venmoUsername: null });
+	await page.goto(`/i/${artist.issueSlug}`);
+	await expect(page.locator('#page-cover h1')).toHaveText('The No Pill Band');
+	await expect(page.locator('.story-tip-pill, .story-tip-other')).toHaveCount(0);
+	await goToStoryPage(page, 'page-content-0');
+	await expect(page.locator('.story-bar .story-wall')).toBeVisible();
+	await expect(page.locator('.story-bar .story-tip')).toHaveCount(0);
+	await expect(page.locator('a[href*="venmo.com"]')).toHaveCount(0);
 });

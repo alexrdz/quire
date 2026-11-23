@@ -123,8 +123,6 @@ test('an Artist without a Venmo username shows no tip buttons', async ({ page })
 		const response = await page.goto(path);
 		expect(response?.status(), path).toBe(200);
 		await expect(page.locator('.venmo-tip-panel'), path).toHaveCount(0);
-		// No Tip pills on the Cover or in the bottom bar either.
-		await expect(page.locator('.story-tip-pill, .story-tip'), path).toHaveCount(0);
 		await expect(page.locator('a[href*="venmo.com"]'), path).toHaveCount(0);
 	}
 	expect(await tipTapsFor(withoutVenmo.artistId)).toEqual([]);
