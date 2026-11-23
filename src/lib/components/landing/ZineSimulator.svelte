@@ -638,7 +638,9 @@
     position: relative;
     inline-size: 100%;
     max-inline-size: var(--preview-inline-size);
-    block-size: var(--preview-block-size);
+    /* A minimum, not a fixed height: with enlarged text the phone grows instead of
+       hiding a card's headline below its fold (WCAG 1.4.4, B1-T24). */
+    min-block-size: var(--preview-block-size);
     background: #090710;
     border-radius: 44px;
     border: 1px solid rgba(255, 255, 255, 0.15);
@@ -798,7 +800,7 @@
 
   /* Main screen body */
   .zine-screen-body {
-    flex: 1;
+    flex: 1 0 auto;
     min-block-size: 0;
     position: relative;
     overflow: hidden;
@@ -813,6 +815,18 @@
     flex-direction: column;
     justify-content: safe flex-end;
     overflow-y: auto;
+  }
+
+  /* The Track and Photo cards fill the screen and grow with their content, so enlarged
+     text lengthens the phone rather than pushing the headline out of view. At normal text
+     size their content fits, so they fill the same box as before. Notes and Wall keep their
+     own scrolling lists inside the fixed screen. */
+  .card-page.audio-card,
+  .card-page.photo-card {
+    position: relative;
+    inset: auto;
+    flex: 1 0 auto;
+    overflow-y: visible;
   }
 
   .card-bg-image {
