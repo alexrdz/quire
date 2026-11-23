@@ -359,7 +359,6 @@
 							id="fallback-video-input"
 							type="file"
 							accept="video/mp4,video/webm,video/quicktime,video/*"
-							capture="environment"
 							disabled={!uploadsEnabled}
 							onchange={handleFileSelected}
 							class="recorder-native-input"

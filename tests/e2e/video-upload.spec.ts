@@ -25,7 +25,10 @@ test('a clip chosen through the Quick Issue picker is published as a portrait vi
 
 	const recorder = page.locator('.video-recorder-root');
 	await recorder.getByRole('button', { name: 'Upload Video File' }).click();
-	await recorder.getByLabel('Choose Video File (MP4, WebM, MOV)').setInputFiles(CLIP);
+	const picker = recorder.getByLabel('Choose Video File (MP4, WebM, MOV)');
+	// A picker, not a second camera: on phones it opens the camera roll (the recorder covers the camera).
+	await expect(picker).not.toHaveAttribute('capture');
+	await picker.setInputFiles(CLIP);
 
 	// The chosen file is on the one input the form sends, and its shape sets the orientation.
 	await expect(recorder.getByText('Vertical (9:16)')).toBeVisible();
