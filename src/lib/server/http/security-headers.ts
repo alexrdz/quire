@@ -13,6 +13,7 @@
  * gives them nosniff and the referrer policy.
  */
 import type { Mode } from '$lib/features';
+import { getConfig } from '$lib/server/config';
 
 export interface CspInput {
 	mode: Mode;
@@ -20,6 +21,29 @@ export interface CspInput {
 	mediaOrigin: string | null;
 	/** The request path: the Issue reader may be framed by Quire itself (see below). */
 	pathname?: string;
+	/**
+	 * Where the browser PUTs video bytes (ADR 0010): the R2 S3 endpoint, or null
+	 * without R2. `withSecurityHeaders` reads it from the R2 config when it is left out.
+	 */
+	uploadOrigin?: string | null;
+}
+
+/** R2 account ids are 32 hex characters; anything else never reaches a header. */
+const R2_ACCOUNT_ID = /^[0-9a-f]{32}$/i;
+
+/**
+ * The origin presigned video PUTs go to (ADR 0010): the account's R2 S3 endpoint,
+ * the same one `storage.ts` gives its S3 client (path-style, so the bucket is in
+ * the path, not the host). Null when the account id is malformed.
+ */
+export function r2UploadOrigin(accountId: string): string | null {
+	return R2_ACCOUNT_ID.test(accountId) ? `https://${accountId.toLowerCase()}.r2.cloudflarestorage.com` : null;
+}
+
+/** The R2 upload origin from the deploy's R2 config, or null without R2. */
+export function configuredUploadOrigin(): string | null {
+	const r2 = getConfig().integrations.r2;
+	return r2 ? r2UploadOrigin(r2.accountId) : null;
 }
 
 /**
@@ -48,8 +72,10 @@ export const FRAME_SOURCES = [
 /** Fan Google sign-in: the form POST to `?/googleSignIn` answers with a 303 to Google. */
 export const GOOGLE_SIGN_IN_ORIGIN = 'https://accounts.google.com';
 
-export function buildCspDirectives({ mode, mediaOrigin, pathname }: CspInput): CspDirectives {
+export function buildCspDirectives({ mode, mediaOrigin, pathname, uploadOrigin = null }: CspInput): CspDirectives {
 	const media = mediaOrigin ? [mediaOrigin] : [];
+	// Direct-to-R2 video uploads (ADR 0010): only the upload origin, never all of R2.
+	const upload = uploadOrigin ? [uploadOrigin] : [];
 	return {
 		'default-src': ["'self'"],
 		'script-src': ["'self'"],
@@ -70,7 +96,7 @@ export function buildCspDirectives({ mode, mediaOrigin, pathname }: CspInput): C
 		'media-src': ["'self'", 'blob:', ...media],
 		'frame-src': FRAME_SOURCES,
 		// Vite's dev server reconnects over a websocket; production keeps 'self' only.
-		'connect-src': mode === 'development' ? ["'self'", 'ws:', 'wss:'] : ["'self'"],
+		'connect-src': mode === 'development' ? ["'self'", 'ws:', 'wss:', ...upload] : ["'self'", ...upload],
 		'form-action': ["'self'", GOOGLE_SIGN_IN_ORIGIN],
 		'frame-ancestors': allowsSameOriginFraming(pathname) ? ["'self'"] : ["'none'"],
 		'object-src': ["'none'"],
@@ -111,7 +137,10 @@ export const STATIC_SECURITY_HEADERS: Readonly<Record<string, string>> = {
  * (`Response.redirect`, proxied fetches) are copied first, so nothing skips them.
  */
 export function withSecurityHeaders(response: Response, input: CspInput): Response {
-	const csp = buildCspHeader(input, response.headers.get('content-security-policy'));
+	const csp = buildCspHeader(
+		{ ...input, uploadOrigin: input.uploadOrigin === undefined ? configuredUploadOrigin() : input.uploadOrigin },
+		response.headers.get('content-security-policy')
+	);
 	const apply = (headers: Headers) => {
 		headers.set('content-security-policy', csp);
 		for (const [name, value] of Object.entries(STATIC_SECURITY_HEADERS)) headers.set(name, value);

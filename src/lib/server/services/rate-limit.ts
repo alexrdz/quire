@@ -92,6 +92,16 @@ export const RATE_LIMITS = {
 		message: 'You have asked to change your Venmo username a few times already. Please try again in an hour.'
 	},
 	/**
+	 * Direct video upload slots (ADR 0010), counted on presign only, per Artist.
+	 * A failed or cancelled upload and every Retry cost a presign, so this allows
+	 * for venue Wi-Fi.
+	 */
+	videoUploadArtist: {
+		max: 20,
+		windowSeconds: HOUR,
+		message: 'You have started a lot of video uploads in the last hour. Please try again later.'
+	},
+	/**
 	 * Sign-in, sign-up and password reset through Quire's own form actions. These
 	 * call Better Auth's server API directly, which bypasses its HTTP rate limiter,
 	 * so they are limited here with the same numbers as `/api/auth`.

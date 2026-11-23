@@ -5,3 +5,4 @@ export * from './scan';
 export * from './tipping';
 export * from './venmo';
 export * from './wall';
+export * from './upload';
