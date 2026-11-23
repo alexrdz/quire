@@ -20,6 +20,8 @@
 		uploadsEnabled?: boolean;
 		/** Picks the wording of the uploads-off notice. */
 		mode?: Mode;
+		/** Whether a video link field sits next to the recorder, so the uploads-off notice can point to it. */
+		linkNearby?: boolean;
 		/** Bind it to keep the form's Submit disabled while a clip is uploading or has failed. */
 		uploadStatus?: VideoUploadStatus;
 		/** The same status as a callback, for forms that keep one status per page and can't bind. */
@@ -35,6 +37,7 @@
 		existingVideoUrl = '',
 		uploadsEnabled = true,
 		mode,
+		linkNearby = true,
 		uploadStatus = $bindable('none'),
 		onuploadstatus,
 		onrecorded,
@@ -343,7 +346,7 @@
 	{/if}
 
 	{#if !uploadsEnabled}
-		<FeatureNotice feature="uploads" {mode} />
+		<FeatureNotice feature="uploads" {mode} variant={linkNearby ? 'video' : 'videoNoLink'} />
 	{/if}
 
 	{#if recorderPhase === 'idle'}

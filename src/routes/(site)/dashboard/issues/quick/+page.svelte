@@ -336,6 +336,7 @@
 										orientationName="videoOrientation"
 										maxDurationSeconds={60}
 										bind:uploadStatus={videoStatus}
+										linkNearby={false}
 										uploadsEnabled={data.features.uploads}
 										mode={data.features.mode}
 									/>

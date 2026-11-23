@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { FEATURE_UNAVAILABLE } from '../../../src/lib/features';
+import { FEATURE_UNAVAILABLE, VIDEO_UPLOADS_UNAVAILABLE } from '../../../src/lib/features';
 import { postAction, signInWithPassword } from '../helpers/actions';
 import {
 	addIssuePage,
@@ -131,19 +131,27 @@ test.describe('Uploads off', () => {
 			const count = await inputs.count();
 			expect(count, `${path} has upload controls`).toBeGreaterThan(0);
 			for (let i = 0; i < count; i++) await expect(inputs.nth(i), `${path} input ${i}`).toBeDisabled();
-			const notices = page.locator('.feature-notice[data-feature="uploads"]');
+			// Photo and audio controls keep the general wording; the video recorder has its own.
+			const notices = page.locator('.feature-notice[data-feature="uploads"]:not([data-variant])');
 			expect(await notices.count(), path).toBeGreaterThan(0);
-			await expect(notices.first(), path).toHaveText(FEATURE_UNAVAILABLE.uploads);
+			for (let i = 0; i < (await notices.count()); i++) {
+				await expect(notices.nth(i), `${path} notice ${i}`).toHaveText(FEATURE_UNAVAILABLE.uploads);
+			}
+			// Production never shows the Demo's wording.
+			await expect(page.locator('.feature-notice'), path).not.toContainText(['Demo']);
 		}
 	});
 
-	test('the video recorder is off too: no camera, no file picker, the same notice; the video URL still works', async ({ page }) => {
+	test('the video recorder is off too: no camera, no file picker, a video notice; the video URL still works', async ({ page }) => {
 		// A video page with no video yet, so its recorder starts idle.
 		const videoPageId = await addIssuePage(artist.issueId, 'video', { title: 'Video' });
 		await signInWithPassword(page, artist.email, artist.password);
 
-		async function recorderIsOff(where: string, recorder: ReturnType<typeof page.locator>) {
-			await expect(recorder.locator('.feature-notice[data-feature="uploads"]'), where).toHaveText(FEATURE_UNAVAILABLE.uploads);
+		async function recorderIsOff(where: string, recorder: ReturnType<typeof page.locator>, wording: string) {
+			// Video wording, not the general "paste an image URL" line.
+			const notice = recorder.locator('.feature-notice[data-feature="uploads"]');
+			await expect(notice, where).toHaveText(wording);
+			await expect(notice, where).not.toContainText('image');
 			await expect(recorder.getByRole('button', { name: 'Open Camera' }), where).toBeDisabled();
 			await expect(recorder.getByRole('button', { name: 'Upload Video File' }), where).toBeDisabled();
 			const inputs = recorder.locator('input[type="file"]');
@@ -152,18 +160,19 @@ test.describe('Uploads off', () => {
 		}
 
 		await page.goto('/dashboard/issues/quick');
-		await recorderIsOff('Quick Issue', page.locator('.video-recorder-root'));
+		// Quick Issue has no video link field, so the notice says where a link can go.
+		await recorderIsOff('Quick Issue', page.locator('.video-recorder-root'), VIDEO_UPLOADS_UNAVAILABLE.videoNoLink);
 
 		await page.goto(`/dashboard/bookbinder/${artist.issueId}`);
 		// The existing video page's edit form.
 		const existing = page.locator('form[action="?/updatePage"]', { has: page.locator(`input[name="pageId"][value="${videoPageId}"]`) });
-		await recorderIsOff('Bookbinder video page', existing.locator('.video-recorder-root'));
+		await recorderIsOff('Bookbinder video page', existing.locator('.video-recorder-root'), VIDEO_UPLOADS_UNAVAILABLE.video);
 		await expect(existing.locator('input[name="videoUrl"]')).toBeEnabled();
 
 		// The new-page form, with the video kind chosen.
 		await page.locator('#new-kind').selectOption('video');
 		const addForm = page.locator('form[action="?/addPage"]');
-		await recorderIsOff('Bookbinder new page', addForm.locator('.video-recorder-root'));
+		await recorderIsOff('Bookbinder new page', addForm.locator('.video-recorder-root'), VIDEO_UPLOADS_UNAVAILABLE.video);
 		await expect(addForm.locator('#new-video-url')).toBeEnabled();
 	});
 });

@@ -22,6 +22,28 @@ const DEMO_UNAVAILABLE: Partial<Record<FeatureName, string>> = {
 	uploads: 'Uploads are turned off in this Demo. You can still paste an image URL or embed.'
 };
 
-export function featureUnavailableMessage(name: FeatureName, mode?: Mode): string {
+/**
+ * Uploads-off wording for the video recorder, in place of the general uploads line
+ * (which offers an image URL). The copy never promises what the page doesn't have:
+ * `video` sits above a video link field (Bookbinder); `videoNoLink` has none (Quick Issue).
+ */
+export type FeatureNoticeVariant = 'video' | 'videoNoLink';
+
+export const VIDEO_UPLOADS_UNAVAILABLE: Record<FeatureNoticeVariant, string> = {
+	video: 'Video uploads are temporarily unavailable. You can still paste a YouTube, Vimeo or Bandcamp link below.',
+	videoNoLink:
+		'Video uploads are temporarily unavailable. You can publish without a video, then add a YouTube, Vimeo or Bandcamp link in the Bookbinder.'
+};
+
+const DEMO_VIDEO_UPLOADS_UNAVAILABLE: Record<FeatureNoticeVariant, string> = {
+	video: 'Video uploads are turned off in this Demo. You can still paste a YouTube, Vimeo or Bandcamp link below.',
+	videoNoLink:
+		'Video uploads are turned off in this Demo. You can publish without a video, then add a YouTube, Vimeo or Bandcamp link in the Bookbinder.'
+};
+
+export function featureUnavailableMessage(name: FeatureName, mode?: Mode, variant?: FeatureNoticeVariant): string {
+	if (name === 'uploads' && variant) {
+		return mode === 'demo' ? DEMO_VIDEO_UPLOADS_UNAVAILABLE[variant] : VIDEO_UPLOADS_UNAVAILABLE[variant];
+	}
 	return (mode === 'demo' && DEMO_UNAVAILABLE[name]) || FEATURE_UNAVAILABLE[name];
 }
