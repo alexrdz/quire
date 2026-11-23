@@ -174,8 +174,12 @@
 		transform: rotate(var(--screen-tilt, 0deg));
 	}
 
+	/*
+	 * A 9:16 phone screen, centred. Its width keeps the same inset as the landscape
+	 * screen, so on a narrow page the corner tape still lands on the page (B1-T20).
+	 */
 	.video-screen.is-portrait {
-		max-inline-size: 300px;
+		inline-size: min(300px, 100% - 2 * var(--space-s));
 		margin-inline: auto;
 	}
 
