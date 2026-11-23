@@ -20,6 +20,16 @@ import path from 'node:path';
 import { eq } from 'drizzle-orm';
 import { type DomainError, type Result, err, ok } from '$domain/types';
 import { ArtistAccountStatus } from '$domain/account';
+import {
+	findVideoLocations,
+	mayHoldLocation,
+	readBoxHeader,
+	UNREADABLE_VIDEO_MESSAGE,
+	VIDEO_HAS_LOCATION_MESSAGE,
+	VideoStructureError,
+	webmHasLocationTag,
+	webmTagsOffsets
+} from '$domain/video-location';
 import { featureUnavailableMessage } from '$lib/features';
 import { finalizeVideoUploadSchema, presignVideoUploadSchema } from '$lib/schemas/upload';
 import { getConfig } from '../config';
@@ -74,6 +84,9 @@ export const VIDEO_UPLOAD_HTTP_STATUS: Record<string, number> = {
 	EMAIL_NOT_CONFIRMED: 403,
 	FORBIDDEN_UPLOAD_KEY: 403,
 	INVALID_REQUEST: 400,
+	REQUEST_TOO_LARGE: 413,
+	VIDEO_HAS_LOCATION: 422,
+	UNREADABLE_VIDEO: 422,
 	INVALID_UPLOAD_KEY: 400,
 	EMPTY_FILE: 400,
 	SIZE_MISMATCH: 400,
@@ -189,17 +202,67 @@ export interface FinalizedVideoUpload {
 	contentType: string;
 }
 
+/** The most top-level box headers finalize reads; real files have under ten. */
+export const MAX_TOP_LEVEL_BOXES = 64;
+/** The largest metadata box (moov, uuid, ...) finalize reads whole; real ones are far smaller. */
+export const MAX_METADATA_BOX_BYTES = 8 * 1024 * 1024;
+/** How much of a WebM's end, and of each Tags element its SeekHead names, finalize reads. */
+export const WEBM_TAIL_BYTES = 256 * 1024;
+
+const unreadable = (): Result<never, DomainError> =>
+	err({ code: 'UNREADABLE_VIDEO', message: UNREADABLE_VIDEO_MESSAGE });
+const hasLocation = (): Result<never, DomainError> =>
+	err({ code: 'VIDEO_HAS_LOCATION', message: VIDEO_HAS_LOCATION_MESSAGE });
+
 /**
- * B1-T23 adds the location check here (ADR 0010, "Checked on the server"): it
- * reads the file's metadata and refuses a video that still carries a location.
- * Until then every video passes.
+ * The server's location check (ADR 0010, "Checked on the server"): the browser strips
+ * a clip's location before uploading it, and this refuses any that still has one, so an
+ * old or modified client can't publish a location. The file came from a browser, so it
+ * is read defensively: at most MAX_TOP_LEVEL_BOXES box headers, metadata boxes of at most
+ * MAX_METADATA_BOX_BYTES, and anything malformed or over a cap is refused as unreadable,
+ * never let through unchecked. The media data itself is never read.
  */
 export async function refuseVideoWithLocation(
-	_store: MediaStore,
-	_pendingKey: string,
-	_contentType: string
+	store: MediaStore,
+	pendingKey: string,
+	contentType: string,
+	size: number,
+	head: Uint8Array
 ): Promise<Result<void, DomainError>> {
-	return ok(undefined);
+	try {
+		if (contentType === 'video/webm') {
+			const parts: Uint8Array[] = [head];
+			for (const offset of webmTagsOffsets(head)) {
+				if (offset < 0 || offset >= size) return unreadable();
+				parts.push(await store.readRange(pendingKey, offset, WEBM_TAIL_BYTES));
+			}
+			if (size > head.length) {
+				const tailStart = Math.max(head.length, size - WEBM_TAIL_BYTES);
+				parts.push(await store.readRange(pendingKey, tailStart, size - tailStart));
+			}
+			return parts.some((part) => webmHasLocationTag(part)) ? hasLocation() : ok(undefined);
+		}
+
+		// MP4 and MOV: walk the top-level boxes by their headers alone.
+		let at = 0;
+		for (let boxes = 0; at < size; boxes++) {
+			if (boxes >= MAX_TOP_LEVEL_BOXES) return unreadable();
+			const headerBytes = await store.readRange(pendingKey, at, 16);
+			const header = readBoxHeader(headerBytes, 0, size - at);
+			if (!header) return unreadable();
+			if (mayHoldLocation(header.type)) {
+				if (header.size > MAX_METADATA_BOX_BYTES) return unreadable();
+				const box = await store.readRange(pendingKey, at, header.size);
+				if (box.length !== header.size) return unreadable();
+				if (findVideoLocations(box, at).length > 0) return hasLocation();
+			}
+			at += header.size;
+		}
+		return at === size ? ok(undefined) : unreadable();
+	} catch (error) {
+		if (error instanceof VideoStructureError) return unreadable();
+		throw error;
+	}
 }
 
 /**
@@ -249,7 +312,7 @@ export async function finalizeVideoUpload(
 			return refuse({ code: 'UNSUPPORTED_MEDIA_TYPE', message: MESSAGES.notVideo });
 		}
 
-		const location = await refuseVideoWithLocation(store, pendingKey, detected);
+		const location = await refuseVideoWithLocation(store, pendingKey, detected, stored.size, head);
 		if (!location.ok) return refuse(location.error);
 
 		const publicKey = `${pending.uuid}${MIME_TO_EXT[detected]}`;

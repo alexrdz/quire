@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { issueForCity } from './helpers/db';
 import { LOCAL_UPLOADS_DIR } from './helpers/upload-files';
+import { findVideoLocations, VIDEO_HAS_LOCATION_MESSAGE } from '../../src/lib/domain/video-location';
 
 /**
  * B1-T22 (ADR 0010): the recorder uploads a clip straight to storage, here the local
@@ -55,7 +56,9 @@ test('a picked clip uploads straight to storage, and the Issue shows it', async 
 	const city = `Pickerton ${RUN}`;
 	const recorder = await openQuickIssue(page, city);
 	const multipart: string[] = [];
+	const puts: Array<Record<string, string>> = [];
 	page.on('request', (req) => {
+		if (req.method() === 'PUT' && req.url().includes('/api/uploads/local/')) puts.push(req.headers());
 		if (req.method() === 'POST' && req.url().includes('/dashboard/issues/quick') && (req.postData() ?? '').includes('portrait-clip')) {
 			multipart.push(req.url());
 		}
@@ -74,6 +77,10 @@ test('a picked clip uploads straight to storage, and the Issue shows it', async 
 	await expect(page.locator('.video-screen .video-frame')).toHaveClass(/video-frame-portrait/);
 	expect(readFileSync(path.join(LOCAL_UPLOADS_DIR, path.basename(src))).equals(readFileSync(CLIP))).toBe(true);
 	expect(multipart, 'the clip never goes through the form action').toEqual([]);
+	// R2's CORS rule allows only Content-Type: the PUT sends the signed type and no x-amz-* or custom headers.
+	expect(puts).toHaveLength(1);
+	expect(puts[0]['content-type']).toBe('video/webm');
+	expect(Object.keys(puts[0]).filter((h) => h.startsWith('x-'))).toEqual([]);
 });
 
 test('a recorded clip uploads straight to storage, preferring MP4/H.264, and the Issue shows it', async ({ page }) => {
@@ -171,4 +178,38 @@ test('Bookbinder: a picked clip becomes a video page, and the page edits and sav
 	const saved = page.waitForResponse((r) => r.url().includes('?/updatePage') && r.request().method() === 'POST');
 	await save.click();
 	expect(await (await saved).text()).toContain('"type":"success"');
+});
+
+test('a camera-roll clip with GPS is published without it', async ({ page }) => {
+	const city = `Gpston ${RUN}`;
+	const recorder = await openQuickIssue(page, city);
+	const withGps = path.resolve('tests/fixtures/video/keys-moov-meta.mov');
+	expect(readFileSync(withGps).toString('latin1')).toContain('com.apple.quicktime.location.ISO6709');
+
+	await recorder.getByRole('button', { name: 'Upload Video File' }).click();
+	await recorder.getByLabel('Choose Video File (MP4, WebM, MOV)').setInputFiles(withGps);
+	await expect(recorder.getByText('Video Uploaded')).toBeVisible();
+
+	const src = await publishAndRead(page, city);
+	expect(src).toMatch(/^\/uploads\/[0-9a-f-]{36}\.mov$/);
+	const stored = new Uint8Array(readFileSync(path.join(LOCAL_UPLOADS_DIR, path.basename(src))));
+	// Same size (blanked in place), and no location left anywhere in it.
+	expect(stored.length).toBe(readFileSync(withGps).length);
+	expect(findVideoLocations(stored)).toEqual([]);
+	expect(Buffer.from(stored).toString('latin1')).not.toMatch(/\+40\.7128|40\.7128/);
+});
+
+test('a picked WebM with a location tag is refused before it uploads, with no Retry', async ({ page }) => {
+	const recorder = await openQuickIssue(page, `Tagton ${RUN}`);
+	let presigns = 0;
+	page.on('request', (req) => {
+		if (req.url().includes('/api/uploads/video/presign')) presigns += 1;
+	});
+	await recorder.getByRole('button', { name: 'Upload Video File' }).click();
+	await recorder.getByLabel('Choose Video File (MP4, WebM, MOV)').setInputFiles(path.resolve('tests/fixtures/video/tagged-location.webm'));
+	await expect(recorder.getByRole('alert')).toHaveText(VIDEO_HAS_LOCATION_MESSAGE);
+	await expect(recorder.getByRole('button', { name: 'Retry Upload' })).toHaveCount(0);
+	await expect(recorder.getByRole('button', { name: 'Remove Video' })).toBeVisible();
+	await expect(page.getByRole('button', { name: /Publish Issue/ })).toBeDisabled();
+	expect(presigns).toBe(0);
 });
