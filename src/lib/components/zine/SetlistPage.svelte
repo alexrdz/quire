@@ -1,9 +1,45 @@
-<script lang="ts">
-	import { Stack } from '$lib/components/layout';
-	import Tape from './Tape.svelte';
-	import ZinePageShell from './ZinePageShell.svelte';
-	import { zineTilt, type PageContent, type PageShell } from './reader';
+<script lang="ts" module>
+	/** A setlist as the page shows it: the main set, then the encore (empty when there is none). */
+	export interface SetlistDisplay {
+		main: string[];
+		encore: string[];
+		/** Whether the setlist marks an encore, so the divider shows (even with no songs after it). */
+		hasEncore: boolean;
+	}
 
+	/** "Encore" on its own: the divider itself, not a song. */
+	const ENCORE_MARKER = /^\s*encore\s*$/i;
+	/** A title ending in "(Encore)", with optional spaces: an encore song, shown without the suffix. */
+	const ENCORE_SUFFIX = /\s*\(\s*encore\s*\)\s*$/i;
+
+	/**
+	 * Splits a setlist for display (the stored songs are untouched). The encore starts at
+	 * the first song that is exactly "Encore" (which becomes the divider and is not listed)
+	 * or whose title ends in "(Encore)" (listed without the suffix). From there on, every
+	 * song is in the encore, a further "Encore" marker is dropped and "(Encore)" suffixes are
+	 * removed. "Encore" anywhere else in a title ("Encore Une Fois") is an ordinary song.
+	 */
+	export function splitSetlist(songs: readonly string[]): SetlistDisplay {
+		const start = songs.findIndex((song) => ENCORE_MARKER.test(song) || ENCORE_SUFFIX.test(song));
+		if (start === -1) return { main: [...songs], encore: [], hasEncore: false };
+		const encore = songs
+			.slice(start)
+			.filter((song) => !ENCORE_MARKER.test(song))
+			.map((song) => song.replace(ENCORE_SUFFIX, '').trim());
+		return { main: songs.slice(0, start), encore, hasEncore: true };
+	}
+</script>
+
+<script lang="ts">
+	import type { PageContent, PageShell } from './reader';
+
+	/**
+	 * A setlist page in the Stories reader (ADR 0011): a clean typographic list on the
+	 * dark page. The heading is in the Artist's type pairing; songs are numbered (muted,
+	 * tabular numbers, white titles), with an "Encore" divider before the encore (see
+ * splitSetlist). A long
+	 * list scrolls inside the page; scrolling never pages the reader, and a tap still does.
+	 */
 	interface Props {
 		shell: PageShell;
 		content: PageContent;
@@ -13,125 +49,152 @@
 	let { shell, content, venue }: Props = $props();
 
 	const songs = $derived(content.songs || ['Opener', 'New Track', 'Crowd Favorite', 'Encore']);
-	/** The sheet's resting tilt: text, so within the ADR 0009 limit of about 2 degrees. */
-	const tilt = $derived(zineTilt(shell.pageNumber));
+	const display = $derived(splitSetlist(songs));
+	const mainSet = $derived(display.main);
+	const encore = $derived(display.encore);
+	const hasEncore = $derived(display.hasEncore);
+	const titleId = $derived(`${shell.id}-title`);
 </script>
 
-<ZinePageShell {shell}>
-	<Stack gap="xs">
-		<span class="text-highlight type-face eyebrow-small">{venue}</span>
-		<h2 class="bespoke-heading">{content.title || "Tonight's Setlist"}</h2>
-	</Stack>
+{#snippet rows(list: string[], start: number)}
+	{#each list as song, i (i)}
+		<li class="setlist-row">
+			<span class="setlist-num" aria-hidden="true">{String(start + i).padStart(2, '0')}</span>
+			<span class="setlist-song">{song}</span>
+		</li>
+	{/each}
+{/snippet}
 
-	<!-- A typewritten sheet with a torn bottom edge, taped to the page. -->
-	<div class="setlist-sheet" style="--sheet-tilt: {tilt}deg;">
-		<Tape placement="top" position={shell.pageNumber} />
-		<div class="setlist-paper">
-			<ol class="setlist-songs type-face">
-				{#each songs as song, sIdx}
-					<li class="song-row" class:is-last={sIdx === songs.length - 1}>
-						<span class="song-num">{String(sIdx + 1).padStart(2, '0')}</span>
-						<span class="song-title">{song}</span>
-						<span class="song-tag">LIVE</span>
-					</li>
-				{/each}
-			</ol>
+<section id={shell.id} class="story-setlist" aria-labelledby={titleId}>
+	<!-- The list scrolls here when it is longer than the page; a keyboard can scroll it too. -->
+	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+	<div class="story-scroll" tabindex="0" role="region" aria-labelledby={titleId}>
+		<div class="story-setlist-column">
+			<span class="story-setlist-venue">{venue}</span>
+			<h2 id={titleId} class="story-setlist-title" tabindex="-1">{content.title || "Tonight's Setlist"}</h2>
+
+			{#if mainSet.length > 0}
+				<ol class="setlist-list">
+					{@render rows(mainSet, 1)}
+				</ol>
+			{/if}
+
+			{#if hasEncore}
+				<h3 class="setlist-encore">Encore</h3>
+				<ol class="setlist-list" start={mainSet.length + 1}>
+					{@render rows(encore, mainSet.length + 1)}
+				</ol>
+			{/if}
 		</div>
 	</div>
-</ZinePageShell>
+</section>
 
 <style>
-	.setlist-sheet {
-		position: relative;
-		inline-size: 100%;
-		max-inline-size: 30rem;
-		transform: rotate(var(--sheet-tilt, 0deg));
-		/* The shadow follows the torn edge (a box-shadow would be clipped with it). */
-		filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45)) drop-shadow(0 12px 16px rgba(0, 0, 0, 0.55));
+	.story-setlist {
+		position: absolute;
+		inset: 0;
+		overflow: hidden;
+		background-color: var(--bg-void);
+		color: #ffffff;
 	}
 
-	.setlist-paper {
-		padding-block: var(--space-m) var(--space-l);
-		padding-inline: var(--space-s);
-		background-color: var(--zine-scrap-light);
-		background-image: var(--zine-mottle);
-		background-size: 420px 420px;
-		color: var(--zine-scrap-light-ink);
-		/* Torn off the pad at the bottom. */
-		clip-path: polygon(
-			0% 0%,
-			100% 0%,
-			100.00% 100%,
-			95.45% calc(100% - 7px),
-			90.91% 100%,
-			86.36% calc(100% - 6px),
-			81.82% 100%,
-			77.27% calc(100% - 8px),
-			72.73% 100%,
-			68.18% calc(100% - 5px),
-			63.64% 100%,
-			59.09% calc(100% - 5px),
-			54.55% 100%,
-			50.00% calc(100% - 5px),
-			45.45% 100%,
-			40.91% calc(100% - 7px),
-			36.36% 100%,
-			31.82% calc(100% - 5px),
-			27.27% 100%,
-			22.73% calc(100% - 6px),
-			18.18% 100%,
-			13.64% calc(100% - 5px),
-			9.09% 100%,
-			4.55% calc(100% - 5px),
-			0.00% 100%
-		);
+	/* Between the header and the bottom bar; scrolls inside the page when long. */
+	.story-scroll {
+		position: absolute;
+		inset-inline: 0;
+		inset-block: var(--story-top-space) var(--story-bottom-space);
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		padding-block: var(--space-s);
+		padding-inline: var(--space-m);
 	}
 
-	.setlist-songs {
-		list-style: none;
+	.story-scroll:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
+	}
+
+	.story-setlist-column {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2xs);
+		max-inline-size: 65ch;
+		margin-inline: auto;
 	}
 
-	.song-row {
-		display: flex;
-		align-items: baseline;
-		gap: var(--space-xs);
-		font-size: var(--text-body);
-		line-height: 1.5;
+	.story-setlist-venue {
+		font-size: var(--text-meta);
+		font-weight: var(--weight-bold);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: rgba(255, 255, 255, 0.78);
 	}
 
-	.song-num {
-		flex-shrink: 0;
-		font-size: var(--text-small);
-		color: #5b5466;
-	}
-
-	.song-title {
-		position: relative;
-		min-inline-size: 0;
+	.story-setlist-title {
+		margin: 0;
+		margin-block-end: var(--space-xs);
+		font-family: var(--story-heading-font, inherit);
+		font-size: var(--text-heading);
+		font-weight: var(--weight-bold);
+		line-height: var(--leading-heading);
 		overflow-wrap: anywhere;
 	}
 
-	.song-tag {
-		flex-shrink: 0;
-		margin-inline-start: auto;
-		font-size: var(--text-meta);
-		letter-spacing: var(--tracking-label);
-		color: #5b5466;
+	.story-setlist-title:focus {
+		outline: none;
 	}
 
-	/* The last song (the encore) is underlined in marker, by hand. */
-	.song-row.is-last .song-title::after {
+	.setlist-list {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.setlist-row {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-s);
+		padding-block: var(--space-xs);
+		border-block-end: 1px solid rgba(255, 255, 255, 0.1);
+	}
+
+	.setlist-num {
+		flex-shrink: 0;
+		min-inline-size: 2ch;
+		font-size: var(--text-small);
+		font-weight: var(--weight-bold);
+		font-variant-numeric: tabular-nums;
+		color: rgba(255, 255, 255, 0.62);
+	}
+
+	.setlist-song {
+		flex: 1;
+		min-inline-size: 0;
+		font-size: var(--text-body);
+		font-weight: var(--weight-semibold);
+		line-height: var(--leading-snug);
+		color: #ffffff;
+		overflow-wrap: anywhere;
+	}
+
+	/* The encore divider: a label over a rule in the accent colour. */
+	.setlist-encore {
+		display: flex;
+		align-items: center;
+		gap: var(--space-xs);
+		margin: 0;
+		padding-block-start: var(--space-s);
+		font-size: var(--text-meta);
+		font-weight: var(--weight-bold);
+		letter-spacing: var(--tracking-label);
+		text-transform: uppercase;
+		color: #ffffff;
+	}
+
+	.setlist-encore::after {
 		content: '';
-		position: absolute;
-		inset-inline: -0.2em -0.35em;
-		inset-block-end: -0.2em;
-		block-size: 0.55em;
-		border-block-end: 3px solid var(--support);
-		border-radius: 0 0 60% 40% / 0 0 100% 70%;
-		transform: rotate(-1.5deg);
-		pointer-events: none;
+		flex: 1;
+		block-size: 2px;
+		background-color: var(--accent);
 	}
 </style>
