@@ -9,10 +9,14 @@
 	import { videoSubmitBlockReason, type VideoUploadStatus } from '$lib/utils/video-upload-client';
 
 	import FeatureNotice from '$lib/components/site/FeatureNotice.svelte';
+	import BookbinderPreview from '$lib/components/dashboard/BookbinderPreview.svelte';
+	import { contentPageId } from '$lib/components/zine/reader';
 
 	let { data, form } = $props();
 
-	let previewIframe = $state<HTMLIFrameElement | null>(null);
+	// The preview reloads after each save, at the page that changed (ADR 0011).
+	let previewRefresh = $state(0);
+	let previewJumpTo = $state<string | null>(null);
 	let showQrSticker = $state(false);
 	let caseDisplayOpen = $state(false);
 	let newKind = $state<'text' | 'setlist' | 'photo' | 'audio' | 'video'>('text');
@@ -24,18 +28,20 @@
 		return videoSubmitBlockReason(pageVideoStatus[pageId] ?? 'none');
 	}
 
-	function refreshPreview() {
-		if (previewIframe) {
-			previewIframe.src = previewIframe.src;
-		}
+	/**
+	 * Saves through the form, then reloads the preview at the page `jumpTo` names
+	 * (read after the save, so an added page's index is known), or where it was.
+	 */
+	function refreshingPreview(jumpTo?: () => string | null) {
+		return () =>
+			async ({ update }: { update: () => Promise<void> }) => {
+				await update();
+				previewJumpTo = jumpTo?.() ?? null;
+				previewRefresh += 1;
+			};
 	}
 
-	function enhanceAndRefresh() {
-		return async ({ update }: { update: () => Promise<void> }) => {
-			await update();
-			refreshPreview();
-		};
-	}
+	const enhanceAndRefresh = refreshingPreview();
 
 	function parsePageContent(jsonStr: string): {
 		title?: string;
@@ -87,7 +93,7 @@
 				Designing: {data.issue.city} @ {data.issue.venue}
 			</h1>
 			<p class="text-muted subtext-small">
-				Edit cover metadata, lifecycle status, and bespoke zine pages. Saves update the live mobile preview on the right.
+				Edit cover metadata, lifecycle status, and bespoke zine pages. Saves update the preview on the right, which shows the Issue as Fans see it.
 			</p>
 		</Stack>
 
@@ -151,7 +157,7 @@
 					<span class="meta-chip meta-highlight">{data.issue.status.toUpperCase()}</span>
 				</Cluster>
 
-				<form data-stack="gap:md" method="POST" action="?/save" use:enhance={enhanceAndRefresh}>
+				<form data-stack="gap:md" method="POST" action="?/save" use:enhance={refreshingPreview(() => 'page-cover')}>
 					<Split ratio="1-1" gap="md" collapse="sm">
 						<Stack gap="xs">
 							<label for="city" class="input-label-sm">City</label>
@@ -290,7 +296,7 @@
 							method="POST"
 							action="?/updatePage"
 							enctype="multipart/form-data"
-							use:enhance={enhanceAndRefresh}
+							use:enhance={refreshingPreview(() => contentPageId(idx))}
 						>
 							<input type="hidden" name="pageId" value={page.id} />
 							<input type="hidden" name="kind" value={page.kind} />
@@ -502,7 +508,7 @@
 						method="POST"
 						action="?/addPage"
 						enctype="multipart/form-data"
-						use:enhance={enhanceAndRefresh}
+						use:enhance={refreshingPreview(() => contentPageId(data.pages.length - 1))}
 					>
 						<Split ratio="1-2" gap="sm" collapse="sm" class="w-full">
 							<Stack gap="xs">
@@ -694,18 +700,7 @@
 
 	<!-- RIGHT PANE: STICKY MOBILE DEVICE PREVIEW -->
 	<aside class="preview-pane">
-		<Stack gap="sm" align="center">
-			<span class="text-muted font-mono preview-caption">
-				LIVE MOBILE READER PREVIEW (375 × 780)
-			</span>
-			<div class="device-mockup">
-				<iframe
-					bind:this={previewIframe}
-					src="/i/{data.issue.slug}"
-					title="Live Issue Mobile Preview"
-				></iframe>
-			</div>
-		</Stack>
+		<BookbinderPreview slug={data.issue.slug} refresh={previewRefresh} jumpTo={previewJumpTo} />
 	</aside>
 </div>
 
@@ -799,11 +794,6 @@
 		font-size: var(--text-ui);
 		font-weight: var(--weight-heavy);
 		color: var(--highlight);
-	}
-
-	.preview-caption {
-		font-size: var(--text-meta);
-		letter-spacing: var(--tracking-wide);
 	}
 
 	/* Sleek Rectangular Navigation & Buttons (Zero 9999px Pills) */
