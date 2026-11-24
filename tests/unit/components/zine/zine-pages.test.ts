@@ -5,7 +5,7 @@ import { createRawSnippet } from 'svelte';
 
 vi.mock('$app/forms', () => ({ enhance: () => ({ destroy() {} }) }));
 
-const { default: SetlistPage } = await import('$lib/components/zine/SetlistPage.svelte');
+const { default: SetlistPage, splitSetlist } = await import('$lib/components/zine/SetlistPage.svelte');
 const { default: StoryPhoto } = await import('$lib/components/zine/story/StoryPhoto.svelte');
 const { default: StoryCover } = await import('$lib/components/zine/story/StoryCover.svelte');
 const { default: StoryReader } = await import('$lib/components/zine/story/StoryReader.svelte');
@@ -37,7 +37,7 @@ describe('Issue reader page components', () => {
 			props: { shell: shell('setlist'), content: { songs: ['Intro'] }, venue: 'The Room' }
 		});
 		expect(body).toContain('id="page-content-0"');
-		expect(body).toMatch(/class="page zine-paper content-page-canvas[\s"]/);
+		expect(body).toMatch(/<section[^>]*class="story-setlist[\s"]/);
 		expect(body).toContain('Intro');
 		expect(body).not.toMatch(/Page 2 of/);
 		expect(body).not.toContain('Next Page');
@@ -234,6 +234,71 @@ describe('Issue reader page components', () => {
 		});
 		expect(body).toMatch(/class="story-link-card[^"]*"/);
 		expect(body).toMatch(/<a[^>]*href="https:\/\/example.com\/watch"[^>]*class="story-link-button[^"]*"[^>]*>\s*Open video/);
+	});
+
+	it('a setlist lists every song in order, numbered, with an Encore divider before the encore', () => {
+		const songs = ['Static Bloom', 'Velvet Wire', 'Night Bus', 'Subway Static (Encore)', 'Last Light'];
+		const { body } = render(SetlistPage, { props: { shell: shell('setlist'), content: { songs }, venue: 'The Room' } });
+		expect(body).toContain('The Room');
+		expect(body).toContain("Tonight's Setlist");
+		// Shown in order; the encore song without its suffix.
+		const shown = ['Static Bloom', 'Velvet Wire', 'Night Bus', 'Subway Static', 'Last Light'];
+		const at = shown.map((song) => body.indexOf(`>${song}<`));
+		expect(at.every((i) => i > 0)).toBe(true);
+		expect([...at].sort((a, b) => a - b)).toEqual(at);
+		expect(body).not.toContain('(Encore)');
+		expect(body.match(/class="setlist-num[^"]*"[^>]*>(\d\d)</g)?.map((m) => m.slice(-3, -1))).toEqual(['01', '02', '03', '04', '05']);
+		expect(body.indexOf('>Encore</h3>')).toBeGreaterThan(body.indexOf('>Night Bus<'));
+		expect(body.indexOf('>Encore</h3>')).toBeLessThan(body.indexOf('>Subway Static<'));
+		expect(body).toMatch(/<ol class="setlist-list[^"]*" start="4"/);
+		// No decoration that isn't information: no Live tag, no tape, sheet or tilt.
+		expect(body).not.toMatch(/setlist-tag|>Live</);
+		expect(body).not.toMatch(/tape|scrap|setlist-sheet|type-face|rotate\(|--sheet-tilt/i);
+		expectOnlyCustomProperties(body);
+	});
+
+	it('splitSetlist: the encore starts at "(Encore)" or a bare "Encore", and nowhere else', () => {
+		// A "(Encore)" suffix, any case, optional spaces: the divider goes before it, and the suffix is not shown.
+		expect(splitSetlist(['A', 'B', 'C (Encore)', 'D'])).toEqual({ main: ['A', 'B'], encore: ['C', 'D'], hasEncore: true });
+		expect(splitSetlist(['A', 'B(encore)', 'C ( ENCORE ) '])).toEqual({ main: ['A'], encore: ['B', 'C'], hasEncore: true });
+		// A bare "Encore" is the divider itself, not a song.
+		expect(splitSetlist(['A', 'B', 'Encore', 'C'])).toEqual({ main: ['A', 'B'], encore: ['C'], hasEncore: true });
+		expect(splitSetlist(['A', '  ENCORE  ', 'C'])).toEqual({ main: ['A'], encore: ['C'], hasEncore: true });
+		expect(splitSetlist(['A', 'Encore'])).toEqual({ main: ['A'], encore: [], hasEncore: true });
+		// A second marker after the first is dropped.
+		expect(splitSetlist(['A', 'Encore', 'B', 'Encore', 'C'])).toEqual({ main: ['A'], encore: ['B', 'C'], hasEncore: true });
+		// "Encore" anywhere else in a title is an ordinary song.
+		for (const songs of [['Encore Une Fois', 'B'], ['A', 'Encores and Endings'], ['A', 'The Encore Kid'], ['A', 'Encore: Live']]) {
+			expect(splitSetlist(songs), songs.join(' | ')).toEqual({ main: songs, encore: [], hasEncore: false });
+		}
+		// The stored list is untouched.
+		const stored = ['A', 'B (Encore)'];
+		splitSetlist(stored);
+		expect(stored).toEqual(['A', 'B (Encore)']);
+	});
+
+	it('a setlist without songs keeps its default list; its "Encore" becomes the divider', () => {
+		const { body } = render(SetlistPage, { props: { shell: shell('setlist'), content: {}, venue: 'The Room' } });
+		for (const song of ['Opener', 'New Track', 'Crowd Favorite']) expect(body).toContain(`>${song}<`);
+		expect(body).toContain('>Encore</h3>');
+		expect(body).not.toMatch(/setlist-song[^>]*>Encore</);
+	});
+
+	it('a text page is a readable article in a scrolling region, keeping its words as written', () => {
+		const { body } = render(TextPage, {
+			props: { shell: shell('text'), content: { title: 'Load Out', body: 'We packed the van at 2am.' }, source: 'bespoke', artistName: 'The Neon Velvet' }
+		});
+		expect(body).toMatch(/<div class="story-scroll[^"]*" tabindex="0" role="region"/);
+		expect(body).toMatch(/<article class="story-article/);
+		expect(body).toContain('Load Out');
+		expect(body).toContain('We packed the van at 2am.');
+		expect(body).not.toMatch(/tape|scrap|rotate\(/i);
+		expectOnlyCustomProperties(body);
+		const bespokeDefault = render(TextPage, {
+			props: { shell: shell('text'), content: {}, source: 'bespoke', artistName: 'The Neon Velvet' }
+		}).body;
+		expect(bespokeDefault).toContain('From the Road');
+		expect(bespokeDefault).toContain('Thank you for being here tonight with us in this room.');
 	});
 
 	it('a template text page is about the Artist by default', () => {
