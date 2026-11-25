@@ -2,6 +2,7 @@ import { error, fail, redirect, type Actions, type ServerLoad } from '@sveltejs/
 import { allowsStandIn, getConfig } from '$lib/server/config';
 import { FEATURE_UNAVAILABLE } from '$lib/features';
 import { ArtistAccountStatus } from '$domain/account';
+import { isPubliclyReadable } from '$domain/issue';
 import { db, schema } from '$lib/server/db';
 import { eq, and } from 'drizzle-orm';
 import { auth, createSessionForUser } from '$lib/server/auth';
@@ -30,7 +31,7 @@ async function resolveIssueWall(slug: string | undefined) {
 				with: { artist: true }
 			})
 		: undefined;
-	if (!issue || issue.status === 'draft') {
+	if (!issue || !isPubliclyReadable(issue)) {
 		return { ok: false as const, failure: fail(404, { error: 'Issue not found.' }) };
 	}
 	if (issue.artist.accountStatus === ArtistAccountStatus.Closed) {

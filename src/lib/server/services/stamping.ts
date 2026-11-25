@@ -17,6 +17,7 @@ import {
 	ok,
 	err
 } from '$domain/types';
+import { isPubliclyReadable } from '$domain/issue';
 
 const COOKIE_SECRET = getConfig().core.cookieSecret;
 
@@ -178,7 +179,8 @@ export async function claimStampForFan(
 		where: eq(schema.issues.id, issueId)
 	});
 
-	if (!issue) {
+	// A draft can't be stamped: it is not public (B1-T34).
+	if (!issue || !isPubliclyReadable(issue)) {
 		return err({ code: 'ISSUE_NOT_FOUND', message: 'Issue does not exist.' });
 	}
 
@@ -231,6 +233,12 @@ export async function saveIssueForFan(
 	fanUserId: string,
 	issueId: string
 ): Promise<Result<{ collectionId: string; kind: 'saved' | 'stamped' }, DomainError>> {
+	// Only an Issue anyone may read can be saved: never a draft, nor an id that doesn't exist (B1-T34).
+	const issue = await db.query.issues.findFirst({ where: eq(schema.issues.id, issueId) });
+	if (!issue || !isPubliclyReadable(issue)) {
+		return err({ code: 'ISSUE_NOT_FOUND', message: 'Issue does not exist.' });
+	}
+
 	const existing = await db.query.collections.findFirst({
 		where: and(
 			eq(schema.collections.fanUserId, fanUserId),

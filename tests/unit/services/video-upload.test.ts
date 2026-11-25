@@ -438,7 +438,11 @@ describe('upload ids', () => {
 			'base64url'
 		);
 		expect(verifyVideoUploadId(`${forged}.${signature}`, artistId, now)).toBeNull();
-		expect(verifyVideoUploadId(`${payload}.x${signature!.slice(1)}`, artistId, now)).toBeNull();
+		// A changed signature: its first character swapped for a different one (never the same,
+		// which happened when the HMAC already began with "x", about one run in 64).
+		const tampered = `${signature![0] === 'x' ? 'y' : 'x'}${signature!.slice(1)}`;
+		expect(tampered).not.toBe(signature);
+		expect(verifyVideoUploadId(`${payload}.${tampered}`, artistId, now)).toBeNull();
 		expect(verifyVideoUploadId('', artistId, now)).toBeNull();
 		expect(verifyVideoUploadId(`${id}.extra`, artistId, now)).toBeNull();
 	});

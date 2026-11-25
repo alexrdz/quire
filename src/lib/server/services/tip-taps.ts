@@ -10,11 +10,12 @@
  * return `recorded: false`, and the Fan still gets Venmo.
  */
 import crypto from 'node:crypto';
-import { and, count, eq, ne } from 'drizzle-orm';
+import { and, count, eq } from 'drizzle-orm';
 import { ArtistAccountStatus } from '$domain/account';
 import { tipTapSchema, type TipTapInput } from '$schemas/tipping';
 import { db, schema } from '../db';
 import { claimOnceWithin, consumeRateLimits } from './rate-limit';
+import { isPubliclyReadable } from '$domain/issue';
 
 export type TipTapSkipReason = 'invalid' | 'not_found' | 'duplicate' | 'rate_limited' | 'error';
 
@@ -52,14 +53,11 @@ export async function recordTipTap(raw: unknown, ctx: TipTapContext): Promise<Ti
 		let issueId: string | null = null;
 		if (input.issueSlug) {
 			const issue = await db.query.issues.findFirst({
-				where: and(
-					eq(schema.issues.slug, input.issueSlug),
-					eq(schema.issues.artistId, artist.id),
-					ne(schema.issues.status, 'draft')
-				),
-				columns: { id: true }
+				where: and(eq(schema.issues.slug, input.issueSlug), eq(schema.issues.artistId, artist.id)),
+				columns: { id: true, status: true }
 			});
-			if (!issue) return { recorded: false, reason: 'not_found' };
+			// No Tip Tap against a draft: it is not public (B1-T34).
+			if (!issue || !isPubliclyReadable(issue)) return { recorded: false, reason: 'not_found' };
 			issueId = issue.id;
 		}
 
