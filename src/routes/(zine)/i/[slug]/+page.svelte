@@ -83,11 +83,12 @@
 		})
 	);
 
-	// The Stories reader's pages (ADR 0011): the Cover, the content pages (one
-	// segment per photo), the Wall and the Endpaper. The ids are also the URL hashes.
+	// The Stories reader's pages (ADR 0011): the Cover, the content pages (one segment
+	// each; a photo page's polaroid stack handles its photos, B1-T35), the Wall and the
+	// Endpaper. The ids are also the URL hashes.
 	let storyPages = $derived<StoryPageInfo[]>([
 		{ id: 'page-cover', segments: 1 },
-		...readerPages.map((page, idx) => ({ id: contentPageId(idx), segments: Math.max(1, page.photos.length) })),
+		...readerPages.map((_page, idx) => ({ id: contentPageId(idx), segments: 1 })),
 		{ id: 'page-wall', segments: 1 },
 		{ id: 'page-endpaper', segments: 1 }
 	]);
@@ -137,7 +138,6 @@
 				<StoryPhoto
 					id={shell.id}
 					photos={entry.photos}
-					{part}
 					title={content.title}
 					body={content.body}
 					city={data.issue.city}

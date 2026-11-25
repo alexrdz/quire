@@ -1,187 +1,97 @@
 <script lang="ts">
 	import type { PhotoEntry } from '$domain/photo-pile';
+	import PhotoPile from '../PhotoPile.svelte';
 
 	/**
-	 * A photo page (ADR 0011): each photo fills the page and is its own segment
-	 * of the progress bar. Portrait photos cover the page; landscape photos are
-	 * shown whole, centred on black. The page title, the photo's caption and the
-	 * page's words sit at the bottom over a scrim.
+	 * A photo page (ADR 0011, amended by B1-T35): the polaroid stack, centred between the
+	 * header and the bottom bar on the dark page, with the page's title and words under it.
+	 * The stack is one segment of the progress bar: it handles its own photos (swipe or
+	 * tap to toss, tap to flip for the caption, Back, Restack), and a tap or drag that
+	 * starts on it never changes the page. A single photo is one polaroid that flips if
+	 * captioned, with no toss, counter or restack.
 	 */
 	interface Props {
 		id: string;
 		photos: PhotoEntry[];
-		/** Which photo is showing. */
-		part: number;
 		title?: string;
 		body?: string;
 		city: string;
 	}
 
-	let { id, photos, part, title, body, city }: Props = $props();
+	let { id, photos, title, body, city }: Props = $props();
 
 	const heading = $derived(title || 'From Tonight');
-	const current = $derived(photos[Math.min(Math.max(0, part), photos.length - 1)]);
-	/** Photos measured wider than tall, by index: shown whole instead of cropped. */
-	let landscape = $state<Record<number, boolean>>({});
-
-	let images = $state<HTMLImageElement[]>([]);
-
-	// Notes whether each photo is landscape once it loads. Listeners are added
-	// here, not as onload or an action on <img>: for those Svelte server-renders an
-	// inline onload attribute, which is inline script the CSP refuses.
-	$effect(() => {
-		const cleanups = images.map((img, index) => {
-			if (!img) return () => {};
-			const read = () => {
-				if (img.naturalWidth && img.naturalHeight) landscape[index] = img.naturalWidth > img.naturalHeight;
-			};
-			if (img.complete) read();
-			img.addEventListener('load', read);
-			return () => img.removeEventListener('load', read);
-		});
-		return () => cleanups.forEach((cleanup) => cleanup());
-	});
 </script>
 
-<section {id} class="story-photo" class:is-landscape={landscape[part]} aria-labelledby="{id}-title">
+<section {id} class="story-photo" aria-labelledby="{id}-title">
 	<div class="story-photo-stage">
-	{#each photos as photo, i (i)}
-		<img
-			class="story-photo-img"
-			class:is-current={i === part}
-			class:is-landscape={landscape[i]}
-			src={photo.url}
-			alt={photo.caption || (photos.length > 1 ? `${heading}, photo ${i + 1} of ${photos.length}` : heading)}
-			aria-hidden={i === part ? undefined : 'true'}
-			bind:this={images[i]}
-		/>
-	{/each}
-	{#if photos.length === 0}
-		<div class="story-photo-empty" aria-hidden="true">{city}</div>
-	{/if}
-	</div>
+		{#if photos.length > 0}
+			<!-- Full width, so the stack sizes itself (min(100%, 24rem, 48dvh)) instead of
+			     shrinking to nothing inside the centred column. -->
+			<div class="story-photo-pile">
+				<PhotoPile {photos} label={title || `${city} photo pile`} />
+			</div>
+		{:else}
+			<div class="story-photo-empty" aria-hidden="true">{city}</div>
+		{/if}
 
-	<div class="story-caption-wrap">
-	<div class="story-caption" data-scrim>
-		{#if photos.length > 1}
-			<span class="story-photo-count">{part + 1} / {photos.length}</span>
-		{/if}
-		<h2 id="{id}-title" class="story-photo-title" tabindex="-1">{heading}</h2>
-		{#if current?.caption}
-			<p class="story-photo-caption">{current.caption}</p>
-		{/if}
-		{#if body}
-			<p class="story-photo-body">{body}</p>
-		{/if}
-	</div>
+		<div class="story-photo-text">
+			<h2 id="{id}-title" class="story-photo-title" tabindex="-1">{heading}</h2>
+			{#if body}
+				<p class="story-photo-body">{body}</p>
+			{/if}
+		</div>
 	</div>
 </section>
 
 <style>
-	/* A portrait photo fills the whole page, behind the header and the caption. */
 	.story-photo {
 		position: absolute;
 		inset: 0;
-		display: flex;
-		flex-direction: column;
 		overflow: hidden;
-		background: #000000;
+		background-color: var(--bg-void);
 		color: #ffffff;
 	}
 
+	/* The stack and its words, centred between the header and the bottom bar; they
+	   scroll inside the page if a long caption needs the room. */
 	.story-photo-stage {
 		position: absolute;
-		inset: 0;
+		inset-inline: 0;
+		inset-block: var(--story-top-space) var(--story-bottom-space);
+		display: flex;
+		flex-direction: column;
+		justify-content: safe center;
+		align-items: center;
+		gap: var(--space-s);
+		overflow-x: hidden;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		padding-block: var(--space-xs);
+		padding-inline: var(--space-s);
 	}
 
-	/* A landscape photo is shown whole with its caption right under it, the two
-	   together centred between the header and the bottom bar. */
-	.story-photo.is-landscape {
-		justify-content: center;
-		padding-block-start: var(--story-top-space);
-	}
-
-	.story-photo.is-landscape .story-photo-stage {
-		position: relative;
-		flex: none;
-	}
-
-	.story-photo.is-landscape .story-photo-img.is-current {
-		position: static;
-		display: block;
-		block-size: auto;
-	}
-
-	.story-photo.is-landscape .story-caption-wrap {
-		margin-block-start: 0;
-	}
-
-	.story-photo-img {
-		position: absolute;
-		inset: 0;
+	.story-photo-pile {
 		inline-size: 100%;
-		block-size: 100%;
-		object-fit: cover;
-		visibility: hidden;
-	}
-
-	.story-photo-img.is-current {
-		visibility: visible;
-	}
-
-	.story-photo-img.is-landscape {
-		object-fit: contain;
 	}
 
 	.story-photo-empty {
-		position: absolute;
-		inset: 0;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		min-block-size: 30dvh;
 		font-size: var(--text-title);
 		font-weight: var(--weight-heavy);
 		color: rgba(255, 255, 255, 0.18);
 	}
 
-	/* The scrim: at least 62% black under every word, so white text passes AA over any photo.
-	   It sits above the bottom bar, which brings its own scrim. */
-	.story-caption-wrap {
-		position: relative;
-		margin-block-start: auto;
-		flex: none;
-	}
-
-	/* Under a landscape photo the caption sits on the black page: no fade up into the photo. */
-	.story-photo.is-landscape .story-caption-wrap::before {
-		display: none;
-	}
-
-	.story-caption {
+	.story-photo-text {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3xs);
-		max-block-size: 55dvh;
-		overflow-y: auto;
-		padding-block: var(--space-s) var(--story-bottom-space);
-		padding-inline: var(--space-s);
-		background-color: rgba(0, 0, 0, 0.62);
-	}
-
-	.story-caption-wrap::before {
-		content: '';
-		position: absolute;
-		inset-inline: 0;
-		inset-block-end: 100%;
-		block-size: 25dvh;
-		background: linear-gradient(to top, rgba(0, 0, 0, 0.62), transparent);
-		pointer-events: none;
-	}
-
-	.story-photo-count {
-		font-size: var(--text-meta);
-		font-weight: var(--weight-bold);
-		color: #ffffff;
+		inline-size: 100%;
+		max-inline-size: 65ch;
+		text-align: center;
 	}
 
 	.story-photo-title {
@@ -191,18 +101,18 @@
 		font-weight: var(--weight-bold);
 		line-height: var(--leading-heading);
 		color: #ffffff;
+		overflow-wrap: anywhere;
 	}
 
 	.story-photo-title:focus {
 		outline: none;
 	}
 
-	.story-photo-caption,
 	.story-photo-body {
 		margin: 0;
-		max-inline-size: 60ch;
 		font-size: var(--text-body);
 		line-height: var(--leading-body);
 		color: #ffffff;
+		overflow-wrap: anywhere;
 	}
 </style>
