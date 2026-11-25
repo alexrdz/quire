@@ -1,6 +1,7 @@
 import { error, type RequestEvent } from '@sveltejs/kit';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { ArtistAccountStatus } from '$domain/account';
+import { isPubliclyReadable } from '$domain/issue';
 import { db, schema } from '$lib/server/db';
 import { optionalViewer } from '$lib/server/guards';
 import { verifyScanToken } from '$lib/server/services/stamping';
@@ -26,7 +27,8 @@ async function findIssue(access: IssueReaderAccess) {
 			where: eq(schema.issues.slug, access.slug),
 			with: { artist: true, issuePages: { orderBy: [asc(schema.issuePages.position)] } }
 		});
-		return issue && issue.status !== 'draft' ? issue : undefined;
+		// A draft is the Artist's alone (B1-T34): the same rule as every other public path.
+		return issue && isPubliclyReadable(issue) ? issue : undefined;
 	}
 	if (!access.issueId) return undefined;
 	return db.query.issues.findFirst({

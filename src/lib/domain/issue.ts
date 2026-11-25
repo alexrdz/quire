@@ -187,3 +187,14 @@ export function groupIssuesByMonth<T extends { date: string }>(
 
 	return Array.from(buckets.values()).sort((a, b) => b.key.localeCompare(a.key));
 }
+
+/**
+ * Whether anyone may read an Issue by its slug or id: every status but a draft. A draft is
+ * the Artist's alone (B1-T34); published, cancelled and archived Issues stay readable, since
+ * Fans' Stubs, Tip Taps and the Wall outlive them (CONTEXT, decision 21). Every public path
+ * (the reader, the Wall, Save, Stamp, Tip Taps, My Stubs) checks this; the Back Page has its
+ * own, stricter list.
+ */
+export function isPubliclyReadable(issue: { status: string }): boolean {
+	return issue.status !== 'draft';
+}
