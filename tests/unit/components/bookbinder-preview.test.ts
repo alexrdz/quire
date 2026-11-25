@@ -1,12 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render } from 'svelte/server';
+
+// The route the preview renders in: the Bookbinder (an id), or anywhere else.
+const route = vi.hoisted(() => ({ params: {} as Record<string, string> }));
+vi.mock('$app/state', () => ({ page: route }));
 
 /**
  * B1-T32 (ADR 0011): the Bookbinder preview shows the Stories reader in a 390 by 844
  * phone, scaled to fit the pane, and never lets a tip through.
  */
 
-const { default: BookbinderPreview, PREVIEW_PHONE, TIP_ACTION_SELECTOR, previewScale } = await import(
+const { default: BookbinderPreview, PREVIEW_PHONE, TIP_ACTION_SELECTOR, TIP_ACTION_SELECTORS, isVenmoUrl, previewScale } = await import(
 	'$lib/components/dashboard/BookbinderPreview.svelte'
 );
 
@@ -30,13 +34,30 @@ describe('BookbinderPreview', () => {
 	it('treats every preset, the custom amount and any Venmo link as a tip action', () => {
 		// The selector is matched against the real tip buttons in bookbinder-preview.spec.ts;
 		// here, that it names what they carry: data-amount-cents, and any venmo.com link.
-		expect(TIP_ACTION_SELECTOR.split(',').map((part: string) => part.trim())).toEqual([
-			'[data-amount-cents]',
-			'a[href*="venmo.com"]'
-		]);
+		// bookbinder-preview.spec.ts repeats these two; keep them in step.
+		expect(TIP_ACTION_SELECTORS).toEqual(['[data-amount-cents]', 'a[href*="venmo.com"]']);
+		expect(TIP_ACTION_SELECTOR).toBe('[data-amount-cents], a[href*="venmo.com"]');
 	});
 
-	it('renders the reader in a frame at /i/<slug>, labelled as a preview, with only custom properties inline', () => {
+	it('knows a Venmo URL, and only a Venmo URL', () => {
+		for (const url of ['https://venmo.com/u/x', 'https://account.venmo.com/pay', '//venmo.com/x?amount=5', new URL('https://VENMO.com/x')]) {
+			expect(isVenmoUrl(url as string), String(url)).toBe(true);
+		}
+		// "venmo.com/x" with no scheme is a path on the preview's own site, as window.open reads it.
+		for (const url of ['/i/x', 'venmo.com/x', 'https://example.com/venmo.com', 'https://notvenmo.com/x', 'https://venmo.com.evil.test/x', '', null, undefined]) {
+			expect(isVenmoUrl(url as string), String(url)).toBe(false);
+		}
+	});
+
+	it("in the Bookbinder, frames the Artist's own preview route, which shows drafts too (B1-T33)", () => {
+		route.params = { id: 'issue-123' };
+		const { body } = render(BookbinderPreview, { props: { slug: 'neon-velvet-brooklyn-2026-10-12' } });
+		expect(body).toMatch(/<iframe[^>]*src="\/dashboard\/bookbinder\/issue-123\/preview"/);
+		route.params = {};
+	});
+
+	it('elsewhere, frames the public reader at /i/<slug>, labelled as a preview, with only custom properties inline', () => {
+		route.params = {};
 		const { body } = render(BookbinderPreview, { props: { slug: 'neon-velvet-brooklyn-2026-10-12' } });
 		expect(body).toMatch(/<iframe[^>]*src="\/i\/neon-velvet-brooklyn-2026-10-12"/);
 		expect(body).toContain('title="Live Issue Mobile Preview"');

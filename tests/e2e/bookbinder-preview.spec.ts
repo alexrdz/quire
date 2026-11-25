@@ -52,6 +52,29 @@ async function openBookbinder(page: Page) {
 	return reader;
 }
 
+/**
+ * The preview's tip guard selectors. They must equal TIP_ACTION_SELECTORS in
+ * BookbinderPreview.svelte (its unit test pins that list); a Playwright spec can't import
+ * a Svelte module's exports.
+ */
+const TIP_ACTION_SELECTOR = '[data-amount-cents], a[href*="venmo.com"]';
+
+/**
+ * Every control in the reader that looks like a tip (a Venmo URL, a "$n" label, or "with
+ * Venmo" in its name), except the buttons that only open the tip sheet, which doesn't
+ * match the guard's selectors. Empty means every tip control is guarded.
+ */
+function unguardedTipControls(reader: ReturnType<Page['frameLocator']>) {
+	return reader.locator('body').evaluate((body, selector) => {
+		const nameOf = (el: Element) => `${el.getAttribute('aria-label') ?? ''} ${el.textContent ?? ''}`.replace(/\s+/g, ' ').trim();
+		return [...body.querySelectorAll('a, button, [role="button"]')]
+			.filter((el) => el.getAttribute('aria-haspopup') !== 'dialog')
+			.filter((el) => el.matches('[data-venmo-url], a[href*="venmo"]') || /\$\d/.test(nameOf(el)) || /with venmo/i.test(nameOf(el)))
+			.filter((el) => !el.matches(selector))
+			.map((el) => `${el.tagName.toLowerCase()}.${el.className} "${nameOf(el)}"`);
+	}, TIP_ACTION_SELECTOR);
+}
+
 const currentId = (page: Page) =>
 	page.frameLocator(PREVIEW).locator('.story-page[data-place="current"]').getAttribute('data-page-id');
 
@@ -113,21 +136,43 @@ test('a tip in the preview never opens Venmo or records a Tip Tap, and the Wall 
 	const popups: string[] = [];
 	page.on('popup', (popup) => popups.push(popup.url()));
 	const reader = await openBookbinder(page);
-	const frameUrl = () => page.frames().find((f) => f.url().includes('/i/'))?.url() ?? '';
+	const frameUrl = () => page.frames().find((f) => f.url().includes('/preview'))?.url() ?? '';
 	const before = frameUrl();
 
-	// A tip pill on the Cover.
-	const pill = reader.locator('[data-amount-cents]').first();
+	const tipsOff = page.getByRole('status').filter({ hasText: 'tips are off' });
+
+	// Backstop: every tip-looking control on the Cover carries the guard's selector.
+	expect(await unguardedTipControls(reader), 'tip controls without data-amount-cents').toEqual([]);
+
+	// A Cover pill: a click, then Enter and Space on it while focused (keys fire click).
+	const pill = reader.locator('.story-cover-tip-pills [data-amount-cents]').first();
 	await expect(pill).toBeVisible();
 	await pill.click();
-	await expect(page.getByRole('status').filter({ hasText: 'tips are off' })).toBeVisible();
-	// The tip sheet's amounts, from the bottom bar on a content page.
+	await expect(tipsOff).toBeVisible();
+	await pill.focus();
+	await page.keyboard.press('Enter');
+	await page.keyboard.press('Space');
+
+	// The tip sheet, from the bottom bar on a content page: a preset, then the custom amount.
 	await reader.getByRole('button', { name: /Open tonight/ }).click();
 	await reader.getByRole('button', { name: /Tip .* with Venmo/ }).first().click();
-	const sheetTip = reader.locator('dialog[open] [data-amount-cents]').first();
-	await expect(sheetTip).toBeVisible();
-	await sheetTip.click();
+	const sheet = reader.locator('dialog[open]');
+	const preset = sheet.locator('[data-amount-cents]').first();
+	await expect(preset).toBeVisible();
+	await preset.click();
+	await sheet.getByLabel(/Other amount/).fill('12');
+	const custom = sheet.getByRole('button', { name: 'Tip $12 with Venmo' });
+	await expect(custom).toBeVisible();
+	// The backstop again, with the custom-amount button showing.
+	expect(await unguardedTipControls(reader), 'tip controls in the sheet without data-amount-cents').toEqual([]);
+	await custom.click();
+	await custom.focus();
+	await page.keyboard.press('Enter');
 	await page.keyboard.press('Escape');
+
+	// Nothing in the frame can open Venmo in a new window either.
+	const opened = await reader.locator('body').evaluate(() => window.open('https://venmo.com/u/quire-sample-band?amount=5') === null);
+	expect(opened, 'window.open to Venmo is refused').toBe(true);
 
 	// The Wall: a note can be written, but posting is off.
 	await page.frameLocator(PREVIEW).locator('body').evaluate(() => (location.hash = 'page-wall'));
@@ -146,4 +191,71 @@ test('a tip in the preview never opens Venmo or records a Tip Tap, and the Wall 
 	expect(popups, 'nothing opens').toEqual([]);
 	expect(frameUrl().split('#')[0]).toBe(before.split('#')[0]);
 	expect(frameUrl()).not.toContain('venmo.com');
+});
+
+test.describe('the owner preview route (B1-T33)', () => {
+	const DRAFT_CITY = `Draftburg ${RUN}`;
+	let draft = { id: '', slug: '' };
+
+	test.beforeAll(async ({ browser, baseURL }) => {
+		const context = await browser.newContext();
+		const page = await context.newPage();
+		await page.goto(`${baseURL}/demo`);
+		await expect(page).toHaveURL(/\/dashboard/);
+		const quick = await postAction(page.request, baseURL!, '/dashboard/issues/quick', {
+			city: DRAFT_CITY,
+			venue: 'The Draft Room',
+			date: '2026-11-25',
+			timezone: 'America/New_York',
+			saveMode: 'draft',
+			setlistSongs: 'Unreleased One\nUnreleased Two'
+		});
+		expect(quick.type).not.toBe('failure');
+		draft = (await issueForCity(DRAFT_CITY))!;
+		await postAction(page.request, baseURL!, `/dashboard/bookbinder/${draft.id}?/addPage`, {
+			kind: 'text',
+			title: 'Draft Notes',
+			body: 'Not out yet.'
+		});
+		await context.close();
+	});
+
+	test("a draft's preview in the Bookbinder shows its pages", async ({ page }) => {
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await page.route('https://images.unsplash.com/**', (route) => route.abort());
+		await page.goto('/demo');
+		await page.goto(`/dashboard/bookbinder/${draft.id}`);
+		const reader = page.frameLocator(PREVIEW);
+		await expect(reader.locator('.story-reader.is-ready')).toBeAttached();
+		await expect(page.locator(PREVIEW)).toHaveAttribute('src', `/dashboard/bookbinder/${draft.id}/preview`);
+		await expect(reader.locator('.setlist-song')).toHaveText(['Unreleased One', 'Unreleased Two']);
+		await expect(reader.locator('.story-page h2', { hasText: 'Draft Notes' })).toBeAttached();
+	});
+
+	test('only the owner gets the preview: a signed-out visitor and a Fan get 404, and the draft is not public', async ({ browser, baseURL }) => {
+		const url = `/dashboard/bookbinder/${draft.id}/preview`;
+		const anon = await browser.newContext();
+		expect((await anon.request.get(`${baseURL}${url}`)).status(), 'signed out').toBe(404);
+		expect((await anon.request.get(`${baseURL}/i/${draft.slug}`)).status(), 'the public reader').toBe(404);
+		await anon.close();
+
+		const fan = await browser.newContext();
+		const fanPage = await fan.newPage();
+		await fanPage.goto(`${baseURL}/demo?role=fan&redirect=/me/stubs`);
+		await expect(fanPage).toHaveURL(/\/me\/stubs/);
+		expect((await fan.request.get(`${baseURL}${url}`)).status(), 'a Fan').toBe(404);
+		expect((await fan.request.get(`${baseURL}/i/${draft.slug}`)).status(), 'a Fan at the public reader').toBe(404);
+		await fan.close();
+	});
+
+	test("the preview response is never indexed or cached, and only Quire may frame it", async ({ page, baseURL }) => {
+		await page.goto('/demo');
+		const response = await page.request.get(`${baseURL}/dashboard/bookbinder/${draft.id}/preview`);
+		expect(response.status()).toBe(200);
+		const headers = response.headers();
+		expect(headers['x-robots-tag']).toBe('noindex, nofollow');
+		expect(headers['cache-control']).toBe('private, no-store');
+		expect(headers['content-security-policy']).toContain("frame-ancestors 'self'");
+		expect(await response.text()).toContain('<meta name="robots" content="noindex, nofollow"');
+	});
 });

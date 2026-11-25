@@ -12,14 +12,38 @@
 		return Math.max(0.25, Math.round(scale * 1000) / 1000);
 	}
 
-	/** A tap in the preview that would tip: any preset or custom-amount button, or a Venmo link. */
-	export const TIP_ACTION_SELECTOR = '[data-amount-cents], a[href*="venmo.com"]';
+	/**
+	 * Everything in the reader that would tip, as one list: the preview cancels these
+	 * before the reader sees them (no Venmo, no Tip Tap).
+	 *
+	 * Contract for reader changes: every tip action (each preset, the custom amount, a
+	 * Cover pill, and any new tip control) must carry `data-amount-cents`. Venmo links are
+	 * caught by their href as well. bookbinder-preview.spec.ts fails if a tip control
+	 * appears in the reader without one of these.
+	 */
+	export const TIP_ACTION_SELECTORS = ['[data-amount-cents]', 'a[href*="venmo.com"]'] as const;
+	export const TIP_ACTION_SELECTOR = TIP_ACTION_SELECTORS.join(', ');
+
+	/** Whether a URL goes to Venmo (window.open from inside the preview is refused for these). */
+	export function isVenmoUrl(url: string | URL | undefined | null): boolean {
+		if (!url) return false;
+		try {
+			const host = new URL(String(url), 'https://quire.invalid').hostname.toLowerCase();
+			return host === 'venmo.com' || host.endsWith('.venmo.com');
+		} catch {
+			return false;
+		}
+	}
 </script>
 
 <script lang="ts">
+	import { page } from '$app/state';
+
 	/**
-	 * The Bookbinder's preview (ADR 0011): the same Stories reader Fans see, at
-	 * /i/<slug>, in a 390 by 844 phone scaled down to fit the pane. The reader runs in
+	 * The Bookbinder's preview (ADR 0011): the same Stories reader Fans see, in a 390 by
+	 * 844 phone scaled down to fit the pane. In the Bookbinder it frames the Artist's own
+	 * preview route (/dashboard/bookbinder/<id>/preview, B1-T33), which shows drafts too
+	 * and refuses every write on the server; anywhere else, the public /i/<slug>. The reader runs in
 	 * its own frame, so its viewport, URL hash and keys never touch the editor.
 	 *
 	 * It is read-only. Before any reader handler runs, it cancels every tip action (so
@@ -43,6 +67,7 @@
 	let pendingHash: string | null = null;
 
 	const scale = $derived(previewScale(areaWidth, areaHeight));
+	const src = $derived(page.params.id ? `/dashboard/bookbinder/${page.params.id}/preview` : `/i/${slug}`);
 
 	/**
 	 * The element an event in the frame came from. Not `instanceof Element`: the frame's
@@ -57,10 +82,13 @@
 
 	function guardClick(event: MouseEvent) {
 		if (!elementOf(event.target)?.closest(TIP_ACTION_SELECTOR)) return;
+		// Enter and Space on a focused tip button arrive here too: they fire click.
 		event.preventDefault();
 		event.stopImmediatePropagation();
-		notice = "This is a preview, so tips are off: nothing opens Venmo and no tip is counted.";
+		notice = TIPS_OFF;
 	}
+
+	const TIPS_OFF = "This is a preview, so tips are off: nothing opens Venmo and no tip is counted.";
 
 	function guardSubmit(event: Event) {
 		event.preventDefault();
@@ -77,6 +105,15 @@
 			if (!win) return;
 			win.addEventListener('click', guardClick, true);
 			win.addEventListener('submit', guardSubmit, true);
+			// Nothing in the preview may open Venmo in a new window either.
+			const open = win.open.bind(win);
+			win.open = ((url?: string | URL, ...rest: unknown[]) => {
+				if (isVenmoUrl(url)) {
+					notice = TIPS_OFF;
+					return null;
+				}
+				return open(url, ...(rest as [string?, string?]));
+			}) as typeof win.open;
 			if (pendingHash) {
 				win.location.hash = pendingHash;
 				pendingHash = null;
@@ -84,7 +121,7 @@
 		};
 		frame.addEventListener('load', onLoad);
 		// Already loaded before this ran (a fast, cached load).
-		if (frame.contentDocument?.readyState === 'complete' && frame.contentWindow?.location.pathname.startsWith('/i/')) {
+		if (frame.contentDocument?.readyState === 'complete' && frame.contentWindow?.location.pathname !== 'blank') {
 			onLoad();
 		}
 		return () => frame.removeEventListener('load', onLoad);
@@ -117,7 +154,7 @@
 			style="--preview-scale: {scale}; --preview-w: {PREVIEW_PHONE.width}px; --preview-h: {PREVIEW_PHONE.height}px;"
 			data-testid="bookbinder-preview-phone"
 		>
-			<iframe bind:this={iframe} src="/i/{slug}" title="Live Issue Mobile Preview"></iframe>
+			<iframe bind:this={iframe} {src} title="Live Issue Mobile Preview"></iframe>
 		</div>
 	</div>
 
