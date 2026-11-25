@@ -31,7 +31,7 @@ This applies to `/i/[slug]` and to the Bookbinder preview, which renders the sam
 ## Pages
 
 - **Cover.** Full-bleed cover art with a scrim. The Artist name is large, then venue, city and date, and the Cover note. The tip presets show as pills right on the Cover (decision 4: tip-first), then one primary button, "Open tonight's zine".
-- **Photo.** Each photo fills the page (`object-fit: cover` for portrait photos; landscape photos are shown whole, centred on black). A caption sits at the bottom over the scrim. Several photos are several segments of the progress bar. This replaces the polaroid pile.
+- **Photo.** *Amended 2026-11-25 by the product owner:* photo pages keep the polaroid stack. The photos sit as a stack of polaroids, centred on the dark page, with the page title and text under it. Swipe the top one away to see the next, tap a captioned one to flip it and read the caption, and restack at the end. A single photo is one polaroid that flips if it has a caption. The stack owns its own swipes and taps, so they never change the page; taps outside it, Next and the arrow keys still do. A photo page is one segment of the progress bar. The polaroids' slight resting tilt is the one exception to "no tilts" below.
 - **Video.** An uploaded clip fills the page, plays muted and inline when the page opens, and pauses when the Fan leaves it, with a clear unmute button. YouTube, Vimeo and Bandcamp embeds sit centred at their own ratio on black and never autoplay.
 - **Audio.** The cover art large and centred, the track title, and a clean player: a 56 px play button, a scrubber and the time.
 - **Setlist.** A clean typographic list on a dark page: numbered songs, with an "Encore" divider. It scrolls inside the page when it is long.
@@ -61,5 +61,5 @@ This applies to `/i/[slug]` and to the Bookbinder preview, which renders the sam
 
 ## Consequences
 
-- `Scrap`, `Tape`, `Stamp`, `TypeLabel`, `PhotoPile`'s toss and flip, `zineTilt` and the accent fonts are removed. Specs that check the ADR 0009 look are replaced by specs for this one.
+- `Scrap`, `Tape`, `Stamp`, `TypeLabel`, `zineTilt` and the accent fonts are removed. `PhotoPile` and its toss and flip stay (amended 2026-11-25). Specs that check the ADR 0009 look are replaced by specs for this one.
 - Decision 16's 2026-11-20 amendment now points to this ADR.
