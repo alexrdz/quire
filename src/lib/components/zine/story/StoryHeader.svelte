@@ -18,6 +18,27 @@
 	}
 
 	let { progress, artistName, artistSlug, avatarUrl, city, date }: Props = $props();
+
+	/** The cover art failed to load: show the initials tile instead of a broken image. */
+	let avatarFailed = $state(false);
+	let avatar: HTMLImageElement | undefined = $state();
+
+	// Listened for here, not with onerror on <img>: Svelte server-renders that as an
+	// inline handler, which the CSP refuses. A load that already failed counts too.
+	$effect(() => {
+		const img = avatar;
+		if (!img) return;
+		const fail = () => (avatarFailed = true);
+		if (img.complete && img.naturalWidth === 0 && img.currentSrc) fail();
+		img.addEventListener('error', fail);
+		return () => img.removeEventListener('error', fail);
+	});
+
+	$effect(() => {
+		// A new image gets a fresh try.
+		void avatarUrl;
+		avatarFailed = false;
+	});
 </script>
 
 <header class="story-header">
@@ -27,8 +48,8 @@
 		{/each}
 	</ol>
 	<div class="story-header-row">
-		{#if avatarUrl}
-			<img class="story-avatar" src={avatarUrl} alt="" />
+		{#if avatarUrl && !avatarFailed}
+			<img class="story-avatar" src={avatarUrl} alt="" bind:this={avatar} />
 		{:else}
 			<span class="story-avatar story-avatar-initials" aria-hidden="true">{initialsOf(artistName)}</span>
 		{/if}

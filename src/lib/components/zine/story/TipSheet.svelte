@@ -80,6 +80,18 @@
 		cursor: default;
 	}
 
+	/* No native spinner arrows on "Other amount": they don't match the sheet, and typing is quicker. */
+	:global(.tip-sheet .venmo-tip-input) {
+		appearance: textfield;
+		-moz-appearance: textfield;
+	}
+
+	:global(.tip-sheet .venmo-tip-input::-webkit-inner-spin-button),
+	:global(.tip-sheet .venmo-tip-input::-webkit-outer-spin-button) {
+		-webkit-appearance: none;
+		margin: 0;
+	}
+
 	/* A bad amount reads as an error: the field and the hint under it turn pink (about 8:1 on the sheet). */
 	:global(.tip-sheet .venmo-tip-input[aria-invalid='true']) {
 		border-color: var(--support);
