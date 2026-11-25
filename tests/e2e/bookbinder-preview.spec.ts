@@ -182,7 +182,7 @@ test('a tip in the preview never opens Venmo or records a Tip Tap, and the Wall 
 	const note = wall.locator('textarea');
 	await expect(note).toBeVisible();
 	await note.fill('From the preview');
-	await wall.getByRole('button', { name: /Post Note/ }).click();
+	await wall.getByRole('button', { name: 'Post', exact: true }).click();
 	await expect(page.getByRole('status').filter({ hasText: 'the Wall, Save and Stamp are off' })).toBeVisible();
 
 	await page.waitForTimeout(500);
