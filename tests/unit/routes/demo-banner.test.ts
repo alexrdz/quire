@@ -183,9 +183,14 @@ describe('the banner on every page (root layout)', () => {
 	it('no route escapes the root layout', () => {
 		const routes = path.resolve(__dirname, '../../../src/routes');
 		const files = fs.readdirSync(routes, { recursive: true }).map(String);
-		// A `+layout@` or `+page@` reset could skip the root layout. Any +error.svelte,
-		// the root one included, renders inside the root layout, so it keeps the banner.
-		expect(files.filter((f) => /\+(layout|page)@/.test(f))).toEqual([]);
+		// A named `+layout@x` or `+page@x` reset could skip layouts the banner relies on. A
+		// reset to the root (`+page@.svelte`, as the Bookbinder's preview uses to drop the site
+		// footer) still renders inside the root layout, so it keeps the banner. Any +error.svelte,
+		// the root one included, renders inside the root layout too.
+		expect(files.filter((f) => /\+(layout|page)@(?!\.svelte$)/.test(f))).toEqual([]);
+		expect(files.filter((f) => /\+(layout|page)@\.svelte$/.test(f)).map((f) => f.split(path.sep).join('/'))).toEqual([
+			'(site)/dashboard/bookbinder/[id]/preview/+page@.svelte'
+		]);
 	});
 
 	it('the root layout reads the mode from the public features, not the environment', () => {

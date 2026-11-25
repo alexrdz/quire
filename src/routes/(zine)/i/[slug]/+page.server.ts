@@ -3,124 +3,21 @@ import { allowsStandIn, getConfig } from '$lib/server/config';
 import { FEATURE_UNAVAILABLE } from '$lib/features';
 import { ArtistAccountStatus } from '$domain/account';
 import { db, schema } from '$lib/server/db';
-import { eq, and, asc, desc } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { auth, createSessionForUser } from '$lib/server/auth';
-import { optionalViewer, requireFan, isDenied } from '$lib/server/guards';
+import { requireFan, isDenied } from '$lib/server/guards';
 import { consumeRateLimit } from '$lib/server/services/rate-limit';
 import {
 	submitWallNote,
 	flagWallNote
 } from '$lib/server/services/moderation';
-import {
-	claimStampForFan,
-	saveIssueForFan,
-	verifyScanToken
-} from '$lib/server/services/stamping';
+import { claimStampForFan, saveIssueForFan } from '$lib/server/services/stamping';
 import { submitNoteSchema, flagNoteSchema } from '$schemas/wall';
+import { loadIssueReader } from '$lib/server/services/issue-reader';
 import { claimStampSchema, saveIssueSchema } from '$schemas/scan';
 
-export const load: ServerLoad = async (event) => {
-	const { params, cookies, request } = event;
-	const slug = params.slug;
-	if (!slug) throw error(404, 'Issue slug required');
-
-	const issue = await db.query.issues.findFirst({
-		where: eq(schema.issues.slug, slug),
-		with: {
-			artist: true,
-			issuePages: {
-				orderBy: [asc(schema.issuePages.position)]
-			}
-		}
-	});
-
-	if (!issue) {
-		throw error(404, 'Issue not found');
-	}
-
-	// Fetch template pages for the artist
-	const templatePages = await db.query.templatePages.findMany({
-		where: eq(schema.templatePages.artistId, issue.artistId),
-		orderBy: [asc(schema.templatePages.position)]
-	});
-
-	// Fetch stamped fan IDs for this issue to power the "Was there" mark (SPEC.md §5.5)
-	const issueStamps = await db.query.collections.findMany({
-		where: and(
-			eq(schema.collections.issueId, issue.id),
-			eq(schema.collections.kind, 'stamped')
-		)
-	});
-	const stampedFanIds = new Set(issueStamps.map((s) => s.fanUserId));
-
-	// Fetch live wall notes with replies
-	const rawNotes = await db.query.notes.findMany({
-		where: and(eq(schema.notes.issueId, issue.id), eq(schema.notes.status, 'live')),
-		orderBy: [desc(schema.notes.createdAt)],
-		with: {
-			author: {
-				columns: { id: true, name: true, image: true }
-			},
-			replies: true
-		}
-	});
-
-	const notes = rawNotes.map((n) => ({
-		...n,
-		wasThere: stampedFanIds.has(n.fanUserId)
-	}));
-
-	const viewer = optionalViewer(event);
-
-	// Check attendance scan token cookie
-	const scanToken = cookies.get(`quire_scan_${slug}`);
-	let isScanVerified = false;
-	if (scanToken) {
-		const tokenCheck = verifyScanToken(scanToken);
-		if (tokenCheck.ok && tokenCheck.value.issueSlug === slug) {
-			isScanVerified = true;
-		}
-	}
-
-	// Check collection state if logged in
-	let collectionStatus: 'none' | 'saved' | 'stamped' = 'none';
-	if (viewer) {
-		const entry = await db.query.collections.findFirst({
-			where: and(
-				eq(schema.collections.fanUserId, viewer.id),
-				eq(schema.collections.issueId, issue.id)
-			)
-		});
-		if (entry) {
-			collectionStatus = entry.kind as 'saved' | 'stamped';
-		}
-	}
-
-	// Parse tip presets
-	let tipPresets = [3, 5, 10];
-	try {
-		tipPresets = JSON.parse(issue.artist.tipPresetsJson || '[3, 5, 10]');
-	} catch {
-		// fallback
-	}
-
-	const isArtistClosed = issue.artist.accountStatus === ArtistAccountStatus.Closed;
-	const isReadOnly = isArtistClosed || issue.status === 'archived';
-
-	return {
-		issue,
-		artist: issue.artist,
-		isArtistClosed,
-		isReadOnly,
-		issuePages: issue.issuePages,
-		templatePages,
-		notes,
-		tipPresets,
-		viewer,
-		isScanVerified,
-		collectionStatus
-	};
-};
+/** The public reader: published and archived Issues by slug; a draft is 404 (B1-T33). */
+export const load: ServerLoad = (event) => loadIssueReader(event, { kind: 'public', slug: event.params.slug });
 
 /**
  * The Issue whose Wall an action writes to, from the URL slug alone. Unknown and

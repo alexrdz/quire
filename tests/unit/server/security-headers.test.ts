@@ -53,13 +53,26 @@ describe('CSP directives', () => {
 		expect(without['media-src']).toEqual(["'self'", 'blob:']);
 	});
 
-	it('lets only Quire frame the Issue reader, and nothing frame any other page', () => {
-		for (const pathname of ['/i/neon-velvet-brooklyn', '/i']) {
+	it("lets only Quire frame the Issue reader and the Bookbinder's preview, and nothing frame any other page", () => {
+		for (const pathname of ['/i/neon-velvet-brooklyn', '/i', '/dashboard/bookbinder/issue-123/preview', '/dashboard/bookbinder/issue-123/preview/']) {
 			expect(buildCspDirectives({ mode: 'production', mediaOrigin: null, pathname })['frame-ancestors']).toEqual([
 				"'self'"
 			]);
 		}
-		for (const pathname of ['/', '/dashboard', '/a/the-neon-velvet', '/login', '/ix', undefined]) {
+		// Only the exact preview path: not the Bookbinder itself, nor anything that merely contains "preview".
+		for (const pathname of [
+			'/',
+			'/dashboard',
+			'/a/the-neon-velvet',
+			'/login',
+			'/ix',
+			undefined,
+			'/dashboard/bookbinder/issue-123',
+			'/dashboard/bookbinder/issue-123/preview/extra',
+			'/dashboard/bookbinder//preview',
+			'/dashboard/settings/preview',
+			'/x/dashboard/bookbinder/issue-123/preview'
+		]) {
 			expect(buildCspDirectives({ mode: 'production', mediaOrigin: null, pathname })['frame-ancestors']).toEqual([
 				"'none'"
 			]);

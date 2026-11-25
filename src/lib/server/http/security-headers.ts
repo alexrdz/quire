@@ -46,13 +46,17 @@ export function configuredUploadOrigin(): string | null {
 	return r2 ? r2UploadOrigin(r2.accountId) : null;
 }
 
+/** The Artist's own preview of an Issue, which the Bookbinder frames (B1-T33). Exactly this path. */
+const BOOKBINDER_PREVIEW_PATH = /^\/dashboard\/bookbinder\/[^/]+\/preview\/?$/;
+
 /**
- * The Bookbinder's live phone preview shows `/i/<slug>` in an iframe, so reader
- * pages accept Quire itself as a parent (`frame-ancestors 'self'`). Every other
+ * Pages Quire itself may frame (`frame-ancestors 'self'`): the reader at `/i/<slug>`
+ * and the Bookbinder's preview at `/dashboard/bookbinder/<id>/preview`. Every other
  * page refuses all framing, and no page can be framed by another site.
  */
 export function allowsSameOriginFraming(pathname: string | undefined): boolean {
-	return pathname === '/i' || Boolean(pathname?.startsWith('/i/'));
+	if (!pathname) return false;
+	return pathname === '/i' || pathname.startsWith('/i/') || BOOKBINDER_PREVIEW_PATH.test(pathname);
 }
 
 export type CspDirectives = Record<string, string[]>;

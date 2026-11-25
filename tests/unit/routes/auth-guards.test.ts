@@ -36,6 +36,12 @@ const PUBLIC_ACTIONS: Record<string, string[]> = {
 /** Every other action in GUARDED_DIRS is an Artist action. */
 const ARTIST_ROUTE_PREFIX = '(site)/dashboard';
 
+/**
+ * Dashboard loads that answer 404, not a sign-in redirect, to everyone but the owner: the
+ * Artist's preview of an Issue (B1-T33), so a draft can't be discovered from its URL.
+ */
+const NOT_FOUND_LOADS = new Set(['(site)/dashboard/bookbinder/[id]/preview']);
+
 /** Artist actions that redirect to sign-in instead of failing (a link the Artist opened). */
 const REDIRECTING_ACTIONS = new Set(['(site)/dashboard/settings/confirm-venmo#default']);
 
@@ -246,7 +252,19 @@ describe('4.3 every action is guarded', () => {
 });
 
 describe('4.3 every dashboard load is guarded', () => {
-	const dashboardLoads = () => [...pageModules, ...layoutModules].filter((m) => m.id.startsWith(ARTIST_ROUTE_PREFIX) && m.load);
+	const dashboardLoads = () =>
+		[...pageModules, ...layoutModules].filter((m) => m.id.startsWith(ARTIST_ROUTE_PREFIX) && m.load && !NOT_FOUND_LOADS.has(m.id));
+
+	it('the owner-only preview is 404 to a signed-out visitor, a Fan and a closed Artist', async () => {
+		for (const id of NOT_FOUND_LOADS) {
+			const mod = pageModules.find((m) => m.id === id);
+			expect(mod?.load, id).toBeTypeOf('function');
+			for (const [who, cookie] of [['signed out', null], ['a Fan', fanCookie], ['a closed Artist', closedArtistCookie]] as const) {
+				const ev = { ...(await event(id, cookie, 'GET')), setHeaders() {} };
+				expect((await outcome(mod!.load!, ev)).status, `${id} as ${who}`).toBe(404);
+			}
+		}
+	});
 
 	it('redirects signed-out visitors to /login with this page as a safe redirect', async () => {
 		expect(dashboardLoads().length).toBeGreaterThanOrEqual(7);
