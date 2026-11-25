@@ -33,6 +33,20 @@
 	let activated = $state(false);
 
 	let videoEl = $state<HTMLVideoElement | null>(null);
+
+	/** The YouTube poster failed to load: show the plain dark facade, not a broken image. */
+	let posterEl = $state<HTMLImageElement | null>(null);
+	let posterFailed = $state(false);
+	// Listened for here, not with onerror on <img>: Svelte server-renders that as an
+	// inline handler, which the CSP refuses.
+	$effect(() => {
+		const img = posterEl;
+		if (!img) return;
+		const fail = () => (posterFailed = true);
+		if (img.complete && img.naturalWidth === 0 && img.currentSrc) fail();
+		img.addEventListener('error', fail);
+		return () => img.removeEventListener('error', fail);
+	});
 	let muted = $state(true);
 	/** From the saved orientation, or the clip's own size once it loads. */
 	let measuredLandscape = $state<boolean | null>(null);
@@ -84,6 +98,7 @@
 			bind:muted
 			class="story-video-clip"
 			class:is-landscape={landscape}
+			aria-label="Video: {heading}"
 			src={embed.src}
 			preload="metadata"
 			playsinline
@@ -137,7 +152,9 @@
 					{:else}
 						<div class="story-embed-facade">
 							{#if embed.kind === 'youtube'}
-								<img src={embed.posterSrc} alt="" loading="lazy" class="story-embed-poster" />
+								{#if !posterFailed}
+									<img src={embed.posterSrc} alt="" loading="lazy" class="story-embed-poster" bind:this={posterEl} />
+								{/if}
 							{/if}
 							<button
 								type="button"

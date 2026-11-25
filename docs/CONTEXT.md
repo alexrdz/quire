@@ -16,7 +16,7 @@ Shared vocabulary and key decisions. Use these terms in code, UI copy and docs. 
 | **Issue QR / Artist QR** | The Issue QR opens that Issue's Cover. The Artist QR (permanent) opens the Back Page. |
 | **Wall** | The open, public guestbook. One per Issue, plus the **General Wall** on the Back Page. |
 | **Note** | A Fan's post on a Wall. Can get one Artist **Reply**. |
-| **Endpaper** | The final page of an Issue, after the Wall, offering Save or Stamp. |
+| **Endpaper** | The final page of an Issue, after the Wall: "That's the zine.", with Save and Stamp as two buttons, and a Stamped card once the Fan has stamped it. |
 | **Saved** | A bookmarked Issue. Any Fan, from anywhere. |
 | **Stamped** | Proof the Fan was at the gig: reached the Issue by scanning its QR within the **Stamp Window**. |
 | **Stamp Window** | The period, in the venue's time zone, during which a QR scan makes a Fan eligible to Stamp. |

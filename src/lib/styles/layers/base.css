@@ -23,20 +23,6 @@
 	--font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 	--font-serif: Georgia, "Times New Roman", Times, serif;
 	--font-mono: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-	/* Issue reader accent faces (ADR 0009): self-hosted, open-licensed, see static/fonts. */
-	--font-type: 'Special Elite', "Courier New", Courier, monospace;
-	--font-marker: 'Permanent Marker', "Comic Sans MS", "Marker Felt", cursive;
-
-	/* Issue reader paper (ADR 0009): dark scraps, light typed slips, tape */
-	--zine-paper-dark: #16121d;
-	--zine-scrap-dark: #211c2a;
-	--zine-scrap-light: #ebe5d5;
-	--zine-scrap-light-ink: #1c1824;
-	--zine-tape: rgba(236, 226, 194, 0.42);
-	/* Photocopy grain (fine white specks) and paper mottling, as tiny inline SVG noise. */
-	--zine-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.11 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
-	--zine-mottle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.96 0 0 0 0 0.88 0 0 0 0.06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E");
-	--zine-ink-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='i'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.4 1.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23i)'/%3E%3C/svg%3E");
 
 	/* utopia: 320–1240px, 16–18px base, 1.2–1.25 type ratios
 	   https://utopia.fyi/type/calculator/?c=320,16,1.2,1240,18,1.25,7,1
@@ -106,8 +92,6 @@
 	--space-sm: var(--space-s);
 	--space-md: var(--space-m);
 	--space-lg: var(--space-l);
-	--page-padding-block: var(--space-s-l);
-	--page-padding-inline: var(--space-s-m);
 
 	/* Corner Radii */
 	--radius-none: 0px;
@@ -132,25 +116,6 @@
 	--layout-container-padding-sm: var(--space-s-m);
 	--layout-container-padding-md: var(--space-s-l);
 	--layout-container-padding-lg: var(--space-m-xl);
-}
-
-/* Issue reader accent faces (ADR 0009). Latin subsets of Special Elite and
-   Permanent Marker (Apache 2.0, static/fonts/LICENSE-*.txt). They load only
-   where the reader uses them, and text shows in the fallback until then. */
-@font-face {
-	font-family: 'Special Elite';
-	src: url('/fonts/special-elite-latin.woff2') format('woff2');
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
-}
-
-@font-face {
-	font-family: 'Permanent Marker';
-	src: url('/fonts/permanent-marker-latin.woff2') format('woff2');
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
 }
 
 *,

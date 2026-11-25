@@ -1,5 +1,5 @@
 import { test, expect, type Browser, type Locator, type Page } from '@playwright/test';
-import { resetRateLimits, seedVideoFileIssue } from './helpers/db';
+import { resetRateLimits, seedVideoFileIssue, seedZineContentIssue } from './helpers/db';
 import { createProductionArtist, PRODUCTION_URL, resetProductionRateLimits, tipTapsFor } from './helpers/production-db';
 import { announcement, currentStoryPage, expectCurrent, goToStoryPage, openStoryAt, openTipSheet, storyPage } from './helpers/story';
 
@@ -609,5 +609,65 @@ test('the tip sheet title fits on one line at 390 px, and an empty or bad amount
 	await expect(panel.getByTestId('venmo-custom-hint')).toHaveText('Enter an amount from $2 to $500, with at most two decimal places.');
 	// It looks like an error, not like the help text it replaces.
 	await expect(panel.getByTestId('venmo-custom-hint')).toHaveCSS('color', 'rgb(255, 143, 178)');
+	await close();
+});
+
+/* ---------------------------------------------------------------------------
+   R-T05 (B1-T30): audit fixes
+   --------------------------------------------------------------------------- */
+
+test('the header avatar falls back to the initials tile when the cover art fails to load', async ({ browser, baseURL }) => {
+	const { page, problems, close } = await readerAt(browser, baseURL, { width: 390, height: 844 });
+	// Every remote image fails, the cover art included.
+	await page.route('https://images.unsplash.com/**', (route) => route.abort());
+	await page.goto(BROOKLYN);
+	await expectCurrent(page, 'page-cover');
+	await expect(page.locator('.story-header img.story-avatar')).toHaveCount(0);
+	await expect(page.locator('.story-header .story-avatar-initials')).toHaveText('NV');
+	expect(problems.filter((p) => /Content Security Policy|Refused to/i.test(p))).toEqual([]);
+	await close();
+});
+
+test('the tip sheet "Other amount" field has no native spinner arrows', async ({ browser, baseURL }) => {
+	const { page, close } = await readerAt(browser, baseURL, { width: 390, height: 844 });
+	await page.goto(BROOKLYN);
+	await expectCurrent(page, 'page-cover');
+	const input = (await openTipSheet(page)).locator('.venmo-tip-input');
+	// appearance: textfield is what drops a number field's spin buttons in Chrome and WebKit
+	// (the spin-button pseudo-element itself isn't exposed to getComputedStyle).
+	expect(await input.evaluate((el) => getComputedStyle(el).appearance)).toBe('textfield');
+	await expect(input).toHaveAttribute('type', 'number');
+	// Typing still works.
+	await input.fill('12.5');
+	await expect(page.locator('dialog[open] .venmo-tip-go')).toHaveText('Tip $12.50 with Venmo');
+	await close();
+});
+
+test('an uploaded video has an accessible name', async ({ browser, baseURL, request }) => {
+	const slug = `stories-video-name-${crypto.randomUUID().slice(0, 8)}`;
+	await request.get('/');
+	await seedVideoFileIssue(slug);
+	const { page, close } = await readerAt(browser, baseURL, { width: 390, height: 844 });
+	await page.route('**/uploads/videos/**', (route) => route.fulfill({ status: 404, body: '' }));
+	await openStoryAt(page, `/i/${slug}`, 'page-content-0');
+	await expect(page.locator('#page-content-0 video')).toHaveAccessibleName('Video: Portrait Clip');
+	await close();
+});
+
+test('a YouTube page whose poster fails shows the plain facade, not a broken image', async ({ browser, baseURL, request }) => {
+	const slug = `stories-poster-${crypto.randomUUID().slice(0, 8)}`;
+	await request.get('/');
+	await seedZineContentIssue(slug);
+	const { page, close } = await readerAt(browser, baseURL, { width: 390, height: 844 });
+	await page.route('https://i.ytimg.com/**', (route) => route.abort());
+	await page.goto(`/i/${slug}`);
+	await expectCurrent(page, 'page-cover');
+	const id = await page
+		.locator('.story-page')
+		.filter({ has: page.locator('h2', { hasText: 'Zine YouTube' }) })
+		.getAttribute('data-page-id');
+	const frame = await goToStoryPage(page, id!);
+	await expect(frame.locator('img.story-embed-poster')).toHaveCount(0);
+	await expect(frame.getByRole('button', { name: 'Play Zine YouTube' })).toBeVisible();
 	await close();
 });

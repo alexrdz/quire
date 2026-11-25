@@ -77,7 +77,7 @@ Both live in one user table with an account-type field (`artist` | `fan`), manag
 
 ### 5.5 Wall (open guestbook)
 - Public. Every fan can read every note.
-- Signing requires Google sign-in. Anonymous fans can type their note directly; tapping 'Post note' triggers Google OAuth with the draft saved in `sessionStorage` and automatically submits upon return. For Endpaper, tapping 'Claim Stamp' triggers Google sign-in and immediately stamps the Issue upon return.
+- Signing requires Google sign-in. Anonymous fans can type their note directly; tapping 'Sign in to post' triggers Google OAuth with the draft saved in `sessionStorage` and automatically submits upon return. For Endpaper, tapping 'Sign in to claim your Stamp' triggers Google sign-in and immediately stamps the Issue upon return.
 - Each Issue has its own Wall, and the Back Page has the General Wall.
 - A note shows the fan's **first name, Google avatar, and a "was there" mark** if the fan Stamped that Issue.
 - **Replies:** only the Artist can reply, one level deep. Replies show a verified mark in the Artist's accent color. Fans can't reply to each other.
@@ -213,7 +213,7 @@ scan           id, issue_id, token, created_at                   (proves a QR sc
 - **Transactional email:** Resend handles Artist email verification, password reset flows (`/login/reset`), and Venmo username change confirmation and notice emails (Section 6.4).
 - **Stamp Window:** 48-hour calendar window — from 00:00 on the gig date through 23:59:59 the following day in the venue's local time zone.
 - **QR scan validation:** Dedicated scan endpoint with issue secret (`/scan/[issue_slug]?k=[issue_secret]`), issuing a signed HMAC scan token to the device and redirecting to the Cover.
-- **Wall pending action:** Anonymous fans can type their note upfront; tapping 'Post note' triggers Google OAuth with the draft stored in `sessionStorage` and automatically submits upon return. Endpaper 'Claim Stamp' signs in and immediately stamps.
+- **Wall pending action:** Anonymous fans can type their note upfront; tapping 'Sign in to post' triggers Google OAuth with the draft stored in `sessionStorage` and automatically submits upon return. Endpaper 'Sign in to claim your Stamp' signs in and immediately stamps.
 - **Page sequence:** Cover -> Bespoke pages -> Master Template recurring pages -> Wall -> Endpaper.
 - **Tech stack & styling:** SvelteKit with Svelte 5 (Runes), TypeScript, Turso (libSQL) via Drizzle ORM, Better Auth, Venmo links (Stripe dormant), Resend, Cloudflare R2, and hand-crafted CUBE CSS with native `@layer` (no Tailwind).
 - **Seeded tour:** 'The Neon Velvet' 3-city tour with one-click sandbox login.

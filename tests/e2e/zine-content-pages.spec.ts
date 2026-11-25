@@ -73,33 +73,12 @@ test.describe('content pages', () => {
 			// Setlist and text pages: stories-setlist-text.spec.ts (R-T03).
 			// Audio and video pages: stories-media.spec.ts (R-T02).
 
-			// No horizontal scroll: not the page, and not any page inside its own frame (corner tape at 320 px).
+			// No horizontal scroll: not the page, and not any page inside its own frame.
 			expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
 			const overflowing = await page.locator('.story-page > section').evaluateAll((sections) =>
 				sections.filter((s) => s.scrollWidth > s.clientWidth + 1).map((s) => s.id)
 			);
 			expect(overflowing).toEqual([]);
-
-			// Tape never covers a control. Every page shares one frame, and a page's
-			// tape and controls move together, so this holds for pages off screen too.
-			const overlaps = await page.evaluate(() => {
-				const hits: string[] = [];
-				for (const section of document.querySelectorAll('.story-page > section')) {
-					const controls = [...section.querySelectorAll(':is(a[href], button, audio, input)')];
-					for (const tape of section.querySelectorAll('.tape')) {
-						const a = tape.getBoundingClientRect();
-						for (const c of controls) {
-							const b = c.getBoundingClientRect();
-							if (!b.width || !b.height) continue;
-							const x = Math.min(a.right, b.right) - Math.max(a.left, b.left);
-							const y = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
-							if (x > 0.5 && y > 0.5) hits.push(c.textContent?.trim() || c.tagName);
-						}
-					}
-				}
-				return hits;
-			});
-			expect(overlaps).toEqual([]);
 
 			// 44 px targets on the audio and video pages: stories-media.spec.ts.
 
