@@ -13,7 +13,7 @@ const { default: VenmoTipPanel } = await import('$lib/components/tips/VenmoTipPa
 const { default: AudioPage } = await import('$lib/components/zine/AudioPage.svelte');
 const { default: VideoPage } = await import('$lib/components/zine/VideoPage.svelte');
 const { default: TextPage } = await import('$lib/components/zine/TextPage.svelte');
-const { default: WallPage } = await import('$lib/components/zine/WallPage.svelte');
+const { default: WallPage, timeAgo, initialsFor } = await import('$lib/components/zine/WallPage.svelte');
 const { default: Endpaper } = await import('$lib/components/zine/Endpaper.svelte');
 
 const shell = (_kind: string, index = 0, count = 3) => contentPageShell(index, count);
@@ -313,10 +313,19 @@ describe('Issue reader page components', () => {
 		expect(body).toContain('About The Neon Velvet');
 	});
 
-	it('the Wall offers the post form to a signed-in Fan and sign-in to everyone else', () => {
+	it('the Wall is a comment thread: avatar, name, Was there, time ago, the Artist reply, Flag in a more menu', () => {
 		const base = {
 			shell: wallShell(3),
-			notes: [{ id: 'n1', body: 'Loud!', wasThere: true, author: { name: 'Maya' }, replies: [{ body: 'Thanks' }] }],
+			notes: [
+				{
+					id: 'n1',
+					body: 'Loud!',
+					wasThere: true,
+					author: { name: 'Maya Lin' },
+					createdAt: new Date(Date.now() - 5 * 60_000),
+					replies: [{ body: 'Thanks' }]
+				}
+			],
 			artistId: 'a1',
 			artistName: 'The Neon Velvet',
 			issueId: 'i1',
@@ -328,24 +337,51 @@ describe('Issue reader page components', () => {
 		const fan = render(WallPage, { props: { ...base, signedIn: true } }).body;
 		expect(fan).toContain('id="page-wall"');
 		expect(fan).toContain('action="?/submitNote"');
-		expect(fan).toContain('action="?/flagNote"');
-		expect(fan).toContain('Was There');
+		expect(fan).toMatch(/class="wall-avatar[^"]*"[^>]*>ML</);
+		expect(fan).toMatch(/class="was-there[^"]*">Was there</);
+		expect(fan).toMatch(/class="note-time[^"]*">5m</);
+		expect(fan).toMatch(/class="artist-badge[^"]*">Artist</);
 		expect(fan).toContain('Thanks');
+		// Flag lives in the note's "more" menu, closed until tapped.
+		expect(fan).toContain('aria-label="More for the note from Maya Lin"');
+		expect(fan).not.toContain('?/flagNote');
+		expect(fan).not.toMatch(/tape|stamp|scrap|marker-face|type-face|--tilt/);
+		expectOnlyCustomProperties(fan);
 
 		const guest = render(WallPage, { props: { ...base, signedIn: false } }).body;
 		expect(guest).not.toContain('?/submitNote');
-		expect(guest).not.toContain('?/flagNote');
-		expect(guest).toContain('Sign in with Google to Post');
+		expect(guest).not.toContain('More for the note');
+		expect(guest).toContain('Sign in to post');
 
 		const readOnly = render(WallPage, { props: { ...base, signedIn: true, isReadOnly: true } }).body;
 		expect(readOnly).not.toContain('?/submitNote');
 		expect(readOnly).toContain('read-only');
+
+		// In the sheet: the same thread, its own field ids, no page section.
+		const sheet = render(WallPage, { props: { ...base, signedIn: true, variant: 'sheet' } }).body;
+		expect(sheet).not.toContain('id="page-wall"');
+		expect(sheet).toContain('id="wall-sheet-note-body"');
+		expect(sheet).toContain('Loud!');
 	});
 
-	it('the Endpaper claims a stamp after a scan, saves otherwise, and shows the result', () => {
+	it('timeAgo reads like a comment thread, and initials come from the name', () => {
+		const now = new Date('2026-10-13T12:00:00Z');
+		expect(timeAgo(new Date('2026-10-13T11:59:40Z'), now)).toBe('just now');
+		expect(timeAgo(new Date('2026-10-13T11:15:00Z'), now)).toBe('45m');
+		expect(timeAgo(new Date('2026-10-13T03:00:00Z'), now)).toBe('9h');
+		expect(timeAgo('2026-10-10T12:00:00Z', now)).toBe('3d');
+		expect(timeAgo(Date.parse('2026-09-01T12:00:00Z') / 1000, now)).toBe('Sep 1');
+		expect(timeAgo(null, now)).toBe('');
+		expect(timeAgo('not a date', now)).toBe('');
+		expect(initialsFor('Maya Lin')).toBe('ML');
+		expect(initialsFor('  devon ')).toBe('D');
+		expect(initialsFor('')).toBe('F');
+	});
+
+	it('the Endpaper: "That\'s the zine.", Stamp after a scan, Save anywhere, a Stamped card, and a readable date', () => {
 		const base = {
 			shell: endpaperShell(3),
-			issue: { id: 'i1', slug: 'neon-velvet-brooklyn', date: '2026-10-12', city: 'Brooklyn', venue: "Baby's" },
+			issue: { id: 'i1', slug: 'neon-velvet-brooklyn', date: '2026-10-12', timezone: 'America/New_York', city: 'Brooklyn', venue: "Baby's" },
 			artistName: 'The Neon Velvet',
 			artistSlug: 'the-neon-velvet',
 			signedIn: true,
@@ -353,17 +389,32 @@ describe('Issue reader page components', () => {
 			saved: false,
 			onSignIn() {}
 		};
-		expect(render(Endpaper, { props: { ...base, isScanVerified: true } }).body).toContain('action="?/claimStamp"');
-		expect(render(Endpaper, { props: { ...base, isScanVerified: false } }).body).toContain('action="?/saveIssue"');
-		expect(render(Endpaper, { props: { ...base, isScanVerified: true, stamped: true } }).body).toContain(
-			'OFFICIAL ATTENDANCE STAMPED'
-		);
-		expect(render(Endpaper, { props: { ...base, isScanVerified: false, saved: true } }).body).toContain(
-			'Saved to Bookmarks'
-		);
+		const verified = render(Endpaper, { props: { ...base, isScanVerified: true } }).body;
+		expect(verified).toContain("That's the zine.");
+		expect(verified).toContain('action="?/claimStamp"');
+		expect(verified).toContain('action="?/saveIssue"');
+		expect(verified).toContain('Oct 12, 2026');
+		expect(verified).not.toMatch(/>[^<]*2026-10-12[^<]*</);
+
+		const remote = render(Endpaper, { props: { ...base, isScanVerified: false } }).body;
+		expect(remote).not.toContain('?/claimStamp');
+		expect(remote).toContain('data-testid="stamp-unavailable"');
+		expect(remote).toContain('action="?/saveIssue"');
+
+		const stamped = render(Endpaper, { props: { ...base, isScanVerified: true, stamped: true } }).body;
+		expect(stamped).toMatch(/class="stamped-title[^"]*">Stamped</);
+		expect(stamped).toContain("Baby's · Oct 12, 2026");
+		expect(stamped).not.toContain('?/claimStamp');
+		expect(stamped).not.toMatch(/ink-stamp|OFFICIAL ATTENDANCE|tape|scrap/);
+
+		expect(render(Endpaper, { props: { ...base, saved: true, isScanVerified: false } }).body).toContain('In your Stubs');
 		const guest = render(Endpaper, { props: { ...base, signedIn: false, isScanVerified: true } }).body;
 		expect(guest).not.toContain('?/claimStamp');
-		expect(guest).toContain('Sign in with Google to Claim Stamp');
+		expect(guest).toContain('Sign in to claim your Stamp');
+		expect(guest).toContain('Sign in to save');
 		expect(guest).toContain('id="page-endpaper"');
+		expect(guest).toContain('href="/a/the-neon-velvet"');
+		expect(guest).toContain('href="/me/stubs"');
+		expectOnlyCustomProperties(guest);
 	});
 });

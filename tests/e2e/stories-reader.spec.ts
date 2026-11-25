@@ -438,14 +438,16 @@ test('the tip and Wall sheets: grab handle, Escape, tap outside and swipe down c
 	}
 	await page.keyboard.press('Escape');
 
-	// The Wall button opens the Wall sheet with the note count, which leads to the Wall page.
+	// The Wall button, with the note count, opens the Wall sheet with the thread (R-T04).
 	const wall = page.locator('.story-bar .story-wall');
-	await expect(wall).toHaveAccessibleName(/^The Wall, \d+ notes?$/);
+	const name = (await wall.getAttribute('aria-label'))!;
+	expect(name).toMatch(/^The Wall, \d+ notes?$/);
 	await wall.click();
 	await expect(dialog.getByRole('heading', { name: 'The Wall' })).toBeVisible();
-	await dialog.getByRole('button', { name: 'Open the Wall' }).click();
+	await expect(dialog.locator('.wall-note-item')).toHaveCount(Number(name.match(/\d+/)![0]));
+	await page.keyboard.press('Escape');
 	await expect(dialog).toHaveCount(0);
-	await expectCurrent(page, 'page-wall');
+	await goToStoryPage(page, 'page-wall');
 	await expect(currentStoryPage(page)).toHaveAttribute('data-page-id', 'page-wall');
 	await close();
 });
@@ -514,9 +516,8 @@ test('no ISO date shows in the reader: the header and Cover read like a person w
 	await expect(page.locator('.story-cover-meta')).toHaveText(/^Baby.s All Right\s*·\s*Brooklyn\s*·\s*Oct 12, 2026$/);
 
 	const iso = /\b\d{4}-\d{2}-\d{2}\b/;
-	// The header, the Cover, every content page and the Wall. R-T04 (B1-T29) rewrites
-	// the Endpaper with formatIssueDate and extends this check to it.
-	for (const id of ids.filter((pageId) => pageId !== 'page-endpaper')) {
+	// Every page: the header, the Cover, the content pages, the Wall and the Endpaper (R-T04).
+	for (const id of ids) {
 		await goToStoryPage(page, id);
 		const shown = await page.evaluate(
 			(pageId) =>
@@ -527,6 +528,10 @@ test('no ISO date shows in the reader: the header and Cover read like a person w
 		);
 		expect(shown, `${id} shows no ISO date`).not.toMatch(iso);
 	}
+	await expect(page.locator('#page-endpaper .endpaper-meta')).toContainText('Oct 12, 2026');
+	await page.locator('.story-bar .story-wall').click();
+	expect(await page.locator('dialog[open]').innerText(), 'Wall sheet').not.toMatch(iso);
+	await page.keyboard.press('Escape');
 	await openTipSheet(page);
 	expect(await page.locator('dialog[open]').innerText()).not.toMatch(iso);
 	await close();
