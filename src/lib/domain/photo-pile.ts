@@ -41,3 +41,13 @@ export function resolvePhotoEntries(content: unknown): PhotoEntry[] {
 	}
 	return [];
 }
+
+/**
+ * Deterministic tilt, in degrees, for position `index`: the sequence behind
+ * `zineTilt` for the ADR 0009 pages that R-T02 to R-T04 have not restyled yet.
+ */
+export function pileTilt(index: number): number {
+	const seed = Math.sin((index + 1) * 12.9898) * 43758.5453;
+	const fraction = seed - Math.floor(seed);
+	return Math.round((fraction * 12 - 6) * 10) / 10;
+}
