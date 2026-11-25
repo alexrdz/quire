@@ -51,9 +51,28 @@ function pageIds(page: Page): Promise<string[]> {
 }
 
 /** Clicks the reader column at a fraction of its width, at 40% of its height (clear of the header and bottom bar). */
+/**
+ * Taps the page at `fraction` of the column's width, at the first height where nothing
+ * under the pointer is a control. A photo page's polaroid stack is one (B1-T35), so a
+ * tap there would toss or flip instead of paging; this is a tap on the page itself.
+ */
 async function tapAt(page: Page, fraction: number) {
 	const box = (await page.locator('.story-column').boundingBox())!;
-	await page.mouse.click(box.x + box.width * fraction, box.y + box.height * 0.4);
+	const x = box.x + box.width * fraction;
+	const y = await page.evaluate(
+		({ x, top, height }) => {
+			const controls =
+				'a[href], button, input, select, textarea, label, summary, video, audio, iframe, [contenteditable], [role="button"], [role="slider"], [role="dialog"], dialog, .story-bar, [data-story-control]';
+			for (const f of [0.4, 0.3, 0.55, 0.7, 0.22, 0.8]) {
+				const at = top + height * f;
+				const el = document.elementFromPoint(x, at);
+				if (el && !el.closest(controls)) return at;
+			}
+			return top + height * 0.4;
+		},
+		{ x, top: box.y, height: box.height }
+	);
+	await page.mouse.click(x, y);
 }
 
 /** A horizontal mouse drag across the middle of the column. */
@@ -94,8 +113,8 @@ function smallControls(scope: Locator) {
  * and over pure black (the two extremes a photo can be), and the lower ratio
  * is kept. A gradient counts as its least opaque visible stop.
  */
-function worstContrast(page: Page, selector: string) {
-	return page.locator(selector).evaluateAll((els) => {
+function worstContrast(page: Page, selector: string, imageHolder = '.story-column, .story-cover, .story-photo') {
+	return page.locator(selector).evaluateAll((els, holder) => {
 		type RGBA = [number, number, number, number];
 		const parse = (c: string): RGBA => {
 			const n = (c.match(/[\d.]+/g) ?? []).map(Number);
@@ -116,7 +135,7 @@ function worstContrast(page: Page, selector: string) {
 			// The layers under the text, outermost first, down to the image: the
 			// Cover or photo section holds the image, so its own background is under it.
 			const layers: RGBA[] = [];
-			for (let node: Element | null = el; node && !node.matches('.story-column, .story-cover, .story-photo'); node = node.parentElement) {
+			for (let node: Element | null = el; node && !node.matches(holder); node = node.parentElement) {
 				const style = getComputedStyle(node);
 				const stops = (style.backgroundImage.match(/rgba?\([^)]*\)/g) ?? []).map(parse).filter((s) => s[3] > 0);
 				if (stops.length) layers.unshift(stops.reduce((min, s) => (s[3] < min[3] ? s : min)));
@@ -130,7 +149,7 @@ function worstContrast(page: Page, selector: string) {
 			});
 			return { text: (el.textContent ?? '').trim().slice(0, 40), ratio: Math.min(...worst) };
 		});
-	});
+	}, imageHolder);
 }
 
 for (const viewport of VIEWPORTS) {
@@ -249,13 +268,18 @@ for (const viewport of VIEWPORTS) {
 				.filter({ has: page.locator('section.story-photo') })
 				.first()
 				.getAttribute('data-page-id');
-			await page.goto(`${BROOKLYN}#${photoId}-photo-2`);
+			// A photo page is one place (its photos are a stack inside it, B1-T35).
+			await page.goto(`${BROOKLYN}#${photoId}`);
 			await expectCurrent(page, photoId!);
-			await expect(page.locator(`#${photoId} .story-photo-count`)).toHaveText(/^2 \//);
 			await page.reload();
 			await expectCurrent(page, photoId!);
-			await expect(page.locator(`#${photoId} .story-photo-count`)).toHaveText(/^2 \//);
-			await expect(page).toHaveURL(new RegExp(`#${photoId}-photo-2$`));
+			await expect(page).toHaveURL(new RegExp(`#${photoId}$`));
+			// An older link to one of its photos still opens the photo page.
+			await page.goto('about:blank');
+			await page.goto(`${BROOKLYN}#${photoId}-photo-2`);
+			await expectCurrent(page, photoId!);
+			await page.goto(`${BROOKLYN}#${photoId}`);
+			await expectCurrent(page, photoId!);
 
 			// Back still leaves the Issue: paging replaces the history entry instead of adding one.
 			const length = await page.evaluate(() => history.length);
@@ -313,7 +337,14 @@ for (const viewport of VIEWPORTS) {
 
 			const photoFrame = page.locator('.story-page').filter({ has: page.locator('section.story-photo') }).first();
 			await goToStoryPage(page, (await photoFrame.getAttribute('data-page-id'))!);
-			const photo = await worstContrast(page, `section.story-photo :is(${text}), .story-bar .story-pill`);
+			// The photo page is the polaroid stack on the dark page (B1-T35): its title, words,
+			// counter and buttons, and the bar.
+			// No image sits behind it any more, so the page's own solid background counts.
+			const photo = await worstContrast(
+				page,
+				`section.story-photo :is(h2, p.story-photo-body, .pile-counter, .pile-btn), .story-bar .story-pill`,
+				'.story-column'
+			);
 			expect(photo.length).toBeGreaterThan(3);
 			for (const { text: words, ratio } of photo) expect(ratio, `Photo: "${words}"`).toBeGreaterThanOrEqual(4.5);
 			await close();
@@ -346,10 +377,15 @@ test('on a phone Prev appears only when the keyboard reaches it, and Next is in 
 	await page.goto(BROOKLYN);
 	const ids = await pageIds(page);
 	await expectCurrent(page, 'page-cover');
-	// A keyboard Fan pages on with the arrow keys; focus lands on each page's heading.
-	await page.keyboard.press('ArrowRight');
-	await page.keyboard.press('ArrowRight');
-	await expectCurrent(page, ids[2]!);
+	// A keyboard Fan pages on with the arrow keys; focus lands on each page's heading. Stop on
+	// a page from the third on with nothing focusable before its heading (a photo stack's
+	// buttons or an article's scroll box would come before Close).
+	let target = 2;
+	while (await page.locator(`.story-page[data-page-id="${ids[target]}"] :is(.pile-stage, .story-scroll)`).count()) target++;
+	for (let i = 1; i <= target; i++) {
+		await page.keyboard.press('ArrowRight');
+		await expectCurrent(page, ids[i]!);
+	}
 
 	const prev = page.getByRole('button', { name: 'Previous page' });
 	await expect(prev).toHaveCSS('opacity', '0');
@@ -360,10 +396,10 @@ test('on a phone Prev appears only when the keyboard reaches it, and Next is in 
 	await expect(prev).toBeFocused();
 	await expect(prev).toHaveCSS('opacity', '1');
 	await page.keyboard.press('Enter');
-	await expectCurrent(page, ids[1]!);
+	await expectCurrent(page, ids[target - 1]!);
 
 	await page.locator('.story-bar').getByRole('button', { name: 'Next' }).click();
-	await expectCurrent(page, ids[2]!);
+	await expectCurrent(page, ids[target]!);
 	// The last page has nothing to go on to.
 	await goToStoryPage(page, 'page-endpaper');
 	await expect(page.locator('.story-bar').getByRole('button', { name: 'Next' })).toHaveCount(0);
@@ -559,7 +595,7 @@ test('the tip pills look the same on the Cover, in the tip sheet and in the bott
 	await close();
 });
 
-test('a landscape photo has its caption directly under it at 390 px', async ({ browser, baseURL }) => {
+test('a photo page is the polaroid stack between the header and the bottom bar, its title under it, at 390 px', async ({ browser, baseURL }) => {
 	const { page, close } = await readerAt(browser, baseURL, { width: 390, height: 844 });
 	await page.route('https://images.unsplash.com/**', (route) =>
 		route.fulfill({ status: 200, contentType: 'image/png', body: LANDSCAPE_PNG })
@@ -567,18 +603,18 @@ test('a landscape photo has its caption directly under it at 390 px', async ({ b
 	await page.goto(BROOKLYN);
 	const frame = page.locator('.story-page').filter({ has: page.locator('section.story-photo') }).first();
 	await goToStoryPage(page, (await frame.getAttribute('data-page-id'))!);
-	await expect(frame.locator('section.story-photo')).toHaveClass(/is-landscape/);
 
-	const photo = (await frame.locator('img.story-photo-img.is-current').boundingBox())!;
-	const caption = (await frame.locator('.story-caption').boundingBox())!;
+	const stack = (await frame.locator('.pile-stage').boundingBox())!;
+	const window = (await frame.locator('.polaroid[data-state="top"] .polaroid-photo').boundingBox())!;
+	const title = (await frame.locator('h2.story-photo-title').boundingBox())!;
 	const header = (await page.locator('.story-header-row').boundingBox())!;
-	const column = (await page.locator('.story-column').boundingBox())!;
-	// Shown whole, full width, at its own shape.
-	expect(Math.round(photo.width)).toBe(Math.round(column.width));
-	expect(photo.width / photo.height).toBeCloseTo(2, 1);
-	// The caption starts where the photo ends, and the photo clears the header.
-	expect(Math.abs(caption.y - (photo.y + photo.height))).toBeLessThanOrEqual(1);
-	expect(photo.y).toBeGreaterThanOrEqual(header.y + header.height);
+	const bar = (await page.locator('.story-bar').boundingBox())!;
+	// A landscape photo is cropped into the polaroid's square window.
+	expect(window.width / window.height).toBeCloseTo(1, 1);
+	// The stack clears the header; the title is under it and above the bottom bar.
+	expect(stack.y).toBeGreaterThanOrEqual(header.y + header.height);
+	expect(title.y).toBeGreaterThan(stack.y + stack.height - 1);
+	expect(title.y + title.height).toBeLessThanOrEqual(bar.y + 1);
 	await close();
 });
 

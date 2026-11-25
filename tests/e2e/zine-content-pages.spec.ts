@@ -67,7 +67,8 @@ test.describe('content pages', () => {
 
 			// Photo: a full-screen photo page, its words over the scrim.
 			const photo = await goToPageTitled(page, 'Zine Photo');
-			await expect(photo.locator('img.story-photo-img.is-current')).toHaveAttribute('src', `${E2E_MEDIA_ORIGIN}/photos/zine.webp`);
+			// The polaroid stack (B1-T35): the photo on the top card, the page's words under the stack.
+			await expect(photo.locator('.polaroid[data-state="top"] img')).toHaveAttribute('src', `${E2E_MEDIA_ORIGIN}/photos/zine.webp`);
 			await expect(photo.locator('.story-photo-body')).toHaveText('Caption body');
 
 			// Setlist and text pages: stories-setlist-text.spec.ts (R-T03).

@@ -1,5 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { MAX_PHOTOS_PER_PAGE, pileTilt, resolvePhotoEntries } from '$domain/photo-pile';
+import {
+	MAX_PHOTOS_PER_PAGE,
+	createPile,
+	pileCanToss,
+	pileTilt,
+	resolvePhotoEntries,
+	transitionPile,
+	type PileEvent,
+	type PileState
+} from '$domain/photo-pile';
+
+function run(state: PileState, ...events: PileEvent[]): PileState {
+	return events.reduce((current, event) => {
+		const next = transitionPile(current, event);
+		if (!next.ok) throw new Error(next.error.message);
+		return next.value;
+	}, state);
+}
 
 describe('resolvePhotoEntries', () => {
 	it('reads the photos array in order and trims values', () => {
@@ -59,5 +76,86 @@ describe('pileTilt', () => {
 	it('does not give every photo the same tilt', () => {
 		const tilts = new Set(Array.from({ length: 8 }, (_, i) => pileTilt(i)));
 		expect(tilts.size).toBeGreaterThan(4);
+	});
+});
+
+describe('pile position FSM', () => {
+	it('starts stacked on the first photo, front side up', () => {
+		expect(createPile(3)).toEqual({ phase: 'stacked', total: 3, top: 0, side: 'front' });
+	});
+
+	it('starts cleared for an empty pile', () => {
+		expect(createPile(0)).toEqual({ phase: 'cleared', total: 0 });
+	});
+
+	it('tosses through the pile and clears after the last photo', () => {
+		expect(run(createPile(3), 'toss')).toMatchObject({ phase: 'stacked', top: 1 });
+		expect(run(createPile(3), 'toss', 'toss')).toMatchObject({ phase: 'stacked', top: 2 });
+		expect(run(createPile(3), 'toss', 'toss', 'toss')).toEqual({ phase: 'cleared', total: 3 });
+	});
+
+	it('shows the front of the next photo after tossing a flipped one', () => {
+		expect(run(createPile(3), 'flip', 'toss')).toMatchObject({ top: 1, side: 'front' });
+	});
+
+	it('flips back and forth', () => {
+		expect(run(createPile(2), 'flip')).toMatchObject({ side: 'back' });
+		expect(run(createPile(2), 'flip', 'flip')).toMatchObject({ side: 'front' });
+	});
+
+	it('restores the previous photo, including from a cleared pile', () => {
+		expect(run(createPile(3), 'toss', 'restore')).toMatchObject({ top: 0 });
+		expect(run(createPile(2), 'toss', 'toss', 'restore')).toMatchObject({
+			phase: 'stacked',
+			top: 1
+		});
+	});
+
+	it('restacks a cleared pile from the first photo', () => {
+		expect(run(createPile(2), 'toss', 'toss', 'restack')).toMatchObject({ top: 0, side: 'front' });
+	});
+
+	it('rejects impossible transitions', () => {
+		expect(transitionPile(createPile(3), 'restore').ok).toBe(false);
+		expect(transitionPile(createPile(3), 'restack').ok).toBe(false);
+		const cleared = run(createPile(2), 'toss', 'toss');
+		expect(transitionPile(cleared, 'toss').ok).toBe(false);
+		expect(transitionPile(cleared, 'flip').ok).toBe(false);
+		expect(transitionPile(createPile(0), 'restore').ok).toBe(false);
+	});
+
+	describe('a one-photo pile', () => {
+		it('starts stacked on its only photo, front side up', () => {
+			expect(createPile(1)).toEqual({ phase: 'stacked', total: 1, top: 0, side: 'front' });
+		});
+
+		it('flips to the caption side and back', () => {
+			expect(run(createPile(1), 'flip')).toEqual({ phase: 'stacked', total: 1, top: 0, side: 'back' });
+			expect(run(createPile(1), 'flip', 'flip')).toEqual({
+				phase: 'stacked',
+				total: 1,
+				top: 0,
+				side: 'front'
+			});
+		});
+
+		it('cannot be tossed into an empty cleared state, from either side', () => {
+			expect(transitionPile(createPile(1), 'toss').ok).toBe(false);
+			expect(transitionPile(run(createPile(1), 'flip'), 'toss').ok).toBe(false);
+		});
+
+		it('has nothing to restore or restack', () => {
+			expect(transitionPile(createPile(1), 'restore').ok).toBe(false);
+			expect(transitionPile(createPile(1), 'restack').ok).toBe(false);
+		});
+	});
+});
+
+describe('pileCanToss', () => {
+	it('needs at least two photos', () => {
+		expect(pileCanToss(0)).toBe(false);
+		expect(pileCanToss(1)).toBe(false);
+		expect(pileCanToss(2)).toBe(true);
+		expect(pileCanToss(12)).toBe(true);
 	});
 });

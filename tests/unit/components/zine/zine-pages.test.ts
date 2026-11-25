@@ -45,32 +45,50 @@ describe('Issue reader page components', () => {
 		expectOnlyCustomProperties(body);
 	});
 
-	it('a photo page shows every photo full-bleed, the current one visible, with its caption over a scrim', () => {
+	it('a photo page is one polaroid stack (B1-T35): every photo a card, the top one first, a counter and Toss', () => {
 		const photos = [
 			{ url: '/uploads/a.webp', caption: 'Front row' },
 			{ url: '/uploads/b.webp' },
 			{ url: '/uploads/c.webp', caption: 'Encore' }
 		];
-		const first = render(StoryPhoto, { props: { id: 'page-content-0', photos, part: 0, title: 'Pit', city: 'Brooklyn' } }).body;
-		expect(first).toContain('id="page-content-0"');
-		expect(first.match(/<img/g)).toHaveLength(3);
-		expect(first).toMatch(/class="story-photo-img[^"]*is-current[^"]*"[^>]*src="\/uploads\/a\.webp"/);
-		expect(first).toContain('1 / 3');
-		expect(first).toContain('Front row');
-		expect(first).toContain('data-scrim');
-		expect(first).not.toContain('pile-stage');
-		expectOnlyCustomProperties(first);
+		const body = render(StoryPhoto, {
+			props: { id: 'page-content-0', photos, title: 'Pit', body: 'From the floor', city: 'Brooklyn' }
+		}).body;
+		expect(body).toContain('id="page-content-0"');
+		// One pile, every photo a polaroid; the first on top.
+		expect(body.match(/class="pile-stage/g)).toHaveLength(1);
+		expect(body.match(/class="polaroid[ "]/g)).toHaveLength(3);
+		expect(body).toMatch(/class="polaroid[^"]*" data-state="top"[\s\S]*?src="\/uploads\/a\.webp"/);
+		// The stack owns its gestures: the reader never pages from it.
+		expect(body).toMatch(/class="pile-stage[^"]*"[^>]*data-story-control/);
+		expect(body).toContain('01 / 03');
+		expect(body).toContain('>Toss<');
+		expect(body).toContain('Front row');
+		// The page's title and words under the stack.
+		expect(body.indexOf('Pit</h2>')).toBeGreaterThan(body.indexOf('pile-stage'));
+		expect(body).toContain('From the floor');
+		expect(body).not.toContain('story-photo-img');
+		expectOnlyCustomProperties(body);
+	});
 
-		const third = render(StoryPhoto, { props: { id: 'page-content-0', photos, part: 2, title: 'Pit', city: 'Brooklyn' } }).body;
-		expect(third).toMatch(/class="story-photo-img[^"]*is-current[^"]*"[^>]*src="\/uploads\/c\.webp"/);
-		expect(third).toContain('3 / 3');
-		expect(third).toContain('Encore');
-		expect(third).toMatch(/class="story-photo-caption[^"]*">Encore<\/p>/);
-		expect(third).not.toMatch(/class="story-photo-caption[^"]*">Front row/);
+	it('a single photo is one polaroid: it flips if captioned, with no toss, counter or restack', () => {
+		const captioned = render(StoryPhoto, {
+			props: { id: 'page-content-0', photos: [{ url: '/uploads/a.webp', caption: 'Soundcheck' }], city: 'Brooklyn' }
+		}).body;
+		expect(captioned.match(/class="polaroid[ "]/g)).toHaveLength(1);
+		expect(captioned).toContain('>Flip<');
+		expect(captioned).not.toMatch(/>Toss<|>Restack<|01 \/ 01/);
+		const plain = render(StoryPhoto, {
+			props: { id: 'page-content-0', photos: [{ url: '/uploads/a.webp' }], city: 'Brooklyn' }
+		}).body;
+		expect(plain).not.toMatch(/>Flip<|>Toss<|>Restack</);
+		// Not a button, but still inside the stack the reader never pages from.
+		expect(plain).toMatch(/<span class="polaroid-body[^"]*" data-side="front" data-single="true"/);
+		expect(plain).toMatch(/data-story-control/);
 	});
 
 	it('a photo page without photos still has its heading', () => {
-		const { body } = render(StoryPhoto, { props: { id: 'page-content-0', photos: [], part: 0, city: 'Brooklyn' } });
+		const { body } = render(StoryPhoto, { props: { id: 'page-content-0', photos: [], city: 'Brooklyn' } });
 		expect(body).not.toContain('<img');
 		expect(body).toContain('From Tonight');
 	});

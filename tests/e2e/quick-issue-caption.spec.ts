@@ -4,9 +4,9 @@ import { goToPageTitled } from './helpers/story';
 
 /**
  * Z-T07: Quick Issue saves the photo caption with the photo. In the Stories
- * reader (ADR 0011) it shows over the photo's scrim; a photo without a caption
- * shows none. Pages published before (caption saved as the page body) still
- * render it, as the page's words.
+ * reader it is written on the back of the polaroid, read by flipping it (B1-T35,
+ * as before #52); a photo without a caption is a polaroid that doesn't flip. Pages
+ * published before (caption saved as the page body) still render it, as the page's words.
  */
 
 const RUN = Date.now().toString(36);
@@ -51,29 +51,39 @@ test.beforeEach(async ({ page }) => {
 	);
 });
 
-test('publish a Quick Issue with a captioned photo, open it, and read the caption over the photo', async ({ page }) => {
+test('publish a Quick Issue with a captioned photo, open it, and flip the polaroid to the caption', async ({ page }) => {
 	const city = `Captionton ${RUN}`;
 	const slug = await publishQuickIssue(page, city, CAPTION);
 
 	await page.goto(`/i/${slug}`);
 	const section = await photoSection(page, `${city} Photo`);
-	await expect(section.locator('img.story-photo-img')).toHaveCount(1);
-	await expect(section.locator('img.story-photo-img')).toHaveAttribute('src', PHOTO_URL);
-	await expect(section.locator('.story-photo-caption')).toHaveText(CAPTION);
-	await expect(section.locator('.story-photo-caption')).toBeVisible();
+	// One polaroid with the photo; its caption is written on the back (B1-T35, as before #52).
+	await expect(section.locator('.polaroid')).toHaveCount(1);
+	await expect(section.locator('.polaroid img')).toHaveAttribute('src', PHOTO_URL);
+	await expect(section.locator('.polaroid-note')).toHaveText(CAPTION);
 	// The caption is the photo's, shown once, not repeated as the page's words.
 	await expect(section.locator('.story-photo-body')).toHaveCount(0);
+
+	const card = section.locator('button.polaroid-body');
+	await expect(card).toHaveAttribute('data-side', 'front');
+	await card.click();
+	await expect(card).toHaveAttribute('data-side', 'back');
+	await expect(section.locator('.polaroid-note')).toBeVisible();
+	await card.click();
+	await expect(card).toHaveAttribute('data-side', 'front');
 });
 
-test('a Quick Issue photo without a caption shows no caption', async ({ page }) => {
+test('a Quick Issue photo without a caption is a polaroid that does not flip', async ({ page }) => {
 	const city = `Stillton ${RUN}`;
 	const slug = await publishQuickIssue(page, city, '');
 
 	await page.goto(`/i/${slug}`);
 	const section = await photoSection(page, `${city} Photo`);
-	await expect(section.locator('img.story-photo-img')).toHaveCount(1);
-	await expect(section.locator('.story-photo-caption')).toHaveCount(0);
-	await expect(section.locator('.story-photo-count')).toHaveCount(0);
+	// One polaroid with nothing on the back: not a button, so it doesn't flip, and no counter.
+	await expect(section.locator('.polaroid')).toHaveCount(1);
+	await expect(section.locator('button.polaroid-body')).toHaveCount(0);
+	await expect(section.locator('.polaroid-note')).toHaveText('');
+	await expect(section.locator('.pile-counter')).toHaveCount(0);
 });
 
 test('an older Quick Issue page, with its caption as the body, still renders it', async ({ page }) => {
@@ -84,7 +94,8 @@ test('an older Quick Issue page, with its caption as the body, still renders it'
 
 	await page.goto(`/i/${slug}`);
 	const section = await photoSection(page, 'Older Quick Photo');
-	await expect(section.locator('img.story-photo-img')).toHaveCount(1);
-	await expect(section.locator('img.story-photo-img')).toHaveAttribute('src', PHOTO_URL);
+	await expect(section.locator('.polaroid')).toHaveCount(1);
+	await expect(section.locator('.polaroid img')).toHaveAttribute('src', PHOTO_URL);
+	// The older caption was saved as the page's words: shown under the stack.
 	await expect(section.locator('.story-photo-body')).toHaveText(CAPTION);
 });
