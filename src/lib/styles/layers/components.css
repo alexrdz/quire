@@ -646,29 +646,3 @@
 .demo-banner--compact .demo-banner-text {
 	font-size: var(--text-meta);
 }
-
-/* ==========================================================================
-   Issue reader: cut-and-paste on dark (ADR 0009)
-   Kept only for the pages R-T02 to R-T04 have not restyled yet; the Stories
-   reader (ADR 0011) styles its own components in src/lib/components/zine/story/.
-   ========================================================================== */
-
-/* Dark paper with a photocopy grain and soft mottling, on every reader page. */
-.zine-paper {
-	background-color: var(--zine-paper-dark);
-	background-image:
-		var(--zine-grain),
-		var(--zine-mottle),
-		radial-gradient(ellipse at 50% -10%, rgba(255, 244, 220, 0.06), transparent 65%);
-	background-size: 160px 160px, 420px 420px, auto;
-}
-
-/* The typewriter face for labels, page numbers and typed notes. */
-.type-face {
-	font-family: var(--font-type);
-	letter-spacing: var(--tracking-normal);
-}
-
-.marker-face {
-	font-family: var(--font-marker);
-}

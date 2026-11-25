@@ -1,5 +1,3 @@
-import { pileTilt } from '$domain/photo-pile';
-
 /**
  * Shared, UI-free pieces of the Issue reader (/i/[slug]): the stored page
  * content, each inner page's id and number, and the video embed rules. The
@@ -7,7 +5,6 @@ import { pileTilt } from '$domain/photo-pile';
  */
 
 export type PageSource = 'bespoke' | 'template';
-export type ChipTone = 'highlight' | 'accent' | 'support';
 /** What a Fan was doing when asked to sign in ('' from the Cover button). */
 export type AuthAction = 'note' | 'stamp' | 'save' | '';
 
@@ -69,25 +66,6 @@ export function wallShell(contentCount: number): PageShell {
 
 export function endpaperShell(contentCount: number): PageShell {
 	return { id: 'page-endpaper', pageNumber: contentCount + 3, pageCount: readerPageCount(contentCount) };
-}
-
-/* ---------------------------------------------------------------------------
-   Cut-and-paste tilts (ADR 0009)
-   --------------------------------------------------------------------------- */
-
-/** ADR 0009: text never tilts beyond about 2 degrees, so it stays easy to read. */
-export const MAX_TEXT_TILT = 2;
-
-/**
- * The resting tilt, in degrees, of the scrap at `position` on a page: the
- * same deterministic sequence as the photo pile, scaled into ±`max`. Every
- * reader sees the same page and nothing is stored.
- */
-export function zineTilt(position: number, max: number = MAX_TEXT_TILT): number {
-	const limit = Math.max(0, max);
-	const tilt = Math.round((pileTilt(position) / 6) * limit * 10) / 10;
-	// pileTilt is rounded to 0.1, so scaling can land a hair past the limit.
-	return Math.max(-limit, Math.min(limit, tilt)) || 0;
 }
 
 /* ---------------------------------------------------------------------------
