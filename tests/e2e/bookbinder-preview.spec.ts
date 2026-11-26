@@ -101,6 +101,41 @@ test('the preview is the reader in a 390 by 844 phone, fitting the pane, with no
 	await expect(page.getByText('Tips and the Wall are off here.')).toBeVisible();
 });
 
+for (const width of [320, 390, 1280]) {
+	test(`at ${width} px the Bookbinder page never scrolls sideways, and the phone fits its area`, async ({ page }) => {
+		await openBookbinder(page);
+		await page.setViewportSize({ width, height: width === 1280 ? 800 : 844 });
+		// The phone's scale follows the pane's size; wait until it has settled.
+		const phone = page.locator('.bookbinder-preview-phone');
+		await expect
+			.poll(async () => {
+				const area = await page.locator('.bookbinder-preview-area').boundingBox();
+				const box = await phone.boundingBox();
+				return Boolean(area && box && box.width <= area.width + 0.01);
+			}, { message: 'the phone fits its area' })
+			.toBe(true);
+		// B1-T36: the scale is rounded down, so the phone never widens the page by a fraction of a pixel.
+		const overflow = await page.evaluate(() => ({
+			scroll: document.documentElement.scrollWidth,
+			client: document.documentElement.clientWidth
+		}));
+		expect(overflow.scroll, `scrollWidth at ${width} px`).toBeLessThanOrEqual(overflow.client);
+		const widest = await page.evaluate(() =>
+			Math.max(...[...document.querySelectorAll('.editor-pane, .preview-pane')].map((el) => el.getBoundingClientRect().right))
+		);
+		expect(widest, `the panes end inside the page at ${width} px`).toBeLessThanOrEqual(width);
+		// The "Preview" chip stays on one line at every width.
+		const chip = page.locator('.bookbinder-preview-chip');
+		const chipLines = await chip.evaluate((el) => {
+			// One client rect per line the text runs over.
+			const range = document.createRange();
+			range.selectNodeContents(el);
+			return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+		});
+		expect(chipLines, `the Preview chip at ${width} px`).toBeLessThanOrEqual(1);
+	});
+}
+
 test('tapping through the preview works: a tap on the right, and the Next button', async ({ page }) => {
 	const reader = await openBookbinder(page);
 	// Open the zine from the Cover, then tap the right side of the (scaled) phone.

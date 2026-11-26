@@ -1,7 +1,10 @@
 /* Desktop Bookbinder Workbench */
+/* minmax(0, 1fr), not 1fr: a plain 1fr column is never narrower than its widest
+   content, and the scaled phone preview takes its width from the column, so on a
+   phone the preview held the whole page wider than the screen (B1-T36). */
 .bookbinder-workbench {
 	display: grid;
-	grid-template-columns: 1fr;
+	grid-template-columns: minmax(0, 1fr);
 	min-block-size: 100vh;
 	background: var(--ink);
 }
