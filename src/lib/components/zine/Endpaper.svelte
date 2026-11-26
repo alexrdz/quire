@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
 	import { formatIssueDate } from '$domain/issue-date';
 	import type { PageShell } from './reader';
 
@@ -19,6 +21,25 @@
 	let { shell, issue, artistName, artistSlug, signedIn, isScanVerified, stamped, saved, onSignIn }: Props = $props();
 
 	const date = $derived(formatIssueDate(issue.date, issue.timezone, 'long'));
+
+	/** The claim's refusal, if any (the Stamp Window, the Scan Token, a draft Issue). */
+	let stampMessage = $state('');
+
+	/**
+	 * Back from Google sign-in after tapping Claim (SPEC.md §5.5, B1-T37): claim the
+	 * Stamp once, through the same form and action as a tap. The `resume` flag makes
+	 * the action spend its single-use token first, so it can never claim twice.
+	 */
+	let stampForm: HTMLFormElement | undefined = $state();
+	let resumeStarted = false;
+	let resumeNext = false;
+	const resumeIntent = $derived((page.data as { resumeIntent?: string | null } | undefined)?.resumeIntent ?? null);
+	$effect(() => {
+		if (resumeStarted || resumeIntent !== 'stamp' || !signedIn || stamped || !stampForm) return;
+		resumeStarted = true;
+		resumeNext = true;
+		void tick().then(() => stampForm?.requestSubmit());
+	});
 </script>
 
 <!--
@@ -51,7 +72,23 @@
 			{#if !stamped}
 				{#if isScanVerified}
 					{#if signedIn}
-						<form method="POST" action="?/claimStamp" use:enhance>
+						<form
+							method="POST"
+							action="?/claimStamp"
+							bind:this={stampForm}
+							use:enhance={({ formData }) => {
+								if (resumeNext) {
+									formData.set('resume', '1');
+									resumeNext = false;
+								}
+								stampMessage = '';
+								return async ({ result, update }) => {
+									if (result.type === 'failure' && result.data?.resumeSpent) return;
+									if (result.type === 'failure') stampMessage = String(result.data?.error || 'Could not claim the Stamp.');
+									await update();
+								};
+							}}
+						>
 							<input type="hidden" name="issueId" value={issue.id} />
 							<button type="submit" class="endpaper-button is-primary">Claim your Stamp</button>
 						</form>
@@ -61,6 +98,9 @@
 						</button>
 					{/if}
 					<p class="endpaper-hint">You scanned the venue's QR code, so this Issue can be stamped as attended.</p>
+					{#if stampMessage}
+						<p class="endpaper-error" role="alert">{stampMessage}</p>
+					{/if}
 				{:else}
 					<span class="endpaper-button is-unavailable" aria-disabled="true" data-testid="stamp-unavailable">Stamp</span>
 					<p class="endpaper-hint">Stamps are for Fans who were there: scan the QR code at the venue during the Stamp Window.</p>
@@ -136,6 +176,13 @@
 	}
 
 	/* The Stamped card: a check, "Stamped", venue and date. */
+	.endpaper-error {
+		margin: 0;
+		font-size: var(--text-small);
+		line-height: var(--leading-body);
+		color: var(--highlight);
+	}
+
 	.stamped-card {
 		display: flex;
 		align-items: center;

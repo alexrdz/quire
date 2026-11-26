@@ -8,7 +8,8 @@
 	/**
 	 * Fan sign-in (ADR 0011): a bottom sheet like the reader's others, a modal
 	 * dialog with the grab handle, Escape and tap outside, and focus kept inside.
-	 * Google sign-in returns to the Wall or the Endpaper, whichever asked.
+	 * Google sign-in returns to the Wall or the Endpaper, whichever asked, and the
+	 * note is posted or the Stamp claimed there, once (B1-T37).
 	 */
 	interface Props {
 		/** What the Fan was doing when asked to sign in; it picks the copy and where sign-in returns to. */
@@ -26,9 +27,9 @@
 	<div class="auth-body">
 		<p class="auth-text">
 			{#if pendingAction === 'note'}
-				Your note is saved here. Sign in with Google, then post it from the Wall.
+				Your note is saved here. Sign in with Google and it posts to the Wall.
 			{:else if pendingAction === 'stamp'}
-				Sign in to keep this show's Stamp in your Stubs.
+				Sign in with Google and this show's Stamp goes straight into your Stubs.
 			{:else if pendingAction === 'save'}
 				Sign in to save this Issue to your Stubs.
 			{:else}
@@ -40,7 +41,19 @@
 			<p class="feature-notice" role="alert">{fanSignInError}</p>
 		{/if}
 		{#if fanSignIn}
-			<form method="POST" action="?/googleAuth" use:enhance>
+			<!-- Real Google sign-in leaves the page; the stand-in comes straight back as a
+			     client-side redirect, so close the sheet then rather than leave it over the page. -->
+			<form
+				method="POST"
+				action="?/googleAuth"
+				use:enhance={() =>
+					async ({ result, update }) => {
+						if (result.type === 'redirect') onClose();
+						await update();
+					}}
+			>
+				<!-- What to finish on return, once (SPEC.md §5.5, B1-T37). -->
+				<input type="hidden" name="intent" value={pendingAction === 'note' || pendingAction === 'stamp' ? pendingAction : ''} />
 				<input
 					type="hidden"
 					name="targetHash"

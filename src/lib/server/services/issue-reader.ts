@@ -1,3 +1,4 @@
+import { readResumeIntent } from './resume-intent';
 import { error, type RequestEvent } from '@sveltejs/kit';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { ArtistAccountStatus } from '$domain/account';
@@ -35,6 +36,11 @@ async function findIssue(access: IssueReaderAccess) {
 		where: and(eq(schema.issues.id, access.issueId), eq(schema.issues.artistId, access.artistId)),
 		with: { artist: true, issuePages: { orderBy: [asc(schema.issuePages.position)] } }
 	});
+}
+
+/** Nothing on an archived Issue or a closed Artist's can be written, so there is nothing to resume. */
+function isReadOnlyIssue(issue: { status: string; artist: { accountStatus: string } }): boolean {
+	return issue.artist.accountStatus === ArtistAccountStatus.Closed || issue.status === 'archived';
 }
 
 export async function loadIssueReader(event: RequestEvent, access: IssueReaderAccess) {
@@ -84,6 +90,10 @@ export async function loadIssueReader(event: RequestEvent, access: IssueReaderAc
 		if (entry) collectionStatus = entry.kind as 'saved' | 'stamped';
 	}
 
+	// What a signed-in Fan asked to finish before Google sign-in (B1-T37): the reader
+	// submits it once on return. Read-only here; the action spends the token.
+	const resumeIntent = viewer && !preview && !isReadOnlyIssue(issue) ? readResumeIntent(event.cookies, issue.slug) : null;
+
 	let tipPresets = [3, 5, 10];
 	try {
 		tipPresets = JSON.parse(issue.artist.tipPresetsJson || '[3, 5, 10]');
@@ -106,6 +116,7 @@ export async function loadIssueReader(event: RequestEvent, access: IssueReaderAc
 		viewer,
 		isScanVerified,
 		collectionStatus,
+		resumeIntent,
 		/** True in the Artist's Bookbinder preview: nothing in it may write. */
 		preview
 	};

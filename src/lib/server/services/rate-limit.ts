@@ -64,6 +64,15 @@ export const RATE_LIMITS = {
 		windowSeconds: DAY,
 		message: 'This email has already sent a handle petition today. Please try again tomorrow.'
 	},
+	/**
+	 * A resume-after-sign-in token (B1-T37) is used at most once: its nonce is claimed
+	 * for as long as the token lives (see `services/resume-intent.ts`).
+	 */
+	resumeIntent: {
+		max: 1,
+		windowSeconds: 15 * MINUTE,
+		message: 'That sign-in has already been used.'
+	},
 	wallNoteIp: {
 		max: 5,
 		windowSeconds: 10 * MINUTE,
@@ -249,7 +258,8 @@ export async function consumeRateLimits(
 export async function claimOnceWithin(
 	action: RateLimitAction,
 	subject: string,
-	now: Date = new Date()
+	now: Date = new Date(),
+	{ failClosed = false }: { failClosed?: boolean } = {}
 ): Promise<boolean> {
 	const nowMs = now.getTime();
 	const expiresAt = nowMs + RATE_LIMITS[action].windowSeconds * 1000;
@@ -266,8 +276,9 @@ export async function claimOnceWithin(
 			.returning({ key: schema.rateLimits.key });
 		return claimed.length > 0;
 	} catch (error) {
-		console.error(`[rate-limit] ${action} claim failed; allowing it.`, error);
-		return true;
+		// A double-tap guard fails open; a single-use guarantee (failClosed) must not.
+		console.error(`[rate-limit] ${action} claim failed; ${failClosed ? 'refusing' : 'allowing'} it.`, error);
+		return !failClosed;
 	}
 }
 
