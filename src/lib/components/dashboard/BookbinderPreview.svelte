@@ -4,12 +4,15 @@
 
 	/**
 	 * How much to scale the phone to fit `available` (never up, never below a sliver).
-	 * The phone keeps its aspect ratio: the tighter of width and height wins.
+	 * The phone keeps its aspect ratio: the tighter of width and height wins. The
+	 * scale is rounded down to a thousandth, never to the nearest: rounding up made
+	 * the scaled phone a fraction of a pixel wider than its room, which widened the
+	 * Bookbinder's one-column layout and scrolled the page sideways at 390 px (B1-T36).
 	 */
 	export function previewScale(availableWidth: number, availableHeight: number): number {
 		if (!(availableWidth > 0) || !(availableHeight > 0)) return 1;
 		const scale = Math.min(1, availableWidth / PREVIEW_PHONE.width, availableHeight / PREVIEW_PHONE.height);
-		return Math.max(0.25, Math.round(scale * 1000) / 1000);
+		return Math.max(0.25, Math.floor(scale * 1000) / 1000);
 	}
 
 	/**
@@ -181,7 +184,10 @@
 		color: var(--ink-muted);
 	}
 
+	/* The chip keeps its one word on one line; the note beside it wraps instead. */
 	.bookbinder-preview-chip {
+		flex: none;
+		white-space: nowrap;
 		padding-block: var(--space-3xs);
 		padding-inline: var(--space-2xs);
 		border-radius: 999px;
