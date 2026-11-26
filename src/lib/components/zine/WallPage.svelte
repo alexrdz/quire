@@ -26,7 +26,9 @@
 </script>
 
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
 	import type { PageShell, WallNote } from './reader';
 
 	/** A note as the Issue load returns it, with the times the thread shows. */
@@ -79,6 +81,25 @@
 	/** The keyboard's height over the sheet (visualViewport), so the composer stays above it. */
 	let keyboard = $state(0);
 	let root: HTMLElement | undefined = $state();
+
+	/**
+	 * Back from Google sign-in after tapping Post (SPEC.md §5.5, B1-T37): post the
+	 * restored draft once, through the same form and action as a tap. Only the Wall
+	 * page does it (sign-in returns to it), never the sheet's copy of the composer.
+	 * The `resume` flag makes the action spend its single-use token first, so this
+	 * can never post twice; a refused note keeps its text for the Fan to fix.
+	 */
+	let noteForm: HTMLFormElement | undefined = $state();
+	let resumeStarted = false;
+	let resumeNext = false;
+	const resumeIntent = $derived((page.data as { resumeIntent?: string | null } | undefined)?.resumeIntent ?? null);
+	$effect(() => {
+		if (variant !== 'page' || resumeStarted || resumeIntent !== 'note') return;
+		if (!signedIn || isReadOnly || !noteForm || noteBody.trim().length === 0) return;
+		resumeStarted = true;
+		resumeNext = true;
+		void tick().then(() => noteForm?.requestSubmit());
+	});
 
 	const countLabel = $derived(notes.length === 1 ? '1 note' : `${notes.length} notes`);
 	const artistInitials = $derived(initialsFor(artistName));
@@ -221,8 +242,16 @@
 				class="wall-form"
 				method="POST"
 				action="?/submitNote"
-				use:enhance={() => {
+				bind:this={noteForm}
+				use:enhance={({ formData }) => {
+					if (resumeNext) {
+						formData.set('resume', '1');
+						resumeNext = false;
+					}
 					return async ({ result, update }) => {
+						// The resume token was already spent (a second tab, a replay): nothing was
+						// posted and there is nothing to say; the draft stays.
+						if (result.type === 'failure' && result.data?.resumeSpent) return;
 						if (result.type === 'success') {
 							noteBody = '';
 							wallMessage =

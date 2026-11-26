@@ -16,6 +16,29 @@ import { claimStampForFan, saveIssueForFan } from '$lib/server/services/stamping
 import { submitNoteSchema, flagNoteSchema } from '$schemas/wall';
 import { loadIssueReader } from '$lib/server/services/issue-reader';
 import { claimStampSchema, saveIssueSchema } from '$schemas/scan';
+import {
+	clearResumeIntent,
+	consumeResumeIntent,
+	isResumeAction,
+	setResumeIntent,
+	type ResumeAction
+} from '$lib/server/services/resume-intent';
+
+/**
+ * A form submitted by the reader on return from sign-in carries `resume=1` (B1-T37).
+ * It spends the Issue's resume token before anything else runs; without a valid,
+ * unspent token it does nothing, so a refresh, Back or replay never acts twice.
+ */
+async function spendResume(
+	formData: FormData,
+	cookies: Parameters<typeof clearResumeIntent>[0],
+	slug: string,
+	action: ResumeAction
+) {
+	if (formData.get('resume') !== '1') return { ok: true as const };
+	if (await consumeResumeIntent(cookies, slug, action)) return { ok: true as const };
+	return { ok: false as const, failure: fail(409, { resumeSpent: true }) };
+}
 
 /** The public reader: published and archived Issues by slug; a draft is 404 (B1-T33). */
 export const load: ServerLoad = (event) => loadIssueReader(event, { kind: 'public', slug: event.params.slug });
@@ -54,6 +77,12 @@ export const actions: Actions = {
 			return fail(503, { fanSignInError: FEATURE_UNAVAILABLE.fanSignIn });
 		}
 
+		// What to finish on return (SPEC.md §5.5): Post the note or claim the Stamp,
+		// once. Any other sign-in clears an earlier, unfinished one.
+		const intent = formData.get('intent');
+		if (isResumeAction(intent)) setResumeIntent(cookies, params.slug!, intent);
+		else clearResumeIntent(cookies, params.slug!);
+
 		if (live.fanSignIn) {
 			const res = await auth.api.signInSocial({
 				body: {
@@ -82,13 +111,15 @@ export const actions: Actions = {
 	},
 
 	submitNote: async (event) => {
-		const { request, params, getClientAddress } = event;
+		const { request, params, cookies, getClientAddress } = event;
 		const fan = requireFan(event, 'Please sign in to leave a note on the Wall.');
 		if (isDenied(fan)) return fan;
 
 		// The Issue and its Artist come from the URL slug only. Any artistId or
 		// issueId in the form is ignored (PRODUCTION_PLAN 3.2).
 		const formData = await request.formData();
+		const resume = await spendResume(formData, cookies, params.slug!, 'note');
+		if (!resume.ok) return resume.failure;
 		const body = String(formData.get('body') || '');
 
 		const parseResult = submitNoteSchema.safeParse({ body });
@@ -158,6 +189,9 @@ export const actions: Actions = {
 		if (isDenied(fan)) return fan;
 
 		const slug = params.slug!;
+		const formData = await request.formData();
+		const resume = await spendResume(formData, cookies, slug, 'stamp');
+		if (!resume.ok) return resume.failure;
 		const scanToken = cookies.get(`quire_scan_${slug}`);
 
 		if (!scanToken) {
@@ -166,7 +200,6 @@ export const actions: Actions = {
 			});
 		}
 
-		const formData = await request.formData();
 		const issueId = String(formData.get('issueId') || '');
 
 		const parseResult = claimStampSchema.safeParse({ issueId });
